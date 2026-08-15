@@ -86,6 +86,41 @@ async def init_db():
             q = await session.execute(select(setting.SystemSetting).where(setting.SystemSetting.key == key))
             if not q.scalar_one_or_none():
                 session.add(setting.SystemSetting(key=key, value=val, description=desc))
+
+        # Ensure Initial Super Admin User exists & credentials match config
+        from app.models.user import User
+        from app.core.security import get_password_hash
+        from app.users.schemas import RoleEnum
+
+        q_user = await session.execute(
+            select(User).where(
+                (User.username == settings.INITIAL_SUPERADMIN_USERNAME) |
+                (User.email == settings.INITIAL_SUPERADMIN_EMAIL) |
+                (User.user_id == "USR-SUPERADMIN-001")
+            )
+        )
+        existing_admin = q_user.scalar_one_or_none()
+        if not existing_admin:
+            new_admin = User(
+                user_id="USR-SUPERADMIN-001",
+                username=settings.INITIAL_SUPERADMIN_USERNAME,
+                email=settings.INITIAL_SUPERADMIN_EMAIL,
+                full_name="مدير النظام الأساسي",
+                hashed_password=get_password_hash(settings.INITIAL_SUPERADMIN_PASSWORD),
+                role=RoleEnum.SUPER_ADMIN,
+                assigned_stages=[],
+                assigned_groups=[],
+                is_active=True,
+            )
+            session.add(new_admin)
+            logger.info("Auto-created Super Admin user.")
+        else:
+            existing_admin.username = settings.INITIAL_SUPERADMIN_USERNAME
+            existing_admin.email = settings.INITIAL_SUPERADMIN_EMAIL
+            existing_admin.hashed_password = get_password_hash(settings.INITIAL_SUPERADMIN_PASSWORD)
+            existing_admin.is_active = True
+            logger.info("Auto-updated Super Admin credentials.")
+
         await session.commit()
     logger.info("Database tables created / verified successfully.")
 
