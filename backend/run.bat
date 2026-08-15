@@ -1,0 +1,6 @@
+@echo off
+echo Installing packages into .venv...
+".venv\Scripts\pip.exe" install "pydantic[email]" email-validator
+echo.
+echo Done! Now running uvicorn...
+".venv\Scripts\uvicorn.exe" app.main:app --reload --port 8000

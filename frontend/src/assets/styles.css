@@ -1,0 +1,360 @@
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Tajawal:wght@400;500;700;800&display=swap');
+
+:root {
+  /* ── Color Palette Derived from Church Logo ────────────────────────────────── */
+  /* Royal Maroon / Crimson */
+  --color-maroon-dark: #3b000b;
+  --color-maroon-main: #7a081d;
+  --color-maroon-bright: #9e0e29;
+  --color-maroon-glow: rgba(158, 14, 41, 0.35);
+
+  /* Orthodox Warm Gold */
+  --color-gold-light: #fbeea9;
+  --color-gold-main: #d4af37;
+  --color-gold-dark: #b8860b;
+  --color-gold-glow: rgba(212, 175, 55, 0.3);
+
+  /* St. Mary Royal Blue Accent */
+  --color-blue-royal: #1d4ed8;
+  --color-blue-bright: #38bdf8;
+  --color-blue-glow: rgba(56, 189, 248, 0.25);
+
+  /* Deep Canvas Background */
+  --bg-gradient: radial-gradient(circle at 50% 0%, #290812 0%, #120509 45%, #080204 100%);
+  --surface-color: rgba(26, 10, 16, 0.72);
+  --surface-border: rgba(212, 175, 55, 0.2);
+  --surface-hover: rgba(50, 18, 28, 0.85);
+
+  /* Status Colors */
+  --success-color: #34d399;
+  --success-glow: rgba(52, 211, 153, 0.2);
+  --warning-color: #fbbf24;
+  --danger-color: #f87171;
+  --danger-glow: rgba(248, 113, 113, 0.2);
+
+  /* Typography */
+  --text-main: #fcfcfc;
+  --text-muted: #cbd5e1;
+  --text-subtle: #94a3b8;
+  --text-gold: #fde047;
+
+  --font-family: 'Cairo', 'Tajawal', system-ui, -apple-system, sans-serif;
+  
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  
+  --shadow-sm: 0 4px 15px rgba(0, 0, 0, 0.4);
+  --shadow-glow: 0 10px 35px -5px rgba(122, 8, 29, 0.45);
+  --shadow-gold-glow: 0 0 25px rgba(212, 175, 55, 0.25);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-family);
+  background: var(--bg-gradient);
+  background-attachment: fixed;
+  color: var(--text-main);
+  min-height: 100vh;
+  direction: rtl;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom Gold-Glow Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(8, 2, 4, 0.8);
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--color-gold-dark) 0%, var(--color-maroon-main) 100%);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-gold-main);
+}
+
+/* Layout Shell */
+.app-container {
+  display: flex;
+  min-height: 100vh;
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.page-body {
+  padding: 2rem;
+  flex: 1;
+  max-width: 1440px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* Premium Glassmorphism Card Component */
+.glass-card {
+  background: var(--surface-color);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-md);
+  padding: 1.5rem;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+.glass-card:hover {
+  border-color: rgba(212, 175, 55, 0.45);
+  box-shadow: var(--shadow-glow);
+}
+
+/* Typography & Headings */
+h1, h2, h3, h4, h5, h6 {
+  color: var(--text-main);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+p {
+  color: var(--text-muted);
+  line-height: 1.65;
+}
+
+/* Buttons System */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1.25rem;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-family);
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--color-maroon-main) 0%, var(--color-maroon-bright) 100%);
+  color: #ffffff;
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  box-shadow: 0 4px 15px rgba(122, 8, 29, 0.4);
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  background: linear-gradient(135deg, var(--color-maroon-bright) 0%, #bd1234 100%);
+  box-shadow: 0 8px 25px rgba(158, 14, 41, 0.6);
+  border-color: var(--color-gold-main);
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-main);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.btn-secondary:hover {
+  background: rgba(212, 175, 55, 0.12);
+  border-color: rgba(212, 175, 55, 0.4);
+  color: var(--color-gold-light);
+}
+
+/* Form Controls */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-bottom: 1.1rem;
+}
+
+.form-label {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.form-input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: rgba(13, 5, 8, 0.75);
+  border: 1px solid rgba(212, 175, 55, 0.2);
+  border-radius: var(--radius-sm);
+  color: var(--text-main);
+  font-family: var(--font-family);
+  font-size: 0.95rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--color-gold-main);
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.25);
+}
+
+/* Badges */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.3rem 0.8rem;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.badge-superadmin {
+  background: rgba(212, 175, 55, 0.2);
+  color: var(--color-gold-light);
+  border: 1px solid rgba(212, 175, 55, 0.4);
+}
+
+.badge-admin {
+  background: rgba(56, 189, 248, 0.18);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.35);
+}
+
+.badge-servant {
+  background: rgba(52, 211, 153, 0.18);
+  color: #34d399;
+  border: 1px solid rgba(52, 211, 153, 0.35);
+}
+
+/* Table Styles */
+.table-container {
+  overflow-x: auto;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--surface-border);
+}
+
+.custom-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: right;
+}
+
+.custom-table th {
+  background: rgba(59, 0, 11, 0.75);
+  padding: 1rem;
+  color: var(--color-gold-light);
+  font-weight: 700;
+  font-size: 0.85rem;
+  border-bottom: 1px solid var(--surface-border);
+}
+
+.custom-table td {
+  padding: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  color: var(--text-main);
+  font-size: 0.9rem;
+}
+
+.custom-table tr:hover td {
+  background: rgba(212, 175, 55, 0.04);
+}
+
+/* Micro Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes pulseGold {
+  0%, 100% { opacity: 0.8; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.05); }
+}
+
+.pulse-gold {
+  animation: pulseGold 2.5s infinite ease-in-out;
+}
+
+/* ── Modal Overlay & Dialog Responsive Scaling ──────────────────────────────── */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(8, 2, 4, 0.88);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999 !important;
+  padding: 1.5rem 1rem;
+  overflow-y: auto;
+}
+
+.modal-card {
+  width: 100%;
+  max-width: 650px;
+  max-height: 84vh;
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(145deg, rgba(26, 10, 16, 0.98) 0%, rgba(13, 5, 8, 0.98) 100%);
+  border: 1px solid rgba(212, 175, 55, 0.4);
+  box-shadow: 0 25px 70px rgba(0, 0, 0, 0.9);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  position: relative;
+  z-index: 100000 !important;
+  animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.modal-header {
+  padding: 1.25rem 1.5rem;
+  background: linear-gradient(135deg, rgba(122, 8, 29, 0.6) 0%, rgba(26, 10, 16, 0.8) 100%);
+  border-bottom: 1px solid rgba(212, 175, 55, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.modal-body {
+  padding: 1.5rem;
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.modal-footer {
+  padding: 1rem 1.5rem;
+  background: rgba(0, 0, 0, 0.4);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
