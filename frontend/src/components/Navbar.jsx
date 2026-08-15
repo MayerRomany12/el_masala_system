@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { LogOut, User, MessageSquare } from 'lucide-react';
+import { LogOut, User, MessageSquare, Menu } from 'lucide-react';
 import churchLogo from '../assets/church_logo.png';
 import { messagesApi } from '../api/messages';
 import { CommunicationHubModal } from './CommunicationHubModal';
 
-export const Navbar = () => {
+export const Navbar = ({ onToggleMobileSidebar }) => {
   const { user, logout } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
   const [isHubOpen, setIsHubOpen] = useState(false);
@@ -37,59 +37,76 @@ export const Navbar = () => {
   return (
     <>
       <header
-        className="glass-card"
+        className="glass-card navbar-header"
         style={{
           borderRadius: 0,
           borderTop: 'none',
           borderLeft: 'none',
           borderRight: 'none',
-          padding: '0.75rem 2rem',
+          padding: '0.65rem 1.25rem',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           position: 'sticky',
           top: 0,
           zIndex: 100,
-          background: 'rgba(26, 10, 16, 0.9)',
+          background: 'rgba(26, 10, 16, 0.92)',
           borderBottom: '1px solid rgba(212, 175, 55, 0.35)',
           boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)'
         }}
       >
-        {/* Church Branding & Logo */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1.2rem' }}>
-          <div style={{
-            position: 'relative',
-            width: '52px',
-            height: '52px',
-            borderRadius: '50%',
-            padding: '2px',
-            background: 'linear-gradient(135deg, #d4af37 0%, #7a081d 100%)',
-            boxShadow: '0 0 15px rgba(212, 175, 55, 0.4)'
-          }}>
-            <img
-              src={churchLogo}
-              alt="شعار الكنيسة"
-              style={{
-                width: '100%',
-                height: '100%',
-                borderRadius: '50%',
-                objectFit: 'cover'
-              }}
-            />
-          </div>
-          <div>
-            <h2 style={{ fontSize: '1.2rem', fontWeight: 900, color: 'var(--color-gold-light)', margin: 0, lineHeight: 1.2, textShadow: '0 2px 10px rgba(212, 175, 55, 0.3)' }}>
-              نظام المسلة الكنسي
-            </h2>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0, fontWeight: 600 }}>
-              كنيسة السيدة العذراء مريم والأنبا بولا أول السواح بالمسلة — مطرانية أسوان
-            </p>
+        {/* Mobile Sidebar Toggle & Church Branding & Logo */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <button
+            onClick={onToggleMobileSidebar}
+            className="btn btn-secondary mobile-hamburger-btn"
+            style={{
+              padding: '0.45rem',
+              borderRadius: 'var(--radius-sm)',
+              color: 'var(--color-gold-light)',
+              borderColor: 'rgba(212, 175, 55, 0.3)'
+            }}
+            title="القائمة"
+          >
+            <Menu size={22} />
+          </button>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+            <div style={{
+              position: 'relative',
+              width: '44px',
+              height: '44px',
+              borderRadius: '50%',
+              padding: '2px',
+              background: 'linear-gradient(135deg, #d4af37 0%, #7a081d 100%)',
+              boxShadow: '0 0 12px rgba(212, 175, 55, 0.4)',
+              flexShrink: 0
+            }}>
+              <img
+                src={churchLogo}
+                alt="شعار الكنيسة"
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  borderRadius: '50%',
+                  objectFit: 'cover'
+                }}
+              />
+            </div>
+            <div>
+              <h2 style={{ fontSize: '1.05rem', fontWeight: 900, color: 'var(--color-gold-light)', margin: 0, lineHeight: 1.2, textShadow: '0 2px 10px rgba(212, 175, 55, 0.3)' }}>
+                نظام المسلة الكنسي
+              </h2>
+              <p className="navbar-subtitle" style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0, fontWeight: 600 }}>
+                كنيسة السيدة العذراء مريم والأنبا بولا أول السواح بالمسلة — مطرانية أسوان
+              </p>
+            </div>
           </div>
         </div>
 
         {/* Logged in Servant User Info & Actions */}
         {user && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div className="navbar-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
             
             {/* Communication Hub Notification Button */}
             <button
@@ -97,26 +114,27 @@ export const Navbar = () => {
               className="btn btn-secondary"
               style={{
                 position: 'relative',
-                padding: '0.55rem 0.95rem',
-                gap: '0.4rem',
+                padding: '0.45rem 0.75rem',
+                gap: '0.35rem',
                 color: 'var(--color-gold-light)',
-                borderColor: 'rgba(212, 175, 55, 0.4)'
+                borderColor: 'rgba(212, 175, 55, 0.4)',
+                fontSize: '0.82rem'
               }}
               title="مركز التواصل والمهام الداخلي"
             >
-              <MessageSquare size={18} />
-              <span>الرسائل والمهام</span>
+              <MessageSquare size={17} />
+              <span className="navbar-text-hide-mobile">الرسائل والمهام</span>
               {unreadCount > 0 && (
                 <span style={{
                   position: 'absolute',
-                  top: '-6px',
-                  right: '-6px',
+                  top: '-5px',
+                  right: '-5px',
                   background: '#ef4444',
                   color: '#fff',
-                  fontSize: '0.72rem',
+                  fontSize: '0.68rem',
                   fontWeight: 900,
-                  width: '20px',
-                  height: '20px',
+                  width: '18px',
+                  height: '18px',
                   borderRadius: '50%',
                   display: 'flex',
                   alignItems: 'center',
@@ -128,33 +146,34 @@ export const Navbar = () => {
               )}
             </button>
 
-            <div style={{
+            <div className="navbar-user-card" style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '0.75rem',
-              padding: '0.45rem 1rem',
+              gap: '0.6rem',
+              padding: '0.35rem 0.75rem',
               background: 'rgba(59, 0, 11, 0.4)',
               borderRadius: 'var(--radius-sm)',
               border: '1px solid rgba(212, 175, 55, 0.25)'
             }}>
               <div style={{
-                width: '36px',
-                height: '36px',
+                width: '32px',
+                height: '32px',
                 borderRadius: '50%',
                 background: 'rgba(212, 175, 55, 0.2)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: 'var(--color-gold-light)'
+                color: 'var(--color-gold-light)',
+                flexShrink: 0
               }}>
-                <User size={20} />
+                <User size={18} />
               </div>
-              <div>
-                <div style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-main)' }}>
+              <div className="navbar-user-info">
+                <div style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-main)' }}>
                   {user.full_name}
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '2px' }}>
-                  <span className={`badge ${getRoleBadgeClass(user.role)}`}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '1px' }}>
+                  <span className={`badge ${getRoleBadgeClass(user.role)}`} style={{ fontSize: '0.7rem', padding: '0.15rem 0.5rem' }}>
                     {user.role}
                   </span>
                 </div>
@@ -164,11 +183,11 @@ export const Navbar = () => {
             <button
               onClick={logout}
               className="btn btn-secondary"
-              style={{ padding: '0.55rem 0.95rem', fontSize: '0.85rem', color: '#f87171', borderColor: 'rgba(248, 113, 113, 0.3)' }}
+              style={{ padding: '0.45rem 0.75rem', fontSize: '0.82rem', color: '#f87171', borderColor: 'rgba(248, 113, 113, 0.3)' }}
               title="تسجيل الخروج"
             >
               <LogOut size={16} />
-              <span>خروج</span>
+              <span className="navbar-text-hide-mobile">خروج</span>
             </button>
           </div>
         )}

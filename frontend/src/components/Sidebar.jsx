@@ -14,10 +14,11 @@ import {
   FileBarChart,
   UserCog,
   Settings,
-  Cake
+  Cake,
+  X
 } from 'lucide-react';
 
-export const Sidebar = () => {
+export const Sidebar = ({ mobileOpen, setMobileOpen }) => {
   const { hasPermission } = useAuth();
 
   const navItems = [
@@ -89,60 +90,77 @@ export const Sidebar = () => {
     }
   ];
 
-  return (
-    <aside style={{
-      width: '270px',
-      background: 'rgba(18, 5, 9, 0.95)',
-      backdropFilter: 'blur(20px)',
-      borderLeft: '1px solid rgba(212, 175, 55, 0.2)',
-      padding: '1.5rem 1rem',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '0.5rem',
-      boxShadow: '4px 0 25px rgba(0, 0, 0, 0.5)'
-    }}>
-      <div style={{
-        fontSize: '0.78rem',
-        fontWeight: 800,
-        color: 'var(--color-gold-light)',
-        padding: '0 0.75rem 0.75rem 0',
-        borderBottom: '1px solid rgba(212, 175, 55, 0.15)',
-        marginBottom: '0.5rem',
-        letterSpacing: '0.05em'
-      }}>
-        قائمة الخدمات والأنشطة
-      </div>
+  const handleNavClick = () => {
+    if (setMobileOpen) {
+      setMobileOpen(false);
+    }
+  };
 
-      <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-        {navItems.map((item) => {
-          if (item.permission && !hasPermission(item.permission)) {
-            return null;
-          }
-          return (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              className={({ isActive }) => `btn ${isActive ? 'btn-primary' : 'btn-secondary'}`}
-              style={({ isActive }) => ({
-                justifyContent: 'flex-start',
-                width: '100%',
-                padding: '0.72rem 1rem',
-                fontSize: '0.88rem',
-                borderRadius: 'var(--radius-sm)',
-                border: isActive ? '1px solid rgba(212, 175, 55, 0.4)' : '1px solid transparent',
-                background: isActive ? 'linear-gradient(135deg, #7a081d 0%, #a80f2d 100%)' : 'transparent',
-                color: isActive ? '#ffffff' : 'var(--text-muted)',
-                boxShadow: isActive ? '0 4px 15px rgba(122, 8, 29, 0.5)' : 'none',
-                fontWeight: isActive ? 800 : 600,
-                transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
-              })}
-            >
-              {item.icon}
-              <span>{item.title}</span>
-            </NavLink>
-          );
-        })}
-      </nav>
-    </aside>
+  return (
+    <>
+      {/* Mobile Drawer Overlay Backdrop */}
+      {mobileOpen && (
+        <div
+          className="sidebar-backdrop"
+          onClick={() => setMobileOpen && setMobileOpen(false)}
+        />
+      )}
+
+      <aside className={`app-sidebar ${mobileOpen ? 'mobile-open' : ''}`}>
+        <div style={{
+          fontSize: '0.82rem',
+          fontWeight: 800,
+          color: 'var(--color-gold-light)',
+          padding: '0 0.5rem 0.75rem 0',
+          borderBottom: '1px solid rgba(212, 175, 55, 0.15)',
+          marginBottom: '0.5rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          letterSpacing: '0.03em'
+        }}>
+          <span>قائمة الخدمات والأنشطة</span>
+          <button
+            onClick={() => setMobileOpen && setMobileOpen(false)}
+            className="btn btn-secondary sidebar-close-btn"
+            style={{ padding: '0.25rem', border: 'none', background: 'transparent', color: 'var(--text-muted)' }}
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+          {navItems.map((item) => {
+            if (item.permission && !hasPermission(item.permission)) {
+              return null;
+            }
+            return (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                onClick={handleNavClick}
+                className={({ isActive }) => `btn ${isActive ? 'btn-primary' : 'btn-secondary'}`}
+                style={({ isActive }) => ({
+                  justifyContent: 'flex-start',
+                  width: '100%',
+                  padding: '0.72rem 1rem',
+                  fontSize: '0.88rem',
+                  borderRadius: 'var(--radius-sm)',
+                  border: isActive ? '1px solid rgba(212, 175, 55, 0.4)' : '1px solid transparent',
+                  background: isActive ? 'linear-gradient(135deg, #7a081d 0%, #a80f2d 100%)' : 'transparent',
+                  color: isActive ? '#ffffff' : 'var(--text-muted)',
+                  boxShadow: isActive ? '0 4px 15px rgba(122, 8, 29, 0.5)' : 'none',
+                  fontWeight: isActive ? 800 : 600,
+                  transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+                })}
+              >
+                {item.icon}
+                <span>{item.title}</span>
+              </NavLink>
+            );
+          })}
+        </nav>
+      </aside>
+    </>
   );
 };

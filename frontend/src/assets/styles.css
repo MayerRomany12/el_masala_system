@@ -358,3 +358,136 @@ p {
   flex-shrink: 0;
 }
 
+/* Sidebar Default Desktop & Mobile Drawer Styles */
+.app-sidebar {
+  width: 270px;
+  background: rgba(18, 5, 9, 0.95);
+  backdrop-filter: blur(20px);
+  border-left: 1px solid rgba(212, 175, 55, 0.2);
+  padding: 1.5rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  box-shadow: 4px 0 25px rgba(0, 0, 0, 0.5);
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 1500;
+  flex-shrink: 0;
+}
+
+.mobile-hamburger-btn {
+  display: none;
+}
+
+.sidebar-close-btn {
+  display: none;
+}
+
+.sidebar-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+  z-index: 1400;
+  animation: fadeIn 0.2s ease forwards;
+}
+
+/* ── Mobile Responsive Breakpoints ────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .page-body {
+    padding: 1.25rem 1rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .app-container {
+    flex-direction: column;
+  }
+
+  .mobile-hamburger-btn {
+    display: inline-flex !important;
+  }
+
+  .sidebar-close-btn {
+    display: inline-flex !important;
+  }
+
+  .app-sidebar {
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 100vh;
+    width: 280px;
+    transform: translateX(100%); /* Hidden on right in RTL */
+    z-index: 1550;
+    box-shadow: -10px 0 30px rgba(0, 0, 0, 0.8);
+  }
+
+  .app-sidebar.mobile-open {
+    transform: translateX(0);
+  }
+
+  .navbar-subtitle {
+    display: none !important;
+  }
+
+  .navbar-text-hide-mobile {
+    display: none !important;
+  }
+
+  .navbar-user-info {
+    display: none !important;
+  }
+
+  .navbar-header {
+    padding: 0.5rem 0.85rem !important;
+  }
+
+  .page-body {
+    padding: 0.85rem 0.65rem;
+  }
+
+  .glass-card {
+    padding: 1rem;
+    border-radius: var(--radius-sm);
+  }
+
+  /* Table Touch Scroll Support */
+  .table-container {
+    -webkit-overflow-scrolling: touch;
+    margin-bottom: 1rem;
+  }
+
+  .custom-table th,
+  .custom-table td {
+    padding: 0.65rem 0.5rem;
+    font-size: 0.82rem;
+  }
+
+  .modal-card {
+    max-width: 96vw;
+    max-height: 92vh;
+    border-radius: var(--radius-sm);
+  }
+
+  .modal-header,
+  .modal-body,
+  .modal-footer {
+    padding: 0.85rem 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .btn {
+    padding: 0.5rem 0.85rem;
+    font-size: 0.85rem;
+  }
+
+  .form-input {
+    padding: 0.6rem 0.85rem;
+    font-size: 0.88rem;
+  }
+}
+

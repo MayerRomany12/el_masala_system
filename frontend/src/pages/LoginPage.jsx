@@ -5,8 +5,8 @@ import { Lock, User, AlertCircle, ArrowLeft } from 'lucide-react';
 import churchLogo from '../assets/church_logo.png';
 
 export const LoginPage = () => {
-  const [username, setUsername] = useState('superadmin');
-  const [password, setPassword] = useState('AdminPassword123!');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 

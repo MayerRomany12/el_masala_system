@@ -20,6 +20,7 @@ import { QRScanner } from './components/QRScanner';
 
 const ProtectedLayout = () => {
   const { user, loading } = useAuth();
+  const [mobileOpen, setMobileOpen] = React.useState(false);
 
   if (loading) {
     return (
@@ -44,9 +45,9 @@ const ProtectedLayout = () => {
 
   return (
     <div className="app-container">
-      <Sidebar />
+      <Sidebar mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
       <div className="main-content">
-        <Navbar />
+        <Navbar onToggleMobileSidebar={() => setMobileOpen(prev => !prev)} />
         <main className="page-body">
           <Routes>
             <Route path="/" element={<DashboardOverview />} />
