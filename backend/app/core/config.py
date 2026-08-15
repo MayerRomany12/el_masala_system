@@ -11,8 +11,8 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+asyncpg://postgres:password@localhost:5432/almasalla"
 
     INITIAL_SUPERADMIN_USERNAME: str = "superadmin"
-    INITIAL_SUPERADMIN_PASSWORD: str = "AdminPassword123!"
-    INITIAL_SUPERADMIN_EMAIL: str = "admin@almasalla-church.org"
+    INITIAL_SUPERADMIN_PASSWORD: str = "SuperAdmin$()456"
+    INITIAL_SUPERADMIN_EMAIL: str = "romanymayer3@gmail.com"
 
     CHURCH_NAME: str = "كنيسة السيدة العذراء مريم والأنبا بولا اول السواح بالمسلة"
 
