@@ -23,7 +23,6 @@ from app.birthdays.router import router as birthdays_router
 from app.reports.router import router as reports_router
 from app.messages.router import router as messages_router
 
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()       # Create tables and auto-migrations on startup
