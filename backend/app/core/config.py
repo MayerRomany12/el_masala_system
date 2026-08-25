@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 120
 
     # Supabase / PostgreSQL
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:password@localhost:5432/almasalla"
+    DATABASE_URL: str = "postgresql+asyncpg://postgres.dncqjnhjzexnaztpjswm:Mayer2211.2%40%405@aws-1-eu-west-1.pooler.supabase.com:6543/postgres"
 
     INITIAL_SUPERADMIN_USERNAME: str = "superadmin"
     INITIAL_SUPERADMIN_PASSWORD: str = "SuperAdmin$()456"
