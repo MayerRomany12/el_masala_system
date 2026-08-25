@@ -30,11 +30,15 @@ ROLE_PERMISSIONS = {
         "events:read",
         "attendance:session", "attendance:scan",
         "followup:read", "followup:write",
-        "rewards:read",
-        "birthdays:read", "birthdays:gift",
         "messages:send"
     ]
 }
+
+
+def get_permissions_for_role(role: str) -> List[str]:
+    if role == RoleEnum.SUPER_ADMIN or role == "Super Admin":
+        return list(ALL_PERMISSIONS)
+    return ROLE_PERMISSIONS.get(role, [])
 
 
 def compute_effective_permissions(user: dict) -> Set[str]:

@@ -41,26 +41,33 @@ export const AuthProvider = ({ children }) => {
   }, [token]);
 
   const login = async (username, password) => {
-    const response = await apiClient.post('/auth/login', { username, password });
-    if (response.data.success) {
-      const { access_token, user: userData } = response.data.data;
-      localStorage.setItem('almasalla_token', access_token);
-      localStorage.setItem('almasalla_user', JSON.stringify(userData));
-      setToken(access_token);
-      setUser(userData);
+    try {
+      const response = await apiClient.post('/auth/login', { username, password });
+      if (response.data && response.data.success) {
+        const { access_token, user: userData } = response.data.data;
+        localStorage.setItem('almasalla_token', access_token);
+        localStorage.setItem('almasalla_user', JSON.stringify(userData));
+        setToken(access_token);
+        setUser(userData);
 
-      // Fetch user permissions immediately upon login
-      try {
-        const meRes = await apiClient.get('/auth/me');
-        if (meRes.data.success) {
-          setPermissions(meRes.data.data.permissions || []);
+        // Fetch user permissions immediately upon login
+        try {
+          const meRes = await apiClient.get('/auth/me');
+          if (meRes.data && meRes.data.success) {
+            setPermissions(meRes.data.data.permissions || []);
+          }
+        } catch (e) {
+          if (userData?.effective_permissions) {
+            setPermissions(userData.effective_permissions);
+          }
         }
-      } catch (e) {
-        // Ignore non-critical permission error if user is admin
+        return userData;
+      } else {
+        throw new Error(response?.data?.message || 'فشل تسجيل الدخول');
       }
-      return userData;
-    } else {
-      throw new Error(response.data.message || 'فشل تسجيل الدخول');
+    } catch (err) {
+      const errorMsg = err.response?.data?.detail || err.response?.data?.message || err.message || 'خطأ في اسم المستخدم أو كلمة المرور';
+      throw new Error(errorMsg);
     }
   };
 

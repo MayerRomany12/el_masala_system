@@ -38,8 +38,9 @@ class UserRepository:
         return self._db
 
     async def get_by_username(self, username: str) -> Optional[dict]:
+        clean_name = username.strip().lower()
         result = await self._get_db().execute(
-            select(User).where(User.username == username)
+            select(User).where(func.lower(User.username) == clean_name)
         )
         row = result.scalar_one_or_none()
         return _row_to_dict(row) if row else None
@@ -52,8 +53,9 @@ class UserRepository:
         return _row_to_dict(row) if row else None
 
     async def get_by_email(self, email: str) -> Optional[dict]:
+        clean_email = email.strip().lower()
         result = await self._get_db().execute(
-            select(User).where(User.email == email)
+            select(User).where(func.lower(User.email) == clean_email)
         )
         row = result.scalar_one_or_none()
         return _row_to_dict(row) if row else None

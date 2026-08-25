@@ -11,7 +11,7 @@ class RoleEnum:
 
 class UserBase(BaseModel):
     username: str = Field(..., min_length=3, max_length=50)
-    email: EmailStr
+    email: Optional[str] = None
     full_name: str
     role: str = RoleEnum.SERVANT
     assigned_stages: Optional[List[str]] = Field(default_factory=list)
@@ -28,7 +28,7 @@ class UserCreate(UserBase):
 
 
 class UserUpdate(BaseModel):
-    email: Optional[EmailStr] = None
+    email: Optional[str] = None
     full_name: Optional[str] = None
     role: Optional[str] = None
     assigned_stages: Optional[List[str]] = None
@@ -47,5 +47,5 @@ class UserPermissionsUpdate(BaseModel):
 class UserResponse(UserBase):
     user_id: str
     effective_permissions: Optional[List[str]] = Field(default_factory=list)
-    created_at: datetime
+    created_at: Optional[datetime] = None
     last_login: Optional[datetime] = None

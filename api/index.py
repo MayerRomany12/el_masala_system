@@ -12,11 +12,11 @@ import asyncio
 
 # Ensure DB tables & Super Admin user are created/updated on Vercel startup
 try:
-    loop = asyncio.get_event_loop()
-    if loop.is_running():
+    try:
+        loop = asyncio.get_running_loop()
         loop.create_task(init_db())
-    else:
-        loop.run_until_complete(init_db())
+    except RuntimeError:
+        asyncio.run(init_db())
 except Exception as e:
     print(f"Startup DB init log: {e}")
 
