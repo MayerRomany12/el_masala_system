@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { birthdaysApi } from '../api/birthdays';
+import { getWaUrl } from '../utils/phone';
 import {
   Gift,
   Cake,
@@ -378,14 +379,14 @@ export const BirthdayManagement = () => {
                               <Phone size={13} />
                               <span>{cleanPhone}</span>
                             </a>
-                            <a
-                              href={`https://wa.me/2${cleanPhone}?text=${encodeURIComponent(`كل سنة وانت طيب يا ${m.full_name} 🎉🎂 بمناسبة عيد ميلادك!`)}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="btn btn-secondary"
-                              style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#25D366' }}
-                              title="إرسال تهنئة واتساب"
-                            >
+                             <a
+                               href={getWaUrl(cleanPhone, `كل سنة وانت طيب يا ${m.full_name} 🎉🎂 بمناسبة عيد ميلادك!`)}
+                               target="_blank"
+                               rel="noreferrer"
+                               className="btn btn-secondary"
+                               style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#25D366' }}
+                               title="إرسال تهنئة واتساب"
+                             >
                               <MessageSquare size={13} />
                             </a>
                           </div>

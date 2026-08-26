@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.members.repository import MemberRepository
 from app.members.schemas import MemberCreate, MemberUpdate, MemberStatusEnum
 from app.core.errors import NotFoundException, BadRequestException
+from app.shared.utils import normalize_phone_number
 
 
 class MemberService:
@@ -13,6 +14,12 @@ class MemberService:
 
     async def create_member(self, data: MemberCreate) -> Dict[str, Any]:
         member_dict = data.model_dump()
+        if member_dict.get("phone"):
+            member_dict["phone"] = normalize_phone_number(member_dict["phone"])
+        if member_dict.get("whatsapp_phone"):
+            member_dict["whatsapp_phone"] = normalize_phone_number(member_dict["whatsapp_phone"])
+        elif member_dict.get("phone"):
+            member_dict["whatsapp_phone"] = member_dict["phone"]
         return await self.repository.create_member(member_dict)
 
     async def get_member_by_id(self, member_id: str) -> Dict[str, Any]:
@@ -46,6 +53,11 @@ class MemberService:
         update_fields = data.model_dump(exclude_unset=True)
         if not update_fields:
             return existing
+
+        if "phone" in update_fields and update_fields["phone"]:
+            update_fields["phone"] = normalize_phone_number(update_fields["phone"])
+        if "whatsapp_phone" in update_fields and update_fields["whatsapp_phone"]:
+            update_fields["whatsapp_phone"] = normalize_phone_number(update_fields["whatsapp_phone"])
 
         updated = await self.repository.update_member(member_id, update_fields)
         if not updated:

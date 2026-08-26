@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { followupApi } from '../api/followup';
+import { getWaUrl } from '../utils/phone';
 import {
   HeartHandshake,
   Search,
@@ -397,14 +398,14 @@ export const FollowupManagement = () => {
                               <Phone size={13} />
                               <span>{cleanPhone}</span>
                             </a>
-                            <a
-                              href={`https://wa.me/2${cleanPhone}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="btn btn-secondary"
-                              style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#25D366' }}
-                              title="مراسلة واتساب"
-                            >
+                             <a
+                               href={getWaUrl(cleanPhone)}
+                               target="_blank"
+                               rel="noreferrer"
+                               className="btn btn-secondary"
+                               style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#25D366' }}
+                               title="مراسلة واتساب"
+                             >
                               <MessageSquare size={13} />
                             </a>
                           </div>

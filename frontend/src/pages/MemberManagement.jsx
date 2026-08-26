@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { membersApi } from '../api/members';
 import { useAuth } from '../context/AuthContext';
+import { normalizePhone, getWaUrl } from '../utils/phone';
 import {
   Users,
   UserPlus,
@@ -162,11 +163,17 @@ export const MemberManagement = () => {
     setModalError('');
     setSubmitting(true);
 
+    const payload = {
+      ...formData,
+      phone: normalizePhone(formData.phone),
+      whatsapp_phone: normalizePhone(formData.whatsapp_phone || formData.phone)
+    };
+
     try {
       if (editingMember) {
-        await membersApi.updateMember(editingMember.member_id, formData);
+        await membersApi.updateMember(editingMember.member_id, payload);
       } else {
-        await membersApi.createMember(formData);
+        await membersApi.createMember(payload);
       }
       setShowAddModal(false);
       fetchData();
@@ -406,9 +413,9 @@ export const MemberManagement = () => {
                           <Phone size={14} />
                           <span>{member.phone}</span>
                         </a>
-                        {member.whatsapp_phone && (
+                        {(member.whatsapp_phone || member.phone) && (
                           <a
-                            href={`https://wa.me/${member.whatsapp_phone.replace(/\D/g, '')}`}
+                            href={getWaUrl(member.whatsapp_phone || member.phone)}
                             target="_blank"
                             rel="noopener noreferrer"
                             style={{ color: '#34d399', textDecoration: 'none' }}
