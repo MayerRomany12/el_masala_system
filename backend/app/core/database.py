@@ -27,6 +27,8 @@ AsyncSessionLocal = async_sessionmaker(
     autocommit=False,
 )
 
+async_session_maker = AsyncSessionLocal
+
 
 async def init_db():
     """Create all tables on startup and apply missing column migrations."""

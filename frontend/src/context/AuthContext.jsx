@@ -66,7 +66,18 @@ export const AuthProvider = ({ children }) => {
         throw new Error(response?.data?.message || 'فشل تسجيل الدخول');
       }
     } catch (err) {
-      const errorMsg = err.response?.data?.detail || err.response?.data?.message || err.message || 'خطأ في اسم المستخدم أو كلمة المرور';
+      let errorMsg = 'اسم المستخدم أو كلمة المرور غير صحيحة';
+      if (err.response?.data?.message) {
+        errorMsg = err.response.data.message;
+      } else if (err.response?.data?.detail) {
+        errorMsg = typeof err.response.data.detail === 'string'
+          ? err.response.data.detail
+          : 'اسم المستخدم أو كلمة المرور غير صحيحة';
+      } else if (err.response?.status === 500) {
+        errorMsg = 'تعذر الاتصال بقاعدة البيانات أو الخادم (500). يرجى التأكد من تشغيل الخادم وضبط DATABASE_URL.';
+      } else if (err.message && !err.message.includes('status code')) {
+        errorMsg = err.message;
+      }
       throw new Error(errorMsg);
     }
   };

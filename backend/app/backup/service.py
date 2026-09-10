@@ -161,8 +161,8 @@ class BackupService:
 
             # Safe isolated audit logging for restore failure
             try:
-                from app.core.database import async_session_maker
-                async with async_session_maker() as isolated_db:
+                from app.core.database import AsyncSessionLocal
+                async with AsyncSessionLocal() as isolated_db:
                     iso_audit = AuditService(isolated_db)
                     await iso_audit.log_event(
                         action="BACKUP_RESTORE_FAILED",
