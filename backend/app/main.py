@@ -30,10 +30,20 @@ from app.backup.router import router as backup_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    os.makedirs(os.path.abspath("uploads/photos"), exist_ok=True)
-    await init_db()       # Create tables and auto-migrations on startup
+    try:
+        os.makedirs(os.path.abspath("uploads/photos"), exist_ok=True)
+    except Exception:
+        pass
+    try:
+        await init_db()       # Create tables and auto-migrations on startup
+    except Exception as err:
+        from app.core.logging import logger
+        logger.error(f"Failed init_db on startup: {err}")
     yield
-    await close_db()      # Dispose connection pool on shutdown
+    try:
+        await close_db()      # Dispose connection pool on shutdown
+    except Exception:
+        pass
 
 
 app = FastAPI(
@@ -64,10 +74,18 @@ async def add_security_headers(request, call_next):
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     return response
 
-# Serve Uploaded Static Files (Photos & Assets)
-uploads_path = os.path.abspath("uploads")
-os.makedirs(uploads_path, exist_ok=True)
-app.mount("/uploads", StaticFiles(directory=uploads_path), name="uploads")
+# Serve Uploaded Static Files (Photos & Assets) with Serverless Fallback
+try:
+    uploads_path = os.path.abspath("uploads")
+    os.makedirs(os.path.join(uploads_path, "photos"), exist_ok=True)
+    app.mount("/uploads", StaticFiles(directory=uploads_path), name="uploads")
+except Exception:
+    try:
+        tmp_uploads = "/tmp/uploads"
+        os.makedirs(os.path.join(tmp_uploads, "photos"), exist_ok=True)
+        app.mount("/uploads", StaticFiles(directory=tmp_uploads), name="uploads")
+    except Exception:
+        pass
 
 from app.core.errors import (
     AppException,

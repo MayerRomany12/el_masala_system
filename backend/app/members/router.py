@@ -182,7 +182,11 @@ async def upload_member_photo(
         raise BadRequestException("عفواً، فشل التحقق من بنية الصورة المرفوعة.")
 
     uploads_dir = os.path.abspath("uploads/photos")
-    os.makedirs(uploads_dir, exist_ok=True)
+    try:
+        os.makedirs(uploads_dir, exist_ok=True)
+    except Exception:
+        uploads_dir = "/tmp/uploads/photos"
+        os.makedirs(uploads_dir, exist_ok=True)
 
     ext = ALLOWED_FORMATS[img_format]
     safe_filename = f"photo_{uuid.uuid4().hex}{ext}"
