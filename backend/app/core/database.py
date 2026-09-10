@@ -31,7 +31,7 @@ AsyncSessionLocal = async_sessionmaker(
 async def init_db():
     """Create all tables on startup and apply missing column migrations."""
     # Import all models so SQLAlchemy registers them
-    from app.models import user, member, event, attendance, followup, rewards, setting, birthday, internal_messages  # noqa
+    from app.models import user, member, event, attendance, followup, rewards, setting, birthday, internal_messages, audit_log  # noqa
     from sqlalchemy import text, select
 
     async with engine.begin() as conn:
@@ -48,10 +48,15 @@ async def init_db():
         # Migrations for AttendanceSession recurrence
         await conn.execute(text("ALTER TABLE attendance_sessions ADD COLUMN IF NOT EXISTS recurrence VARCHAR(30) DEFAULT 'Weekly';"))
 
-        # Migrations for Member date_of_birth and total_points
+        # Migrations for Member date_of_birth, total_points, photo_url, and archiving
         await conn.execute(text("ALTER TABLE members ADD COLUMN IF NOT EXISTS qr_token VARCHAR(64);"))
         await conn.execute(text("ALTER TABLE members ADD COLUMN IF NOT EXISTS card_issued_at TIMESTAMPTZ;"))
         await conn.execute(text("ALTER TABLE members ADD COLUMN IF NOT EXISTS total_points INT DEFAULT 0;"))
+        await conn.execute(text("ALTER TABLE members ADD COLUMN IF NOT EXISTS photo_url TEXT;"))
+        await conn.execute(text("ALTER TABLE members ADD COLUMN IF NOT EXISTS is_archived BOOLEAN DEFAULT FALSE;"))
+        await conn.execute(text("ALTER TABLE members ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ;"))
+        await conn.execute(text("ALTER TABLE members ADD COLUMN IF NOT EXISTS archived_by VARCHAR(50);"))
+
 
         # Approved Partial Unique Index for M6 Followup Task Deduplication
         await conn.execute(text("""

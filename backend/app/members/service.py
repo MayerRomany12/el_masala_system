@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.members.repository import MemberRepository
 from app.members.schemas import MemberCreate, MemberUpdate, MemberStatusEnum
 from app.core.errors import NotFoundException, BadRequestException
-from app.shared.utils import normalize_phone_number
+from app.shared.utils import normalize_phone_number, is_valid_whatsapp_number
 
 
 class MemberService:
@@ -14,12 +14,16 @@ class MemberService:
 
     async def create_member(self, data: MemberCreate) -> Dict[str, Any]:
         member_dict = data.model_dump()
-        if member_dict.get("phone"):
-            member_dict["phone"] = normalize_phone_number(member_dict["phone"])
         if member_dict.get("whatsapp_phone"):
+            if not is_valid_whatsapp_number(member_dict["whatsapp_phone"]):
+                raise BadRequestException("رقم الواتساب غير صالح. يرجى إدخال رقم محمول صالح مسجل عليه واتساب (مثل 010 أو 011 أو 012 أو 015)")
             member_dict["whatsapp_phone"] = normalize_phone_number(member_dict["whatsapp_phone"])
         elif member_dict.get("phone"):
-            member_dict["whatsapp_phone"] = member_dict["phone"]
+            member_dict["whatsapp_phone"] = normalize_phone_number(member_dict["phone"])
+
+        if member_dict.get("phone"):
+            member_dict["phone"] = normalize_phone_number(member_dict["phone"])
+
         return await self.repository.create_member(member_dict)
 
     async def get_member_by_id(self, member_id: str) -> Dict[str, Any]:
@@ -54,10 +58,13 @@ class MemberService:
         if not update_fields:
             return existing
 
+        if "whatsapp_phone" in update_fields and update_fields["whatsapp_phone"]:
+            if not is_valid_whatsapp_number(update_fields["whatsapp_phone"]):
+                raise BadRequestException("رقم الواتساب غير صالح. يرجى إدخال رقم محمول صالح مسجل عليه واتساب (مثل 010 أو 011 أو 012 أو 015)")
+            update_fields["whatsapp_phone"] = normalize_phone_number(update_fields["whatsapp_phone"])
+
         if "phone" in update_fields and update_fields["phone"]:
             update_fields["phone"] = normalize_phone_number(update_fields["phone"])
-        if "whatsapp_phone" in update_fields and update_fields["whatsapp_phone"]:
-            update_fields["whatsapp_phone"] = normalize_phone_number(update_fields["whatsapp_phone"])
 
         updated = await self.repository.update_member(member_id, update_fields)
         if not updated:
@@ -78,8 +85,25 @@ class MemberService:
             raise NotFoundException("فشل تحديث حالة المخدوم")
         return updated
 
+    async def archive_member(self, member_id: str, is_archived: bool, current_user_id: Optional[str] = None) -> Dict[str, Any]:
+        existing = await self.repository.get_by_member_id(member_id)
+        if not existing:
+            raise NotFoundException(f"المخدوم برقم العضوية {member_id} غير موجود")
+
+        updated = await self.repository.archive_member(member_id, is_archived, current_user_id)
+        return updated
+
+    async def update_member_photo(self, member_id: str, photo_url: str) -> Dict[str, Any]:
+        existing = await self.repository.get_by_member_id(member_id)
+        if not existing:
+            raise NotFoundException(f"المخدوم برقم العضوية {member_id} غير موجود")
+
+        updated = await self.repository.update_member(member_id, {"photo_url": photo_url})
+        return updated
+
     async def get_stats(self) -> Dict[str, Any]:
         return await self.repository.get_stats()
+
 
     # ─── M3: QR Token & Card ──────────────────────────────────────────────────
 

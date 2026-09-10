@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { settingsApi } from '../api/settings';
+import { apiClient } from '../api/client';
+import { AuditLogModal } from '../components/AuditLogModal';
 import {
   Settings,
   Save,
@@ -28,7 +30,64 @@ export const SettingsPage = () => {
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [backupActionLoading, setBackupActionLoading] = useState(false);
+  const [showAuditModal, setShowAuditModal] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
+
+  // Download Backup
+  const handleDownloadBackup = async () => {
+    try {
+      setBackupActionLoading(true);
+      const response = await apiClient.get('/backup/download', {
+        responseType: 'blob'
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      const today = new Date().toISOString().slice(0, 10);
+      link.setAttribute('download', `almasalla_backup_${today}.json`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setMessage({ type: 'success', text: 'تم تنزيل ملف النسخة الاحتياطية بنجاح 💾' });
+    } catch (err) {
+      setMessage({ type: 'error', text: err.response?.data?.message || 'تعذر تنزيل النسخة الاحتياطية' });
+    } finally {
+      setBackupActionLoading(false);
+    }
+  };
+
+  // Restore Backup
+  const handleRestoreBackup = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!window.confirm("⚠️ تحذير أمني واستعادة ذرية:\nهل أنت أسباب على يقين من استعادة النسخة الاحتياطية؟\nسيتم تحديث وإعادة بناء بيانات النظام بالكامل داخل Database Transaction أمنية.")) {
+      e.target.value = '';
+      return;
+    }
+
+    try {
+      setBackupActionLoading(true);
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await apiClient.post('/backup/restore', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      if (res.data && res.data.success) {
+        setMessage({ type: 'success', text: 'تمت استعادة كافة بيانات النظام والملفات بنجاح 🔄' });
+        fetchSettings();
+      }
+    } catch (err) {
+      setMessage({ type: 'error', text: err.response?.data?.message || 'فشلت عملية الاستعادة وتم إلغاء التغييرات تلقائياً' });
+    } finally {
+      setBackupActionLoading(false);
+      e.target.value = '';
+    }
+  };
+
 
   // Fetch settings from API
   const fetchSettings = async () => {
@@ -249,6 +308,64 @@ export const SettingsPage = () => {
             </div>
           </div>
 
+          {/* Section 5: Atomic Backup & Restore */}
+          <div className="glass-card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', border: '1px solid rgba(56, 189, 248, 0.3)' }}>
+            <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.75rem' }}>
+              <ShieldCheck size={22} style={{ color: '#38bdf8' }} />
+              <span>النسخ الاحتياطي والاستعادة الذرية (Database Backup & Restore)</span>
+            </h3>
+
+            <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', margin: 0 }}>
+              تصدير واستعادة كافة بيانات قاعدة البيانات بملف JSON مؤرخ ومحمي. عملية الاستعادة تتم داخل Transaction ذرية واحدة تضمن الـ Rollback الكامل في حالة حدوث أي طارئ.
+            </p>
+
+            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={handleDownloadBackup}
+                disabled={backupActionLoading}
+                style={{ padding: '0.65rem 1.25rem', gap: '8px', background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.4)' }}
+              >
+                <span>💾 تنزيل نسخة احتياطية كاملة (JSON)</span>
+              </button>
+
+              <label
+                style={{
+                  padding: '0.65rem 1.25rem',
+                  borderRadius: '8px',
+                  background: 'rgba(239, 68, 68, 0.15)',
+                  color: '#f87171',
+                  border: '1px solid rgba(239, 68, 68, 0.4)',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  fontSize: '0.9rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <span>🔄 استعادة نسخة احتياطية من ملف</span>
+                <input
+                  type="file"
+                  accept=".json"
+                  onChange={handleRestoreBackup}
+                  disabled={backupActionLoading}
+                  style={{ display: 'none' }}
+                />
+              </label>
+
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setShowAuditModal(true)}
+                style={{ padding: '0.65rem 1.25rem', gap: '8px', background: 'rgba(168, 85, 247, 0.15)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.4)' }}
+              >
+                <span>🛡️ عرض سجل النشاطات والتدقيق (Audit Logs)</span>
+              </button>
+            </div>
+          </div>
+
           {/* Submit Button */}
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
             <button
@@ -263,6 +380,10 @@ export const SettingsPage = () => {
           </div>
         </form>
       )}
+
+      {/* Audit Log Modal */}
+      <AuditLogModal isOpen={showAuditModal} onClose={() => setShowAuditModal(false)} />
     </div>
   );
 };
+

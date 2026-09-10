@@ -148,11 +148,21 @@ export const MemberCard = ({ member, activeSide = 'front' }) => {
                   justifyContent: 'center',
                   color: theme.accent,
                   flexShrink: 0,
-                  boxShadow: '0 4px 10px rgba(0,0,0,0.3)'
+                  boxShadow: '0 4px 10px rgba(0,0,0,0.3)',
+                  overflow: 'hidden'
                 }}
               >
-                <User size={34} />
+                {member.photo_url ? (
+                  <img
+                    src={member.photo_url}
+                    alt={member.full_name}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                ) : (
+                  <User size={34} />
+                )}
               </div>
+
 
               {/* Name & Details */}
               <div style={{ flex: 1, minWidth: 0 }}>

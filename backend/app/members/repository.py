@@ -24,6 +24,10 @@ def _row_to_dict(row: Member) -> Dict[str, Any]:
         "address": row.address,
         "notes": row.notes,
         "status": row.status,
+        "photo_url": row.photo_url,
+        "is_archived": row.is_archived,
+        "archived_at": row.archived_at,
+        "archived_by": row.archived_by,
         "qr_token": row.qr_token,
         "card_issued_at": row.card_issued_at,
         "total_points": row.total_points,
@@ -74,13 +78,20 @@ class MemberRepository:
         search: Optional[str] = None,
         stage: Optional[str] = None,
         status: Optional[str] = None,
+        include_archived: bool = False,
         skip: int = 0,
         limit: int = 50,
     ) -> Tuple[List[Dict[str, Any]], int]:
         query = select(Member)
 
         if status:
-            query = query.where(Member.status == status)
+            if status == "Archived":
+                query = query.where(Member.is_archived == True)
+            else:
+                query = query.where(Member.status == status, Member.is_archived == False)
+        elif not include_archived:
+            query = query.where(Member.is_archived == False)
+
         if stage:
             query = query.where(Member.stage == stage)
         if search:
@@ -104,6 +115,7 @@ class MemberRepository:
 
         return items, total
 
+
     async def update_member(self, member_id: str, update_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         update_data["updated_at"] = datetime.now(timezone.utc)
         await self.db.execute(
@@ -120,6 +132,22 @@ class MemberRepository:
         )
         await self.db.flush()
         return await self.get_by_member_id(member_id)
+
+    async def archive_member(self, member_id: str, is_archived: bool, archived_by: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        now = datetime.now(timezone.utc) if is_archived else None
+        await self.db.execute(
+            update(Member)
+            .where(Member.member_id == member_id)
+            .values(
+                is_archived=is_archived,
+                archived_at=now,
+                archived_by=archived_by if is_archived else None,
+                updated_at=datetime.now(timezone.utc)
+            )
+        )
+        await self.db.flush()
+        return await self.get_by_member_id(member_id)
+
 
     async def get_by_qr_token(self, token: str) -> Optional[Dict[str, Any]]:
         """البحث عن مخدوم بواسطة الـ QR Token الأولي — يُستخدم في عملية المسح."""

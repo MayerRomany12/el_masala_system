@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,9 +13,13 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
 @router.post("/login", response_model=StandardResponse[TokenResponse])
-async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
+async def login(
+    body: LoginRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db)
+):
     service = AuthService()
-    result = await service.authenticate_user(body.username, body.password, db)
+    result = await service.authenticate_user(body.username, body.password, db, request=request)
     return StandardResponse(
         success=True,
         message="تم تسجيل الدخول بنجاح",
@@ -29,12 +33,13 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
 
 @router.post("/token", response_model=TokenResponse)
 async def login_for_access_token(
+    request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: AsyncSession = Depends(get_db)
 ):
     """OAuth2 compatible token login handler (Swagger UI support)"""
     service = AuthService()
-    result = await service.authenticate_user(form_data.username, form_data.password, db)
+    result = await service.authenticate_user(form_data.username, form_data.password, db, request=request)
     return TokenResponse(
         access_token=result["access_token"],
         token_type=result["token_type"],

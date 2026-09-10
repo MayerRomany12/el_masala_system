@@ -23,6 +23,8 @@ class MemberBase(BaseModel):
     address: Optional[str] = Field(default=None, description="عنوان السكن")
     notes: Optional[str] = Field(default=None, description="ملاحظات خادمة أو صحية")
     status: str = Field(default=MemberStatusEnum.ACTIVE, description="حالة الحساب (Active, Inactive, Archived)")
+    photo_url: Optional[str] = Field(default=None, description="رابط صورة المخدوم")
+    is_archived: Optional[bool] = Field(default=False, description="حالة الأرشفة")
 
     model_config = {"extra": "ignore"}
 
@@ -41,16 +43,24 @@ class MemberUpdate(BaseModel):
     address: Optional[str] = None
     notes: Optional[str] = None
     status: Optional[str] = None
+    photo_url: Optional[str] = None
+    is_archived: Optional[bool] = None
 
 class MemberStatusUpdate(BaseModel):
     status: str = Field(..., description="الحالة الجديدة (Active, Inactive, Archived)")
+
+class MemberArchiveUpdate(BaseModel):
+    is_archived: bool = Field(..., description="حالة الأرشفة (true / false)")
 
 class MemberResponse(MemberBase):
     member_id: str = Field(..., description="رمز العضوية الفريد الدائم صيغة K-XXXXXX")
     qr_token: Optional[str] = Field(default=None, description="QR Token الأولي — Opaque Random Token")
     card_issued_at: Optional[datetime] = Field(default=None, description="تاريخ إصدار البطاقة")
+    archived_at: Optional[datetime] = None
+    archived_by: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
+
 
 class MemberListResponse(BaseModel):
     total: int

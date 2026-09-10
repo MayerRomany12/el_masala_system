@@ -1,8 +1,10 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { birthdaysApi } from '../api/birthdays';
 import { getWaUrl } from '../utils/phone';
+import { WhatsAppButton } from '../components/WhatsAppButton';
 import {
   Gift,
+
   Cake,
   Calendar,
   Search,
@@ -379,21 +381,19 @@ export const BirthdayManagement = () => {
                               <Phone size={13} />
                               <span>{cleanPhone}</span>
                             </a>
-                             <a
-                               href={getWaUrl(cleanPhone, `كل سنة وانت طيب يا ${m.full_name} 🎉🎂 بمناسبة عيد ميلادك!`)}
-                               target="_blank"
-                               rel="noreferrer"
-                               className="btn btn-secondary"
-                               style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#25D366' }}
-                               title="إرسال تهنئة واتساب"
-                             >
-                              <MessageSquare size={13} />
-                            </a>
+                            <WhatsAppButton
+                              phone={cleanPhone}
+                              memberName={m.full_name}
+                              memberId={m.member_id}
+                              template="birthday"
+                              variant="icon"
+                            />
                           </div>
                         ) : (
                           <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>لا يوجد هاتف</span>
                         )}
                       </td>
+
 
                       <td>
                         {isDelivered ? (

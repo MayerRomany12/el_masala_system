@@ -1,7 +1,9 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { membersApi } from '../api/members';
+import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { normalizePhone, getWaUrl } from '../utils/phone';
+import { WhatsAppButton } from '../components/WhatsAppButton';
 import {
   Users,
   UserPlus,
@@ -20,8 +22,11 @@ import {
   Calendar,
   Heart,
   MapPin,
-  FileText
+  FileText,
+  Camera,
+  Archive
 } from 'lucide-react';
+
 
 const STAGE_OPTIONS = [
   'حضانة (KG1 & KG2)',
@@ -395,8 +400,30 @@ export const MemberManagement = () => {
                       </span>
                     </td>
                     <td>
-                      <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>{member.full_name}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>الجنس: {member.gender}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{
+                          width: '36px',
+                          height: '36px',
+                          borderRadius: '50%',
+                          background: '#334155',
+                          border: '1px solid #38bdf8',
+                          overflow: 'hidden',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0
+                        }}>
+                          {member.photo_url ? (
+                            <img src={member.photo_url} alt={member.full_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          ) : (
+                            <span style={{ fontSize: '0.9rem', color: '#38bdf8', fontWeight: 'bold' }}>{member.full_name.charAt(0)}</span>
+                          )}
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>{member.full_name}</div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>الجنس: {member.gender}</div>
+                        </div>
+                      </div>
                     </td>
                     <td>
                       <div style={{ fontSize: '0.88rem', fontWeight: 600 }}>{member.stage}</div>
@@ -405,7 +432,7 @@ export const MemberManagement = () => {
                       )}
                     </td>
                     <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                         <a
                           href={`tel:${member.phone}`}
                           style={{ color: '#38bdf8', textDecoration: 'none', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.3rem' }}
@@ -413,20 +440,22 @@ export const MemberManagement = () => {
                           <Phone size={14} />
                           <span>{member.phone}</span>
                         </a>
-                        {(member.whatsapp_phone || member.phone) && (
-                          <a
-                            href={getWaUrl(member.whatsapp_phone || member.phone)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={{ color: '#34d399', textDecoration: 'none' }}
-                            title="مراسلة عبر واتساب"
-                          >
-                            <MessageSquare size={16} />
-                          </a>
-                        )}
+                        <WhatsAppButton
+                          phone={member.whatsapp_phone || member.phone}
+                          memberName={member.full_name}
+                          memberId={member.member_id}
+                          template="card"
+                          variant="icon"
+                        />
                       </div>
                     </td>
-                    <td>{getStatusBadge(member.status)}</td>
+                    <td>
+                      {member.is_archived ? (
+                        <span className="badge badge-danger">مؤرشف</span>
+                      ) : (
+                        getStatusBadge(member.status)
+                      )}
+                    </td>
                     <td style={{ color: 'var(--text-subtle)', fontSize: '0.82rem' }}>
                       {new Date(member.created_at).toLocaleDateString('ar-EG')}
                     </td>
@@ -446,7 +475,7 @@ export const MemberManagement = () => {
                               onClick={() => handleOpenEdit(member)}
                               className="btn btn-secondary"
                               style={{ padding: '0.35rem 0.6rem', fontSize: '0.8rem' }}
-                              title="تعديل البيانات"
+                              title="تعديل البيانات والصورة"
                             >
                               <Edit size={15} />
                             </button>
@@ -454,7 +483,7 @@ export const MemberManagement = () => {
                               onClick={() => setStatusModalMember(member)}
                               className="btn btn-secondary"
                               style={{ padding: '0.35rem 0.6rem', fontSize: '0.8rem', color: '#fb923c' }}
-                              title="تغيير الحالة"
+                              title="تغيير الحالة والأرشفة"
                             >
                               <ShieldAlert size={15} />
                             </button>
@@ -462,6 +491,7 @@ export const MemberManagement = () => {
                         )}
                       </div>
                     </td>
+
                   </tr>
                 ))
               )}
@@ -491,7 +521,64 @@ export const MemberManagement = () => {
               )}
 
               <form id="memberForm" onSubmit={handleSubmitForm} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                
+                {/* Photo Upload Section for Existing Member */}
+                {editingMember && (
+                  <div style={{
+                    padding: '0.75rem 1rem',
+                    borderRadius: '10px',
+                    background: 'rgba(56, 189, 248, 0.08)',
+                    border: '1px solid rgba(56, 189, 248, 0.2)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '1rem'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{
+                        width: '48px', height: '48px', borderRadius: '10px', background: '#334155',
+                        border: '1px solid #38bdf8', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                      }}>
+                        {formData.photo_url ? (
+                          <img src={formData.photo_url} alt="صورة المخدوم" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                          <Camera size={24} style={{ color: '#38bdf8' }} />
+                        )}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.9rem', fontWeight: '700', color: '#fff' }}>صورة المخدوم الحالية</div>
+                        <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>صورة شخصية واضحة للتعرف البصري</div>
+                      </div>
+                    </div>
+
+                    <label className="btn btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.82rem', cursor: 'pointer', gap: '6px' }}>
+                      <span>تغيير الصورة 🖼️</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        style={{ display: 'none' }}
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          try {
+                            const data = new FormData();
+                            data.append('file', file);
+                            const res = await apiClient.post(`/members/${editingMember.member_id}/photo`, data);
+                            if (res.data && res.data.data) {
+                              setFormData((prev) => ({ ...prev, photo_url: res.data.data.photo_url }));
+                              alert('تم رفع صورة الطفل بنجاح');
+                            }
+                          } catch (err) {
+                            alert(err.response?.data?.message || 'فشل رفع الصورة');
+                          }
+                        }}
+                      />
+                    </label>
+                  </div>
+                )}
+
                 <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1rem' }}>
+
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label">الاسم الكامل للطفل (الثلاثي / الرباعي)*</label>
                     <input
@@ -763,15 +850,45 @@ export const MemberManagement = () => {
                 <span>غير نشط (Inactive) - منقطع أو غائب مؤقتاً</span>
               </button>
 
-              <button
-                onClick={() => handleUpdateStatus('Archived')}
-                className="btn"
-                style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#fca5a5', border: '1px solid rgba(239, 68, 68, 0.3)', justifyContent: 'flex-start' }}
-              >
-                <ShieldAlert size={18} />
-                <span>مؤرشف (Archived) - انتقل لمرحلة أخرى أو سافر</span>
-              </button>
+              <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.75rem' }}>
+                {statusModalMember.is_archived ? (
+                  <button
+                    onClick={async () => {
+                      setSubmitting(true);
+                      try {
+                        await apiClient.patch(`/members/${statusModalMember.member_id}/archive`, null, { params: { is_archived: false } });
+                        setStatusModalMember(null);
+                        fetchData();
+                      } catch (err) { alert(err.response?.data?.message || 'فشل إلغاء الأرشفة'); }
+                      finally { setSubmitting(false); }
+                    }}
+                    className="btn"
+                    style={{ background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.3)', width: '100%', justifyContent: 'flex-start' }}
+                  >
+                    <Archive size={18} />
+                    <span>إلغاء الأرشفة (Unarchive) وإعادة الملف للمنشطين</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={async () => {
+                      setSubmitting(true);
+                      try {
+                        await apiClient.patch(`/members/${statusModalMember.member_id}/archive`, null, { params: { is_archived: true } });
+                        setStatusModalMember(null);
+                        fetchData();
+                      } catch (err) { alert(err.response?.data?.message || 'فشل أرشفة المخدوم'); }
+                      finally { setSubmitting(false); }
+                    }}
+                    className="btn"
+                    style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#fca5a5', border: '1px solid rgba(239, 68, 68, 0.3)', width: '100%', justifyContent: 'flex-start' }}
+                  >
+                    <Archive size={18} />
+                    <span>أرشفة الملف (Archive) - الاحتفاظ بالبيانات وإخفاؤه من الحضور الجديد</span>
+                  </button>
+                )}
+              </div>
             </div>
+
 
             <div style={{ textAlign: 'right' }}>
               <button onClick={() => setStatusModalMember(null)} className="btn btn-secondary" disabled={submitting}>

@@ -33,7 +33,38 @@ def normalize_phone_number(phone_str: Optional[str]) -> Optional[str]:
         return f"+20{digits}"
 
     # Case 4: Starts with plus originally
-    if clean.startswith("+"):
-        return f"+{digits}"
-
     return f"+20{digits}"
+
+
+def is_valid_whatsapp_number(phone_str: Optional[str]) -> bool:
+    """
+    التحقق من صحة رقم محمول الواتساب.
+    يجب أن يكون رقم محمول مصر يرجع لنطاق الشرايح المحمولة (010, 011, 012, 015)
+    أو رقم دولي صالح للهواتف المحمولة.
+    """
+    if not phone_str:
+        return True  # Optional
+    clean = str(phone_str).strip()
+    if not clean:
+        return True
+
+    digits = "".join(c for c in clean if c.isdigit())
+    if len(digits) < 8 or len(digits) > 15:
+        return False
+
+    # Egyptian Mobile validation (11 digits starting with 010, 011, 012, 015)
+    if digits.startswith("0"):
+        return len(digits) == 11 and digits[1:3] in ("10", "11", "12", "15")
+
+    # Egyptian Mobile with 20 prefix (12 digits starting with 2010, 2011, 2012, 2015)
+    if digits.startswith("20"):
+        if len(digits) == 12:
+            return digits[2:4] in ("10", "11", "12", "15")
+        return len(digits) >= 11
+
+    # Egyptian Mobile 10 digits without leading 0 (1012345678)
+    if len(digits) == 10 and digits[:2] in ("10", "11", "12", "15"):
+        return True
+
+    # International mobile numbers (9 to 15 digits)
+    return len(digits) >= 9

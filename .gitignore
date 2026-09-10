@@ -4,6 +4,12 @@ node_modules/
 venv/
 __pycache__/
 *.pyc
+.pytest_cache/
+*.pytest_cache
+
+# Uploads & User Media
+uploads/photos/*
+!uploads/photos/.gitkeep
 
 # Build outputs
 frontend/dist/
@@ -20,3 +26,4 @@ dist/
 Thumbs.db
 .vscode/
 .idea/
+

@@ -22,5 +22,10 @@ class Member(Base):
     qr_token             = Column(String(64),  unique=True, nullable=True, index=True)
     card_issued_at       = Column(DateTime(timezone=True), nullable=True)
     total_points         = Column(Integer, nullable=False, default=0, index=True)
+    photo_url            = Column(Text, nullable=True)
+    is_archived          = Column(Boolean, nullable=False, default=False, index=True)
+    archived_at          = Column(DateTime(timezone=True), nullable=True)
+    archived_by          = Column(String(50), nullable=True)
     created_at           = Column(DateTime(timezone=True), server_default=func.now())
     updated_at           = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+

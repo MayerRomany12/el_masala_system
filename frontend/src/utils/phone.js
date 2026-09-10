@@ -38,3 +38,23 @@ export const getWaUrl = (phoneStr, text = '') => {
   const query = text ? `?text=${encodeURIComponent(text)}` : '';
   return `https://wa.me/${waNum}${query}`;
 };
+
+export const isValidWhatsappNumber = (phoneStr) => {
+  if (!phoneStr) return true;
+  const digits = String(phoneStr).replace(/\D/g, '');
+  if (!digits) return true;
+  if (digits.length < 8 || digits.length > 15) return false;
+  if (digits.startsWith('0')) {
+    return digits.length === 11 && ['10', '11', '12', '15'].includes(digits.slice(1, 3));
+  }
+  if (digits.startsWith('20')) {
+    if (digits.length === 12) {
+      return ['10', '11', '12', '15'].includes(digits.slice(2, 4));
+    }
+    return digits.length >= 11;
+  }
+  if (digits.length === 10 && ['10', '11', '12', '15'].includes(digits.slice(0, 2))) {
+    return true;
+  }
+  return digits.length >= 9;
+};

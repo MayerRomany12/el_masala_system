@@ -1,8 +1,10 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { followupApi } from '../api/followup';
 import { getWaUrl } from '../utils/phone';
+import { WhatsAppButton } from '../components/WhatsAppButton';
 import {
   HeartHandshake,
+
   Search,
   RefreshCw,
   Plus,
@@ -398,21 +400,19 @@ export const FollowupManagement = () => {
                               <Phone size={13} />
                               <span>{cleanPhone}</span>
                             </a>
-                             <a
-                               href={getWaUrl(cleanPhone)}
-                               target="_blank"
-                               rel="noreferrer"
-                               className="btn btn-secondary"
-                               style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#25D366' }}
-                               title="مراسلة واتساب"
-                             >
-                              <MessageSquare size={13} />
-                            </a>
+                            <WhatsAppButton
+                              phone={cleanPhone}
+                              memberName={t.member_name}
+                              memberId={t.member_id}
+                              template="absence"
+                              variant="icon"
+                            />
                           </div>
                         ) : (
                           <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>لا يوجد هاتف</span>
                         )}
                       </td>
+
 
                       <td>
                         <span

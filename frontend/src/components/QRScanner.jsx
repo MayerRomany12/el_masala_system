@@ -220,9 +220,26 @@ export const QRScanner = ({ onBack }) => {
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '1.25rem', alignItems: 'center' }}>
-            <div style={{ width: '70px', height: '70px', borderRadius: '16px', background: 'rgba(56, 189, 248, 0.15)', border: '2px solid #38bdf8', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#38bdf8' }}>
-              <User size={38} />
+            <div style={{
+              width: '70px',
+              height: '70px',
+              borderRadius: '16px',
+              background: 'rgba(56, 189, 248, 0.15)',
+              border: '2px solid #38bdf8',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#38bdf8',
+              overflow: 'hidden',
+              flexShrink: 0
+            }}>
+              {scannedMember.photo_url ? (
+                <img src={scannedMember.photo_url} alt={scannedMember.full_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                <User size={38} />
+              )}
             </div>
+
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
               <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#ffffff' }}>

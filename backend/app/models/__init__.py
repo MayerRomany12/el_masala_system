@@ -6,6 +6,8 @@ from app.models.followup import FollowupTask, FollowupLog
 from app.models.rewards import PointsTransaction
 from app.models.setting import SystemSetting
 from app.models.birthday import BirthdayGiftDelivery
+from app.models.audit_log import AuditLog
+from app.models.internal_messages import InternalMessage, MessageRecipient
 
 __all__ = [
     "User",
@@ -20,5 +22,9 @@ __all__ = [
     "FollowupLog",
     "PointsTransaction",
     "SystemSetting",
-    "BirthdayGiftDelivery"
+    "BirthdayGiftDelivery",
+    "AuditLog",
+    "InternalMessage",
+    "MessageRecipient"
 ]
+
