@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import { Church, Sparkles, Calendar, ShieldCheck, User } from 'lucide-react';
 import churchLogo from '../assets/church_logo.png';
+import { getPhotoUrl } from '../utils/photo';
 
 // Dynamic stage color resolution (prefix/substring matching)
 export const getStageTheme = (stage = '') => {
@@ -154,7 +155,7 @@ export const MemberCard = ({ member, activeSide = 'front' }) => {
               >
                 {member.photo_url ? (
                   <img
-                    src={member.photo_url}
+                    src={getPhotoUrl(member.photo_url)}
                     alt={member.full_name}
                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                   />

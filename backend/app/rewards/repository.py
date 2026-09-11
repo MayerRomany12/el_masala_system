@@ -155,7 +155,7 @@ class RewardsRepository:
         } for t, u_name in rows]
 
     async def get_leaderboard(self, stage: Optional[str] = None, limit: int = 20) -> List[Dict[str, Any]]:
-        query = select(Member).where(Member.status == "Active")
+        query = select(Member).where(Member.status == "Active", Member.is_archived == False)
         if stage and stage != "ALL":
             stage_prefix = stage.split('-')[0].strip()
             query = query.where(Member.stage.ilike(f"%{stage_prefix}%"))

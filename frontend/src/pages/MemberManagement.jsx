@@ -4,6 +4,7 @@ import { membersApi } from '../api/members';
 import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { normalizePhone, getWaUrl, isValidFullName, isValidEgyptianMobile } from '../utils/phone';
+import { getPhotoUrl } from '../utils/photo';
 import { WhatsAppButton } from '../components/WhatsAppButton';
 import {
   Users,
@@ -618,6 +619,35 @@ export const MemberManagement = () => {
         </div>
       </div>
 
+      {/* 2.5 Active vs Archived Tabs */}
+      <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <button
+          onClick={() => { setSelectedStatus(''); setPage(1); }}
+          className={`btn ${selectedStatus !== 'Archived' ? 'btn-primary' : 'btn-secondary'}`}
+          style={{ padding: '0.55rem 1.2rem', fontSize: '0.9rem', borderRadius: '10px', gap: '8px' }}
+        >
+          <Users size={18} />
+          <span>قائمة المخدومين المنشطين</span>
+        </button>
+
+        <button
+          onClick={() => { setSelectedStatus('Archived'); setPage(1); }}
+          className={`btn ${selectedStatus === 'Archived' ? 'btn-primary' : 'btn-secondary'}`}
+          style={{
+            padding: '0.55rem 1.2rem',
+            fontSize: '0.9rem',
+            borderRadius: '10px',
+            gap: '8px',
+            background: selectedStatus === 'Archived' ? 'rgba(239, 68, 68, 0.25)' : undefined,
+            borderColor: selectedStatus === 'Archived' ? '#f87171' : undefined,
+            color: selectedStatus === 'Archived' ? '#fca5a5' : undefined
+          }}
+        >
+          <Archive size={18} />
+          <span>أرشيف المخدومين والمستبعدين ({stats.inactive_members || 0})</span>
+        </button>
+      </div>
+
       {/* 3. Search and Filters Toolbar */}
       <div className="glass-card" style={{ padding: '1rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
         {/* Search */}
@@ -739,7 +769,7 @@ export const MemberManagement = () => {
                           flexShrink: 0
                         }}>
                           {member.photo_url ? (
-                            <img src={member.photo_url} alt={member.full_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            <img src={getPhotoUrl(member.photo_url)} alt={member.full_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           ) : (
                             <span style={{ fontSize: '0.9rem', color: '#38bdf8', fontWeight: 'bold' }}>{member.full_name.charAt(0)}</span>
                           )}
@@ -786,6 +816,27 @@ export const MemberManagement = () => {
                     </td>
                     <td>
                       <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem' }}>
+                        {/* Always available QR Card View / Download Button */}
+                        <button
+                          onClick={async () => {
+                            try {
+                              const cardRes = await membersApi.getMemberCard(member.member_id);
+                              if (cardRes && cardRes.data) {
+                                setCreatedMember(cardRes.data);
+                              } else {
+                                setCreatedMember(member);
+                              }
+                            } catch (e) {
+                              setCreatedMember(member);
+                            }
+                          }}
+                          className="btn btn-secondary"
+                          style={{ padding: '0.35rem 0.6rem', fontSize: '0.8rem', color: '#38bdf8' }}
+                          title="عرض وتحميل رمز الـ QR والبطاقة في أي وقت"
+                        >
+                          <QrCode size={15} />
+                        </button>
+
                         <button
                           onClick={() => setViewingMember(member)}
                           className="btn btn-secondary"
@@ -794,7 +845,25 @@ export const MemberManagement = () => {
                         >
                           <Eye size={15} />
                         </button>
-                        {hasPermission('members:write') && (
+
+                        {/* Unarchive Quick Button if archived */}
+                        {member.is_archived && hasPermission('members:write') && (
+                          <button
+                            onClick={async () => {
+                              try {
+                                await apiClient.patch(`/members/${member.member_id}/archive`, null, { params: { is_archived: false } });
+                                fetchData();
+                              } catch (err) { alert(err.response?.data?.message || 'فشل إلغاء الأرشفة'); }
+                            }}
+                            className="btn btn-secondary"
+                            style={{ padding: '0.35rem 0.6rem', fontSize: '0.8rem', color: '#34d399' }}
+                            title="إلغاء الأرشفة وإعادة التفعيل"
+                          >
+                            <Archive size={15} />
+                          </button>
+                        )}
+
+                        {hasPermission('members:write') && !member.is_archived && (
                           <>
                             <button
                               onClick={() => handleOpenEdit(member)}
@@ -865,7 +934,7 @@ export const MemberManagement = () => {
                         border: '1px solid #38bdf8', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center'
                       }}>
                         {formData.photo_url ? (
-                          <img src={formData.photo_url} alt="صورة المخدوم" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <img src={getPhotoUrl(formData.photo_url)} alt="صورة المخدوم" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         ) : (
                           <Camera size={24} style={{ color: '#38bdf8' }} />
                         )}
@@ -1030,22 +1099,33 @@ export const MemberManagement = () => {
             boxShadow: 'var(--shadow-glow)'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
-              <div>
-                <span style={{
-                  fontFamily: 'monospace',
-                  fontSize: '1rem',
-                  fontWeight: 800,
-                  color: '#38bdf8',
-                  background: 'rgba(56, 189, 248, 0.15)',
-                  padding: '0.3rem 0.75rem',
-                  borderRadius: '8px',
-                  border: '1px solid rgba(56, 189, 248, 0.3)'
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <div style={{
+                  width: '56px', height: '56px', borderRadius: '50%', background: '#334155', border: '2px solid #38bdf8', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
                 }}>
-                  {viewingMember.member_id}
-                </span>
-                <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-main)', marginTop: '0.5rem' }}>
-                  {viewingMember.full_name}
-                </h2>
+                  {viewingMember.photo_url ? (
+                    <img src={getPhotoUrl(viewingMember.photo_url)} alt={viewingMember.full_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <span style={{ fontSize: '1.2rem', color: '#38bdf8', fontWeight: 'bold' }}>{viewingMember.full_name.charAt(0)}</span>
+                  )}
+                </div>
+                <div>
+                  <span style={{
+                    fontFamily: 'monospace',
+                    fontSize: '0.95rem',
+                    fontWeight: 800,
+                    color: '#38bdf8',
+                    background: 'rgba(56, 189, 248, 0.15)',
+                    padding: '0.25rem 0.65rem',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(56, 189, 248, 0.3)'
+                  }}>
+                    {viewingMember.member_id}
+                  </span>
+                  <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--text-main)', marginTop: '0.3rem' }}>
+                    {viewingMember.full_name}
+                  </h2>
+                </div>
               </div>
               <button onClick={() => setViewingMember(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
                 <X size={22} />
@@ -1120,7 +1200,18 @@ export const MemberManagement = () => {
               </div>
             </div>
 
-            <div style={{ marginTop: '1.5rem', textAlign: 'right' }}>
+            <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <button 
+                onClick={() => {
+                  setCreatedMember(viewingMember);
+                  setViewingMember(null);
+                }} 
+                className="btn btn-primary"
+                style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                <QrCode size={16} />
+                <span>عرض بطاقة الـ QR 🎴</span>
+              </button>
               <button onClick={() => setViewingMember(null)} className="btn btn-secondary">
                 إغلاق
               </button>

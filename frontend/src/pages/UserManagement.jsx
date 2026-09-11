@@ -6,6 +6,7 @@ import { UserPlus, RefreshCw, Shield, AlertCircle, Check, Key, X } from 'lucide-
 const AVAILABLE_PERMISSIONS = [
   { key: 'members:read', label: 'قراءة وسجل الأطفال' },
   { key: 'members:write', label: 'إضافة وتعديل بيانات الأطفال' },
+  { key: 'members:archive', label: 'أرشفة وإعادة تفعيل المخدومين المستبعدين' },
   { key: 'cards:issue', label: 'طباعة وإصدار بطاقات الـ QR' },
   { key: 'attendance:session', label: 'إنشاء وإدارة جلسات الحضور' },
   { key: 'attendance:scan', label: 'مسح وتسجيل الحضور بالكاميرا' },

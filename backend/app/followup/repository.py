@@ -187,7 +187,7 @@ class FollowupRepository:
         threshold_str = await settings_repo.get_setting_value("absence_threshold_weeks", "2")
         threshold = int(threshold_str)
 
-        mem_query = select(Member).where(Member.status == "Active")
+        mem_query = select(Member).where(Member.status == "Active", Member.is_archived == False)
         if stage and stage != "ALL":
             stage_prefix = stage.split('-')[0].strip()
             mem_query = mem_query.where(Member.stage.ilike(f"%{stage_prefix}%"))

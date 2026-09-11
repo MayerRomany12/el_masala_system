@@ -53,6 +53,7 @@ class BirthdayRepository:
     ) -> List[Dict[str, Any]]:
         query = select(Member).where(
             Member.status == "Active",
+            Member.is_archived == False,
             Member.date_of_birth.isnot(None)
         )
         if stage and stage != "ALL":
