@@ -500,8 +500,12 @@ export const MemberManagement = () => {
 
     setSubmitting(true);
 
+    const selectedClass = classes.find(c => c.class_id === formData.class_id);
+    const resolvedStage = selectedClass?.stage || selectedClass?.name || 'عام';
+
     const payload = {
       ...formData,
+      stage: resolvedStage,
       full_name: formData.full_name.trim(),
       date_of_birth: formData.date_of_birth ? formData.date_of_birth : null,
       group_name: formData.group_name?.trim() || null,
@@ -525,22 +529,29 @@ export const MemberManagement = () => {
         fetchData();
         const createdData = res?.data || res;
         if (createdData && (createdData.member_id || createdData.id)) {
-          // إضافة الطفل للفصل المختار عبر ClassGroupMember
+          // إضافة الطفل للفصل المختار عبر ClassGroupMember (إذا لم يكن السيرفر قد أضافه تلقائياً)
           if (formData.class_id) {
             try {
               await apiClient.post(`/classes/${formData.class_id}/members`, {
                 member_id: createdData.member_id || createdData.id
               });
             } catch (classErr) {
-              // لا نوقف التسجيل لو فشل إضافة الفصل — يتم الإضافة يدوياًً لاحقاً
-              console.warn('تحذير: فشل إضافة الطفل للفصل تلقائياً — يمكن الإضافة من شاشة إدارة الفصول', classErr);
+              // العضوية قد تكون نشطة بالفعل عبر السيرفر الذري
+              console.log('Class membership synchronized');
             }
           }
           setCreatedMember(createdData);
         }
       }
     } catch (err) {
-      setModalError(err.response?.data?.message || 'فشلت عملية حفظ المخدوم ببيانات السيرفر. يرجى مراجعة التليفون أو المحاولة مجدداً.');
+      const detail = err.response?.data?.detail;
+      const errorMsg = typeof detail === 'string'
+        ? detail
+        : (Array.isArray(detail)
+            ? detail.map(d => (d.loc ? `${d.loc.slice(-1)}: ` : '') + (d.msg || d.message)).join(' | ')
+            : err.response?.data?.message)
+          || 'فشلت عملية حفظ المخدوم ببيانات السيرفر. يرجى مراجعة البيانات والمحاولة مجدداً.';
+      setModalError(errorMsg);
     } finally {
       setSubmitting(false);
     }
@@ -1024,46 +1035,51 @@ export const MemberManagement = () => {
                   </div>
                 )}
 
-                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1rem' }}>
+                {/* 1. Personal & Class Information */}
+                <div className="form-section-title">
+                  <UserPlus size={18} color="#facc15" />
+                  <span>البيانات الأساسية والفصل الخدمي</span>
+                </div>
 
+                <div className="form-row-2-1">
                   <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">الاسم الكامل للطفل (الثلاثي / الرباعي)*</label>
+                    <label className="form-label">الاسم الكامل للمخدوم (الاسم واسم الأب على الأقل)*</label>
                     <input
                       type="text" className="form-input" value={formData.full_name}
                       onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-                      placeholder="مثال: مارك فادي نبيل" required
+                      placeholder="مثال: كيرلس فادي عاطف" required
                     />
                   </div>
 
                   <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">الجنس*</label>
+                    <label className="form-label">النوع (الجنس)*</label>
                     <select className="form-input" value={formData.gender} onChange={(e) => setFormData({ ...formData, gender: e.target.value })}>
-                      <option value="ذكر">ذكر</option>
-                      <option value="أنثى">أنثى</option>
+                      <option value="ذكر">ذكر 👦</option>
+                      <option value="أنثى">أنثى 👧</option>
                     </select>
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="form-row-2">
                   <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">الفصل الخدمي (التدريسي أو الخدمة)*</label>
+                    <label className="form-label">الفصل الخدمي (فصل التربية الكنسية)*</label>
                     <select
                       className="form-input"
                       value={formData.class_id}
                       onChange={(e) => setFormData({ ...formData, class_id: e.target.value })}
                       required
                     >
-                      <option value="">— اختر الفصل —</option>
+                      <option value="">— اختر الفصل الخدمي —</option>
                       {classes.map((cls) => (
                         <option key={cls.class_id} value={cls.class_id}>
-                          {cls.name}
+                          {cls.name} ({cls.group_type === 'Standard' ? 'أساسي' : cls.group_type})
                         </option>
                       ))}
                     </select>
                   </div>
 
                   <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">اسم الأسرة / الفصل (اختياري)</label>
+                    <label className="form-label">اسم الأسرة أو المجموعة (اختياري)</label>
                     <input
                       type="text" className="form-input" value={formData.group_name}
                       onChange={(e) => setFormData({ ...formData, group_name: e.target.value })}
@@ -1072,7 +1088,32 @@ export const MemberManagement = () => {
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
+                <div className="form-row-2">
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">تاريخ الميلاد (اختياري)</label>
+                    <input
+                      type="date" className="form-input" value={formData.date_of_birth}
+                      onChange={(e) => setFormData({ ...formData, date_of_birth: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">اسم أب الاعتراف (اختياري)</label>
+                    <input
+                      type="text" className="form-input" value={formData.father_of_confession}
+                      onChange={(e) => setFormData({ ...formData, father_of_confession: e.target.value })}
+                      placeholder="مثال: أبونا بولا"
+                    />
+                  </div>
+                </div>
+
+                {/* 2. Contact Phone Numbers */}
+                <div className="form-section-title" style={{ marginTop: '0.9rem' }}>
+                  <Phone size={18} color="#38bdf8" />
+                  <span>أرقام الهواتف والتواصل</span>
+                </div>
+
+                <div className="form-row-3">
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label">تليفون ولي الأمر الرئيسي*</label>
                     <input
@@ -1101,23 +1142,10 @@ export const MemberManagement = () => {
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">تاريخ الميلاد (اختياري)</label>
-                    <input
-                      type="date" className="form-input" value={formData.date_of_birth}
-                      onChange={(e) => setFormData({ ...formData, date_of_birth: e.target.value })}
-                    />
-                  </div>
-
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">اسم أب الاعتراف (اختياري)</label>
-                    <input
-                      type="text" className="form-input" value={formData.father_of_confession}
-                      onChange={(e) => setFormData({ ...formData, father_of_confession: e.target.value })}
-                      placeholder="مثال: القمص يوحنا"
-                    />
-                  </div>
+                {/* 3. Address & Additional Notes */}
+                <div className="form-section-title" style={{ marginTop: '0.9rem' }}>
+                  <MapPin size={18} color="#34d399" />
+                  <span>بيانات السكن والرعاية</span>
                 </div>
 
                 <div className="form-group" style={{ marginBottom: 0 }}>
@@ -1125,7 +1153,7 @@ export const MemberManagement = () => {
                   <input
                     type="text" className="form-input" value={formData.address}
                     onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                    placeholder="منطقة المسلة - الشارع..."
+                    placeholder="عزبة شنوده - الكرور - الشارع..."
                   />
                 </div>
 

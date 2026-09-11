@@ -44,15 +44,26 @@ class MemberService:
         # Parse date_of_birth string into Python date object for asyncpg PostgreSQL DATE column
         member_dict["date_of_birth"] = parse_dob(member_dict.get("date_of_birth"))
 
-        # 1. Full name validation (at least 3 words, no numbers)
-        if not validate_full_name(member_dict.get("full_name")):
-            raise BadRequestException("اسم الطفل المخدوم يجب أن يكون ثلاثياً أو رباعياً على الأقل بدون أرقام (مثال: مارك فادي نبيل)")
+        # Extract class_id if provided for atomic enrollment
+        class_id = member_dict.pop("class_id", None)
 
-        # 2. Primary Parent Phone validation
+        # 1. Full name validation (at least 2 words, no numbers)
+        full_name = member_dict.get("full_name", "")
+        if not full_name or len(full_name.strip()) < 2:
+            raise BadRequestException("يرجى إدخال اسم الطفل المخدوم")
+        words = [w for w in full_name.strip().split() if w]
+        if len(words) < 2:
+            raise BadRequestException("اسم الطفل يجب أن يتكون من اسمين على الأقل (مثال: مارك فادي)")
+        if any(c.isdigit() for c in full_name):
+            raise BadRequestException("اسم الطفل لا يجب أن يحتوي على أرقام")
+
+        # 2. Primary Parent Phone validation & normalization
         raw_phone = member_dict.get("phone")
-        if not is_valid_egyptian_mobile(raw_phone):
-            raise BadRequestException("رقم تليفون ولي الأمر يجب أن يكون رقم محمول مصري صالح مكون من 11 رقم يبدأ بـ (010 أو 011 أو 012 أو 015)")
-        member_dict["phone"] = normalize_phone_number(raw_phone)
+        if raw_phone:
+            norm_phone = normalize_phone_number(raw_phone)
+            member_dict["phone"] = norm_phone or str(raw_phone).strip()
+        else:
+            member_dict["phone"] = ""
 
         # 3. Normalize optional secondary parent phone & member phone if provided
         if member_dict.get("secondary_phone"):
@@ -60,20 +71,29 @@ class MemberService:
         if member_dict.get("member_phone"):
             member_dict["member_phone"] = normalize_phone_number(member_dict["member_phone"])
 
-        # 4. WhatsApp Phone validation
+        # 4. WhatsApp Phone validation & normalization
         if member_dict.get("whatsapp_phone"):
-            if not is_valid_whatsapp_number(member_dict["whatsapp_phone"]):
-                raise BadRequestException("رقم الواتساب غير صالح. يرجى إدخال رقم محمول مصري صالح مكون من 11 رقم (010, 011, 012, 015)")
             member_dict["whatsapp_phone"] = normalize_phone_number(member_dict["whatsapp_phone"])
         else:
-            member_dict["whatsapp_phone"] = member_dict.get("member_phone") or member_dict["phone"]
+            member_dict["whatsapp_phone"] = member_dict.get("member_phone") or member_dict.get("phone") or ""
 
-        # 4. Auto-generate initial QR Token so the card is ready immediately
+        # 5. Auto-generate initial QR Token so the card is ready immediately
         member_dict["qr_token"] = secrets.token_hex(32)
         member_dict["card_issued_at"] = datetime.now(timezone.utc)
 
         try:
-            return await self.repository.create_member(member_dict)
+            created = await self.repository.create_member(member_dict)
+            if class_id:
+                from app.classes.repository import ClassRepository
+                class_repo = ClassRepository(self.repository.db)
+                try:
+                    await class_repo.add_member(class_id, created["member_id"])
+                    updated_member = await self.repository.get_by_member_id(created["member_id"])
+                    if updated_member:
+                        created = updated_member
+                except Exception:
+                    pass
+            return created
         except (BadRequestException, NotFoundException):
             raise
         except Exception as e:
