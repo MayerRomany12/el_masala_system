@@ -436,8 +436,14 @@ export const MemberManagement = () => {
 
     const payload = {
       ...formData,
+      full_name: formData.full_name.trim(),
+      date_of_birth: formData.date_of_birth ? formData.date_of_birth : null,
+      group_name: formData.group_name?.trim() || null,
+      father_of_confession: formData.father_of_confession?.trim() || null,
+      address: formData.address?.trim() || null,
+      notes: formData.notes?.trim() || null,
       phone: normalizePhone(formData.phone),
-      whatsapp_phone: normalizePhone(formData.whatsapp_phone || formData.phone)
+      whatsapp_phone: formData.whatsapp_phone ? normalizePhone(formData.whatsapp_phone) : normalizePhone(formData.phone)
     };
 
     try {

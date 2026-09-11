@@ -18,6 +18,12 @@ class MemberService:
 
         member_dict = data.model_dump()
 
+        # Sanitize optional fields: convert empty string or whitespace to None
+        for key in ["date_of_birth", "group_name", "father_of_confession", "address", "notes", "whatsapp_phone", "photo_url"]:
+            if key in member_dict and member_dict[key] is not None:
+                if isinstance(member_dict[key], str) and not member_dict[key].strip():
+                    member_dict[key] = None
+
         # 1. Full name validation (at least 3 words, no numbers)
         if not validate_full_name(member_dict.get("full_name")):
             raise BadRequestException("اسم الطفل المخدوم يجب أن يكون ثلاثياً أو رباعياً على الأقل بدون أرقام (مثال: مارك فادي نبيل)")
@@ -42,12 +48,14 @@ class MemberService:
 
         try:
             return await self.repository.create_member(member_dict)
+        except (BadRequestException, NotFoundException):
+            raise
         except Exception as e:
             try:
                 await self.repository.db.rollback()
             except Exception:
                 pass
-            raise BadRequestException("فشلت عملية حفظ المخدوم ببيانات السيرفر. يرجى مراجعة التليفون أو المحاولة مجدداً.")
+            raise BadRequestException(f"فشلت عملية حفظ المخدوم ببيانات السيرفر: {str(e)}")
 
     async def get_member_by_id(self, member_id: str) -> Dict[str, Any]:
         member = await self.repository.get_by_member_id(member_id)
@@ -80,6 +88,12 @@ class MemberService:
         update_fields = data.model_dump(exclude_unset=True)
         if not update_fields:
             return existing
+
+        # Sanitize empty string fields to None
+        for key in ["date_of_birth", "group_name", "father_of_confession", "address", "notes", "whatsapp_phone", "photo_url"]:
+            if key in update_fields and update_fields[key] is not None:
+                if isinstance(update_fields[key], str) and not update_fields[key].strip():
+                    update_fields[key] = None
 
         if "whatsapp_phone" in update_fields and update_fields["whatsapp_phone"]:
             if not is_valid_whatsapp_number(update_fields["whatsapp_phone"]):
