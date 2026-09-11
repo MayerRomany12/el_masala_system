@@ -1,3 +1,5 @@
+from typing import Optional
+
 def convert_arabic_digits(input_str: Optional[str]) -> Optional[str]:
     if not input_str:
         return input_str
