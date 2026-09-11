@@ -1,8 +1,9 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import QRCode from 'qrcode';
 import { membersApi } from '../api/members';
 import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import { normalizePhone, getWaUrl } from '../utils/phone';
+import { normalizePhone, getWaUrl, isValidFullName, isValidEgyptianMobile } from '../utils/phone';
 import { WhatsAppButton } from '../components/WhatsAppButton';
 import {
   Users,
@@ -24,8 +25,253 @@ import {
   MapPin,
   FileText,
   Camera,
-  Archive
+  Archive,
+  Download,
+  QrCode
 } from 'lucide-react';
+
+// ─── Modal after newly creating a member with QR code & download button ──────
+const CreatedMemberQRModal = ({ member, onClose }) => {
+  const qrCanvasRef = useRef(null);
+
+  useEffect(() => {
+    if (qrCanvasRef.current && member) {
+      const qrValue = member.qr_token || member.member_id;
+      QRCode.toCanvas(
+        qrCanvasRef.current,
+        qrValue,
+        {
+          width: 200,
+          margin: 1,
+          color: {
+            dark: '#0f172a',
+            light: '#ffffff'
+          }
+        },
+        (err) => {
+          if (err) console.error('فشل إنشاء رمز الـ QR:', err);
+        }
+      );
+    }
+  }, [member]);
+
+  if (!member) return null;
+
+  const downloadQRCard = () => {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = 600;
+    canvas.height = 700;
+
+    // 1. Background Gradient
+    const bgGradient = ctx.createLinearGradient(0, 0, 600, 700);
+    bgGradient.addColorStop(0, '#0f172a');
+    bgGradient.addColorStop(1, '#1e293b');
+    ctx.fillStyle = bgGradient;
+    ctx.fillRect(0, 0, 600, 700);
+
+    // 2. Card Border
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 6;
+    ctx.strokeRect(12, 12, 576, 676);
+
+    // 3. Header Title
+    ctx.fillStyle = '#f8fafc';
+    ctx.font = 'bold 24px Cairo, system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('كنيسة العذراء مريم والأنبا بولا بالمسلة', 300, 55);
+
+    ctx.fillStyle = '#38bdf8';
+    ctx.font = 'bold 18px Cairo, system-ui, sans-serif';
+    ctx.fillText('بطاقة مخدوم - نظام الحضور الذكي ⛪', 300, 88);
+
+    // 4. Divider Line
+    ctx.strokeStyle = 'rgba(56, 189, 248, 0.3)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(40, 105);
+    ctx.lineTo(560, 105);
+    ctx.stroke();
+
+    // 5. Member Full Name
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 28px Cairo, system-ui, sans-serif';
+    ctx.fillText(member.full_name || '', 300, 155);
+
+    // 6. Stage
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '20px Cairo, system-ui, sans-serif';
+    ctx.fillText(member.stage || '', 300, 195);
+
+    // 7. Member ID Badge Box
+    ctx.fillStyle = 'rgba(56, 189, 248, 0.15)';
+    ctx.fillRect(150, 215, 300, 48);
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(150, 215, 300, 48);
+
+    ctx.fillStyle = '#38bdf8';
+    ctx.font = 'bold 26px monospace';
+    ctx.fillText(`ID: ${member.member_id || ''}`, 300, 248);
+
+    // 8. QR Code Image from Canvas
+    if (qrCanvasRef.current) {
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(175, 285, 250, 250);
+      ctx.drawImage(qrCanvasRef.current, 185, 295, 230, 230);
+    }
+
+    // 9. Phone Number
+    ctx.fillStyle = '#cbd5e1';
+    ctx.font = '18px Cairo, system-ui, sans-serif';
+    ctx.fillText(`تليفون ولي الأمر: ${member.phone || ''}`, 300, 580);
+
+    // 10. Footer
+    ctx.fillStyle = '#64748b';
+    ctx.font = '14px Cairo, system-ui, sans-serif';
+    ctx.fillText('رمز QR آمن ومشفر لمسح الحضور التلقائي', 300, 640);
+
+    // Trigger Download
+    const link = document.createElement('a');
+    const safeName = (member.full_name || 'member').replace(/\s+/g, '_');
+    link.download = `QR_Card_${member.member_id}_${safeName}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  };
+
+  const downloadPureQR = () => {
+    if (!qrCanvasRef.current) return;
+    const link = document.createElement('a');
+    link.download = `QR_${member.member_id}.png`;
+    link.href = qrCanvasRef.current.toDataURL('image/png');
+    link.click();
+  };
+
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0, left: 0, right: 0, bottom: 0,
+      background: 'rgba(15, 23, 42, 0.88)',
+      backdropFilter: 'blur(10px)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 1100,
+      padding: '1rem'
+    }}>
+      <div className="glass-card animate-scale-in" style={{
+        width: '100%',
+        maxWidth: '480px',
+        background: '#1e293b',
+        border: '1.5px solid #38bdf8',
+        boxShadow: '0 20px 40px rgba(0,0,0,0.6)',
+        textAlign: 'center',
+        padding: '1.75rem 1.5rem'
+      }}>
+        <div style={{
+          width: 56, height: 56, borderRadius: '50%',
+          background: 'rgba(52, 211, 153, 0.15)',
+          border: '2px solid #34d399',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: '#34d399', margin: '0 auto 1rem auto'
+        }}>
+          <CheckCircle size={32} />
+        </div>
+
+        <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#f8fafc', marginBottom: '0.3rem' }}>
+          🎉 تم تسجيل المخدوم بنجاح!
+        </h2>
+        <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginBottom: '1.25rem' }}>
+          تم توليد الكود الفريد ورمز الـ QR الخاص بالحضور الذكي
+        </p>
+
+        <div style={{
+          background: 'rgba(15, 23, 42, 0.6)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          borderRadius: '12px',
+          padding: '1.25rem',
+          marginBottom: '1.25rem',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '0.75rem'
+        }}>
+          <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#ffffff' }}>
+            {member.full_name}
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+            <span style={{
+              fontFamily: 'monospace',
+              fontSize: '1rem',
+              fontWeight: 900,
+              color: '#38bdf8',
+              background: 'rgba(56, 189, 248, 0.15)',
+              padding: '0.25rem 0.75rem',
+              borderRadius: '8px',
+              border: '1px solid rgba(56, 189, 248, 0.3)'
+            }}>
+              {member.member_id}
+            </span>
+
+            <span style={{
+              fontSize: '0.82rem',
+              fontWeight: 700,
+              color: '#a855f7',
+              background: 'rgba(168, 85, 247, 0.15)',
+              padding: '0.25rem 0.75rem',
+              borderRadius: '8px',
+              border: '1px solid rgba(168, 85, 247, 0.3)'
+            }}>
+              {member.stage}
+            </span>
+          </div>
+
+          <div style={{
+            background: '#ffffff',
+            padding: '10px',
+            borderRadius: '12px',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+            marginTop: '0.5rem'
+          }}>
+            <canvas ref={qrCanvasRef} style={{ width: '180px', height: '180px', display: 'block' }} />
+          </div>
+          <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+            رمز الـ QR المخصص لمسح الحضور الإلكتروني
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <button
+            onClick={downloadQRCard}
+            className="btn btn-primary"
+            style={{ width: '100%', padding: '0.75rem', fontSize: '0.95rem', justifyContent: 'center', gap: '8px' }}
+          >
+            <Download size={18} />
+            <span>تحميل بطاقة الـ QR كاملة (PNG) 🖼️</span>
+          </button>
+
+          <button
+            onClick={downloadPureQR}
+            className="btn btn-secondary"
+            style={{ width: '100%', padding: '0.6rem', fontSize: '0.85rem', justifyContent: 'center', gap: '8px' }}
+          >
+            <QrCode size={16} />
+            <span>تحميل رمز الـ QR فقط (صورة PNG)</span>
+          </button>
+
+          <button
+            onClick={onClose}
+            className="btn btn-secondary"
+            style={{ width: '100%', padding: '0.6rem', fontSize: '0.9rem', justifyContent: 'center', marginTop: '0.25rem' }}
+          >
+            إغلاق ومتابعة التسجيل
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 
 const STAGE_OPTIONS = [
@@ -70,6 +316,7 @@ export const MemberManagement = () => {
   const [editingMember, setEditingMember] = useState(null);
   const [viewingMember, setViewingMember] = useState(null);
   const [statusModalMember, setStatusModalMember] = useState(null);
+  const [createdMember, setCreatedMember] = useState(null);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -166,6 +413,25 @@ export const MemberManagement = () => {
   const handleSubmitForm = async (e) => {
     e.preventDefault();
     setModalError('');
+
+    // 1. Full name validation (at least 3 words, no numbers)
+    if (!isValidFullName(formData.full_name)) {
+      setModalError('اسم الطفل المخدوم يجب أن يكون ثلاثياً أو رباعياً على الأقل بدون أرقام (مثال: مارك فادي نبيل)');
+      return;
+    }
+
+    // 2. Egyptian phone validation
+    if (!isValidEgyptianMobile(formData.phone)) {
+      setModalError('رقم تليفون ولي الأمر يجب أن يكون رقم محمول مصري صالح مكون من 11 رقم يبدأ بـ (010 أو 011 أو 012 أو 015)');
+      return;
+    }
+
+    // 3. Optional WhatsApp validation
+    if (formData.whatsapp_phone && !isValidEgyptianMobile(formData.whatsapp_phone)) {
+      setModalError('رقم الواتساب غير صالح. يرجى إدخال رقم محمول مصري مكون من 11 رقم يبدأ بـ (010 أو 011 أو 012 أو 015)');
+      return;
+    }
+
     setSubmitting(true);
 
     const payload = {
@@ -177,13 +443,19 @@ export const MemberManagement = () => {
     try {
       if (editingMember) {
         await membersApi.updateMember(editingMember.member_id, payload);
+        setShowAddModal(false);
+        fetchData();
       } else {
-        await membersApi.createMember(payload);
+        const res = await membersApi.createMember(payload);
+        setShowAddModal(false);
+        fetchData();
+        const createdData = res?.data || res;
+        if (createdData && (createdData.member_id || createdData.id)) {
+          setCreatedMember(createdData);
+        }
       }
-      setShowAddModal(false);
-      fetchData();
     } catch (err) {
-      setModalError(err.response?.data?.message || 'تعذر حفظ بيانات المخدوم');
+      setModalError(err.response?.data?.message || 'فشلت عملية حفظ المخدوم ببيانات السيرفر. يرجى مراجعة التليفون أو المحاولة مجدداً.');
     } finally {
       setSubmitting(false);
     }
@@ -897,6 +1169,14 @@ export const MemberManagement = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* 8. Newly Created Member QR Modal */}
+      {createdMember && (
+        <CreatedMemberQRModal
+          member={createdMember}
+          onClose={() => setCreatedMember(null)}
+        />
       )}
 
     </div>

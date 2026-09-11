@@ -13,18 +13,41 @@ class MemberService:
         self.repository = MemberRepository(db)
 
     async def create_member(self, data: MemberCreate) -> Dict[str, Any]:
+        from app.shared.utils import validate_full_name, is_valid_egyptian_mobile
+        from datetime import datetime, timezone
+
         member_dict = data.model_dump()
+
+        # 1. Full name validation (at least 3 words, no numbers)
+        if not validate_full_name(member_dict.get("full_name")):
+            raise BadRequestException("اسم الطفل المخدوم يجب أن يكون ثلاثياً أو رباعياً على الأقل بدون أرقام (مثال: مارك فادي نبيل)")
+
+        # 2. Egyptian Phone validation
+        raw_phone = member_dict.get("phone")
+        if not is_valid_egyptian_mobile(raw_phone):
+            raise BadRequestException("رقم تليفون ولي الأمر يجب أن يكون رقم محمول مصري صالح مكون من 11 رقم يبدأ بـ (010 أو 011 أو 012 أو 015)")
+        member_dict["phone"] = normalize_phone_number(raw_phone)
+
+        # 3. WhatsApp Phone validation
         if member_dict.get("whatsapp_phone"):
             if not is_valid_whatsapp_number(member_dict["whatsapp_phone"]):
-                raise BadRequestException("رقم الواتساب غير صالح. يرجى إدخال رقم محمول صالح مسجل عليه واتساب (مثل 010 أو 011 أو 012 أو 015)")
+                raise BadRequestException("رقم الواتساب غير صالح. يرجى إدخال رقم محمول مصري صالح مكون من 11 رقم (010, 011, 012, 015)")
             member_dict["whatsapp_phone"] = normalize_phone_number(member_dict["whatsapp_phone"])
-        elif member_dict.get("phone"):
-            member_dict["whatsapp_phone"] = normalize_phone_number(member_dict["phone"])
+        else:
+            member_dict["whatsapp_phone"] = member_dict["phone"]
 
-        if member_dict.get("phone"):
-            member_dict["phone"] = normalize_phone_number(member_dict["phone"])
+        # 4. Auto-generate initial QR Token so the card is ready immediately
+        member_dict["qr_token"] = secrets.token_hex(32)
+        member_dict["card_issued_at"] = datetime.now(timezone.utc)
 
-        return await self.repository.create_member(member_dict)
+        try:
+            return await self.repository.create_member(member_dict)
+        except Exception as e:
+            try:
+                await self.repository.db.rollback()
+            except Exception:
+                pass
+            raise BadRequestException("فشلت عملية حفظ المخدوم ببيانات السيرفر. يرجى مراجعة التليفون أو المحاولة مجدداً.")
 
     async def get_member_by_id(self, member_id: str) -> Dict[str, Any]:
         member = await self.repository.get_by_member_id(member_id)

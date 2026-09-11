@@ -1,6 +1,13 @@
+export const convertArabicDigits = (str) => {
+  if (!str) return '';
+  const arabicDigits = '٠١٢٣٤٥٦٧٨٩';
+  const englishDigits = '0123456789';
+  return String(str).replace(/[٠١٢٣٤٥٦٧٨٩]/g, (d) => englishDigits[arabicDigits.indexOf(d)]);
+};
+
 export const normalizePhone = (phoneStr) => {
   if (!phoneStr) return '';
-  const clean = String(phoneStr).trim();
+  const clean = convertArabicDigits(phoneStr).trim();
   const digits = clean.replace(/\D/g, '');
   if (!digits) return clean;
 
@@ -19,9 +26,35 @@ export const normalizePhone = (phoneStr) => {
   return `+20${digits}`;
 };
 
+export const isValidEgyptianMobile = (phoneStr) => {
+  if (!phoneStr) return false;
+  const clean = convertArabicDigits(phoneStr).trim();
+  const digits = clean.replace(/\D/g, '');
+  if (digits.startsWith('0')) {
+    return digits.length === 11 && ['10', '11', '12', '15'].includes(digits.slice(1, 3));
+  }
+  if (digits.startsWith('20')) {
+    return digits.length === 12 && ['10', '11', '12', '15'].includes(digits.slice(2, 4));
+  }
+  if (digits.length === 10 && ['10', '11', '12', '15'].includes(digits.slice(0, 2))) {
+    return true;
+  }
+  return false;
+};
+
+export const isValidFullName = (nameStr) => {
+  if (!nameStr) return false;
+  const clean = String(nameStr).trim();
+  const words = clean.split(/\s+/).filter(Boolean);
+  if (words.length < 3) return false;
+  if (/\d/.test(clean)) return false;
+  return true;
+};
+
 export const getWaDigits = (phoneStr) => {
   if (!phoneStr) return '';
-  const digits = String(phoneStr).replace(/\D/g, '');
+  const clean = convertArabicDigits(phoneStr);
+  const digits = String(clean).replace(/\D/g, '');
   if (!digits) return '';
   if (digits.startsWith('0')) {
     return '20' + digits.slice(1);
@@ -41,20 +74,5 @@ export const getWaUrl = (phoneStr, text = '') => {
 
 export const isValidWhatsappNumber = (phoneStr) => {
   if (!phoneStr) return true;
-  const digits = String(phoneStr).replace(/\D/g, '');
-  if (!digits) return true;
-  if (digits.length < 8 || digits.length > 15) return false;
-  if (digits.startsWith('0')) {
-    return digits.length === 11 && ['10', '11', '12', '15'].includes(digits.slice(1, 3));
-  }
-  if (digits.startsWith('20')) {
-    if (digits.length === 12) {
-      return ['10', '11', '12', '15'].includes(digits.slice(2, 4));
-    }
-    return digits.length >= 11;
-  }
-  if (digits.length === 10 && ['10', '11', '12', '15'].includes(digits.slice(0, 2))) {
-    return true;
-  }
-  return digits.length >= 9;
+  return isValidEgyptianMobile(phoneStr);
 };

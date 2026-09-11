@@ -1,70 +1,76 @@
-from typing import Optional
+def convert_arabic_digits(input_str: Optional[str]) -> Optional[str]:
+    if not input_str:
+        return input_str
+    arabic_digits = "٠١٢٣٤٥٦٧٨٩"
+    english_digits = "0123456789"
+    trans = str.maketrans(arabic_digits, english_digits)
+    return str(input_str).translate(trans)
+
 
 def normalize_phone_number(phone_str: Optional[str]) -> Optional[str]:
     """
     تنسيق وحفظ أرقام الهواتف بكود الدولة التلقائي (+20 لمصر).
-    - 01012345678   -> +201012345678
-    - 201012345678  -> +201012345678
-    - +201012345678 -> +201012345678
-    - 1012345678    -> +201012345678
     """
     if not phone_str:
         return phone_str
 
-    clean = str(phone_str).strip()
+    clean = convert_arabic_digits(str(phone_str)).strip()
     if not clean:
         return clean
 
-    # Extract digits only
     digits = "".join(c for c in clean if c.isdigit())
     if not digits:
         return clean
 
-    # Case 1: Already has country code 20 (e.g. 201012345678)
     if digits.startswith("20") and len(digits) >= 11:
         return f"+{digits}"
 
-    # Case 2: Starts with 0 (e.g. 01012345678 -> +201012345678)
     if digits.startswith("0"):
         return f"+20{digits[1:]}"
 
-    # Case 3: 10 digits starting with 1, 2, etc. (e.g. 1012345678 -> +201012345678)
     if len(digits) == 10 and digits[0] in ("1", "2", "3"):
         return f"+20{digits}"
 
-    # Case 4: Starts with plus originally
     return f"+20{digits}"
 
 
-def is_valid_whatsapp_number(phone_str: Optional[str]) -> bool:
+def is_valid_egyptian_mobile(phone_str: Optional[str]) -> bool:
     """
-    التحقق من صحة رقم محمول الواتساب.
-    يجب أن يكون رقم محمول مصر يرجع لنطاق الشرايح المحمولة (010, 011, 012, 015)
-    أو رقم دولي صالح للهواتف المحمولة.
+    التحقق الصارم من أن الرقم رقم محمول مصري مكون من 11 رقم يبدأ بـ 010, 011, 012, 015.
     """
     if not phone_str:
-        return True  # Optional
-    clean = str(phone_str).strip()
-    if not clean:
-        return True
-
-    digits = "".join(c for c in clean if c.isdigit())
-    if len(digits) < 8 or len(digits) > 15:
         return False
-
-    # Egyptian Mobile validation (11 digits starting with 010, 011, 012, 015)
+    clean = convert_arabic_digits(str(phone_str)).strip()
+    digits = "".join(c for c in clean if c.isdigit())
     if digits.startswith("0"):
         return len(digits) == 11 and digits[1:3] in ("10", "11", "12", "15")
-
-    # Egyptian Mobile with 20 prefix (12 digits starting with 2010, 2011, 2012, 2015)
     if digits.startswith("20"):
-        if len(digits) == 12:
-            return digits[2:4] in ("10", "11", "12", "15")
-        return len(digits) >= 11
-
-    # Egyptian Mobile 10 digits without leading 0 (1012345678)
+        return len(digits) == 12 and digits[2:4] in ("10", "11", "12", "15")
     if len(digits) == 10 and digits[:2] in ("10", "11", "12", "15"):
         return True
+    return False
 
-    # International mobile numbers (9 to 15 digits)
-    return len(digits) >= 9
+
+def is_valid_whatsapp_number(phone_str: Optional[str]) -> bool:
+    if not phone_str:
+        return True
+    clean = convert_arabic_digits(str(phone_str)).strip()
+    if not clean:
+        return True
+    return is_valid_egyptian_mobile(clean)
+
+
+def validate_full_name(name_str: Optional[str]) -> bool:
+    """
+    التحقق من أن الاسم ثلاثي أو رباعي على الأقل وبدون أرقام.
+    """
+    if not name_str:
+        return False
+    clean = name_str.strip()
+    words = [w for w in clean.split() if w]
+    if len(words) < 3:
+        return False
+    if any(c.isdigit() for c in clean):
+        return False
+    return True
+
