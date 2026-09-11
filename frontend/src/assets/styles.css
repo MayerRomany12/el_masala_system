@@ -193,23 +193,94 @@ p {
   color: var(--text-muted);
 }
 
-.form-input {
+.form-input,
+.form-control {
   width: 100%;
   padding: 0.75rem 1rem;
   background: rgba(13, 5, 8, 0.75);
-  border: 1px solid rgba(212, 175, 55, 0.2);
+  border: 1px solid rgba(212, 175, 55, 0.25);
   border-radius: var(--radius-sm);
   color: var(--text-main);
   font-family: var(--font-family);
   font-size: 0.95rem;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 
-.form-input:focus {
+.form-input:focus,
+.form-control:focus {
   outline: none;
   border-color: var(--color-gold-main);
   box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.25);
+  background: rgba(26, 10, 16, 0.95);
 }
+
+/* ── Custom Styled Selects (Consistent across entire system) ─────────────────── */
+select.form-input,
+select.form-control {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23d4af37' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: left 0.85rem center;
+  background-size: 16px;
+  padding-left: 2.4rem;
+  padding-right: 0.9rem;
+  cursor: pointer;
+}
+
+select.form-input:disabled,
+select.form-control:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+select.form-input option,
+select.form-control option {
+  background-color: #1a0a10;
+  color: #fcfcfc;
+  padding: 0.6rem 0.9rem;
+}
+
+select.form-input option:checked,
+select.form-control option:checked,
+select.form-input option:hover,
+select.form-control option:hover {
+  background: #7a081d !important;
+  color: #fbeea9 !important;
+}
+
+/* ── Alert System ───────────────────────────────────────────────────────────── */
+.alert {
+  padding: 0.85rem 1.25rem;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-weight: 600;
+  font-size: 0.92rem;
+  margin-bottom: 1.25rem;
+  animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.alert-error {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+}
+
+.alert-success {
+  background: rgba(52, 211, 153, 0.15);
+  border: 1px solid rgba(52, 211, 153, 0.4);
+  color: #6ee7b7;
+}
+
+.alert-warning {
+  background: rgba(251, 191, 36, 0.15);
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  color: #fde68a;
+}
+
 
 /* Badges */
 .badge {

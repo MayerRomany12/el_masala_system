@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import api from '../api/client';
+import { apiClient } from '../api/client';
 import {
   Sun,
   Plus,
@@ -38,7 +38,7 @@ export const SummerActivityManagement = () => {
 
   const fetchSeasons = async () => {
     try {
-      const res = await api.get('/seasons');
+      const res = await apiClient.get('/seasons');
       const items = res.data.data.items || [];
       setSeasons(items);
       if (items.length > 0) {
@@ -56,7 +56,7 @@ export const SummerActivityManagement = () => {
       const params = { group_type: 'Summer' };
       if (selectedSeason) params.season_id = selectedSeason;
 
-      const res = await api.get('/classes', { params });
+      const res = await apiClient.get('/classes', { params });
       setSummerGroups(res.data.data.items || []);
     } catch (err) {
       setError('تعذر جلب أنشطة ومجموعات النشاط الصيفي');
@@ -69,7 +69,7 @@ export const SummerActivityManagement = () => {
     e.preventDefault();
     try {
       setError('');
-      await api.post('/classes', {
+      await apiClient.post('/classes', {
         ...newGroup,
         group_type: 'Summer',
         season_id: selectedSeason || newGroup.season_id
@@ -198,51 +198,59 @@ export const SummerActivityManagement = () => {
 
       {/* Create Modal */}
       {showCreateModal && (
-        <div className="modal-backdrop" onClick={() => setShowCreateModal(false)}>
-          <div className="modal-content glass-card" style={{ maxWidth: '500px', width: '90%', padding: '1.5rem' }} onClick={e => e.stopPropagation()}>
-            <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--color-gold-light)', marginBottom: '1rem' }}>
-              إضافة ورشة / مجموعة نشاط صيفي جديدة ☀️
-            </h3>
+        <div className="modal-overlay" onClick={() => setShowCreateModal(false)}>
+          <div className="modal-card" style={{ maxWidth: '520px' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 style={{ fontSize: '1.2rem', fontWeight: 800, margin: 0, color: 'var(--color-gold-light)' }}>
+                إضافة ورشة / مجموعة نشاط صيفي جديدة ☀️
+              </h3>
+              <button onClick={() => setShowCreateModal(false)} className="btn-secondary" style={{ padding: '0.3rem', borderRadius: '50%', border: 'none', cursor: 'pointer' }}>
+                ✕
+              </button>
+            </div>
             <form onSubmit={handleCreateSummerGroup}>
-              <div style={{ marginBottom: '1rem' }}>
-                <label className="form-label">اسم النشاط / المجموعة الصيفية:</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="مثال: ورشة الكورال - صيف 2026"
-                  className="form-control"
-                  value={newGroup.name}
-                  onChange={e => setNewGroup({ ...newGroup, name: e.target.value })}
-                />
+              <div className="modal-body">
+                <div className="form-group">
+                  <label className="form-label">اسم النشاط / المجموعة الصيفية:</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="مثال: ورشة الكورال - صيف 2026"
+                    className="form-input"
+                    value={newGroup.name}
+                    onChange={e => setNewGroup({ ...newGroup, name: e.target.value })}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">المرحلة الدراسية المستهدفة:</label>
+                  <select
+                    className="form-input"
+                    value={newGroup.stage}
+                    onChange={e => setNewGroup({ ...newGroup, stage: e.target.value })}
+                  >
+                    <option value="حضانة">حضانة</option>
+                    <option value="ابتدائي">ابتدائي</option>
+                    <option value="إعدادي">إعدادي</option>
+                    <option value="ثانوي">ثانوي</option>
+                    <option value="جامعيين وخريجين">جامعيين وخريجين</option>
+                    <option value="عام">عام لكافة الأعمار</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">وصف تفصيلي للنشاط:</label>
+                  <textarea
+                    className="form-input"
+                    rows={3}
+                    placeholder="تفاصيل النشاط والمواعيد والأهداف..."
+                    value={newGroup.description}
+                    onChange={e => setNewGroup({ ...newGroup, description: e.target.value })}
+                  />
+                </div>
               </div>
 
-              <div style={{ marginBottom: '1rem' }}>
-                <label className="form-label">المرحلة الدراسية المستهدفة:</label>
-                <select
-                  className="form-control"
-                  value={newGroup.stage}
-                  onChange={e => setNewGroup({ ...newGroup, stage: e.target.value })}
-                >
-                  <option value="حضانة">حضانة</option>
-                  <option value="ابتدائي">ابتدائي</option>
-                  <option value="إعدادي">إعدادي</option>
-                  <option value="ثانوي">ثانوي</option>
-                  <option value="جامعيين وخريجين">جامعيين وخريجين</option>
-                </select>
-              </div>
-
-              <div style={{ marginBottom: '1rem' }}>
-                <label className="form-label">وصف تفصيلي للنشاط:</label>
-                <textarea
-                  className="form-control"
-                  rows={3}
-                  placeholder="تفاصيل النشاط والمواعيد والأهداف..."
-                  value={newGroup.description}
-                  onChange={e => setNewGroup({ ...newGroup, description: e.target.value })}
-                />
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1.5rem' }}>
+              <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowCreateModal(false)}>إلغاء</button>
                 <button type="submit" className="btn btn-primary">حفظ النشاط الصيفي</button>
               </div>
@@ -253,3 +261,4 @@ export const SummerActivityManagement = () => {
     </div>
   );
 };
+
