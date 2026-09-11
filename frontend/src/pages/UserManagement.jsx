@@ -134,7 +134,7 @@ export const UserManagement = () => {
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       {/* Header Bar */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div className="user-header-container">
         <div>
           <h1 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '0.2rem' }}>
             إدارة المستخدمين والصلاحيات المخصصة
@@ -144,13 +144,13 @@ export const UserManagement = () => {
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <button onClick={fetchUsers} className="btn btn-secondary">
+        <div className="user-header-actions">
+          <button onClick={fetchUsers} className="btn btn-secondary" style={{ flex: 1 }}>
             <RefreshCw size={16} />
             <span>تحديث</span>
           </button>
           {hasPermission('users:write') && (
-            <button onClick={() => setShowModal(true)} className="btn btn-primary">
+            <button onClick={() => setShowModal(true)} className="btn btn-primary" style={{ flex: 2 }}>
               <UserPlus size={18} />
               <span>إضافة خادم / مسؤول جديد</span>
             </button>
@@ -175,8 +175,8 @@ export const UserManagement = () => {
         </div>
       )}
 
-      {/* Users Table */}
-      <div className="glass-card" style={{ padding: 0, overflow: 'hidden' }}>
+      {/* Desktop Users Table */}
+      <div className="glass-card users-desktop-table" style={{ padding: 0, overflow: 'hidden' }}>
         <div className="table-container">
           <table className="custom-table">
             <thead>
@@ -273,6 +273,93 @@ export const UserManagement = () => {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Mobile Users Responsive Cards View */}
+      <div className="users-mobile-list">
+        {loading ? (
+          <div className="glass-card" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+            جاري تحميل حسابات المستخدمين...
+          </div>
+        ) : users.length === 0 ? (
+          <div className="glass-card" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+            لا يوجد مستخدمين مسجلين حالياً.
+          </div>
+        ) : (
+          users.map((user) => (
+            <div key={user.user_id} className="user-mobile-card">
+              <div className="user-mobile-card-row">
+                <div>
+                  <div style={{ fontWeight: 800, color: 'var(--text-main)', fontSize: '1rem' }}>{user.full_name}</div>
+                  <div style={{ fontWeight: 700, color: '#38bdf8', fontSize: '0.85rem' }}>@{user.username}</div>
+                </div>
+                <button
+                  onClick={async () => {
+                    try {
+                      await apiClient.patch(`/users/${user.user_id}`, { is_active: !user.is_active });
+                      fetchUsers();
+                    } catch (err) {
+                      alert(err.response?.data?.message || 'تعذر تغيير حالة حساب المستخدم');
+                    }
+                  }}
+                  className="btn btn-secondary"
+                  style={{
+                    padding: '0.25rem 0.6rem',
+                    fontSize: '0.78rem',
+                    color: user.is_active ? '#34d399' : '#f87171',
+                    borderColor: user.is_active ? 'rgba(52, 211, 153, 0.3)' : 'rgba(248, 113, 113, 0.3)'
+                  }}
+                >
+                  {user.is_active ? 'نشط 🟢' : 'معطل 🔴'}
+                </button>
+              </div>
+
+              <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', wordBreak: 'break-all' }}>
+                📧 {user.email}
+              </div>
+
+              <div className="user-mobile-card-row" style={{ paddingTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.2rem' }}>الدور</label>
+                  <select
+                    className="form-input"
+                    style={{ padding: '0.35rem 0.5rem', fontSize: '0.8rem', width: '100%' }}
+                    value={user.role}
+                    onChange={async (e) => {
+                      const newRole = e.target.value;
+                      try {
+                        await apiClient.patch(`/users/${user.user_id}`, { role: newRole });
+                        fetchUsers();
+                      } catch (err) {
+                        alert(err.response?.data?.message || 'تعذر تغيير صلاحية المستخدم');
+                      }
+                    }}
+                  >
+                    <option value="Servant">Servant</option>
+                    <option value="Admin">Admin</option>
+                    <option value="Super Admin">Super Admin</option>
+                  </select>
+                </div>
+
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.2rem' }}>الصلاحيات</label>
+                  <button
+                    onClick={() => handleOpenPermModal(user)}
+                    className="btn btn-secondary"
+                    style={{ width: '100%', padding: '0.35rem 0.5rem', fontSize: '0.78rem', gap: '0.3rem', color: 'var(--color-gold-light)' }}
+                  >
+                    <Key size={14} />
+                    <span>تخصيص ({user.effective_permissions?.length || 0})</span>
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-subtle)', textAlign: 'left' }}>
+                تاريخ الإنشاء: {new Date(user.created_at).toLocaleDateString('ar-EG')}
+              </div>
+            </div>
+          ))
+        )}
       </div>
 
       {/* Add User Modal */}
@@ -372,7 +459,7 @@ export const UserManagement = () => {
               </button>
             </div>
 
-            <div className="modal-body" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.75rem' }}>
+            <div className="modal-body" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
               {AVAILABLE_PERMISSIONS.map(p => {
                 const isCustom = customPerms.includes(p.key);
                 const isRevoked = revokedPerms.includes(p.key);
