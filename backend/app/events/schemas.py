@@ -72,6 +72,7 @@ class EventRegistrationCreate(BaseModel):
     amount_due: Optional[float] = Field(default=None, ge=0.0, description="المبلغ المستحق (اختياري - افتراضياً رسوم الفعالية)")
     amount_paid: float = Field(default=0.0, ge=0.0, description="المبلغ المدفوع عند التسجيل")
     notes: Optional[str] = Field(default=None, description="ملاحظات التسجيل أو السداد")
+    is_override: Optional[bool] = Field(default=False, description="تجاوز إداري لتسجيل طفل خارج الفصول المستهدفة")
 
 
 class EventRegistrationPaymentUpdate(BaseModel):

@@ -287,3 +287,24 @@ class EventRepository:
         )
         await self.db.flush()
         return await self.get_registration_by_id(registration_id)
+
+    async def get_event_target_class_ids(self, event_id: str) -> List[str]:
+        from app.models.event import EventTargetClass
+        res = await self.db.execute(
+            select(EventTargetClass.class_id).where(EventTargetClass.event_id == event_id)
+        )
+        return list(res.scalars().all())
+
+    async def is_member_in_target_classes(self, member_id: str, class_ids: List[str]) -> bool:
+        if not class_ids:
+            return True  # Empty target classes = General event open to all classes
+        from app.models.class_group import ClassGroupMember
+        res = await self.db.execute(
+            select(ClassGroupMember).where(
+                ClassGroupMember.member_id == member_id,
+                ClassGroupMember.class_id.in_(class_ids),
+                ClassGroupMember.is_active == True
+            )
+        )
+        return res.scalar_one_or_none() is not None
+

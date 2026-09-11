@@ -23,6 +23,8 @@ from app.attendance.router import router as attendance_router
 from app.followup.router import router as followup_router
 from app.rewards.router import router as rewards_router
 from app.birthdays.router import router as birthdays_router
+from app.seasons.router import router as seasons_router
+from app.classes.router import router as classes_router
 from app.reports.router import router as reports_router
 from app.messages.router import router as messages_router
 from app.audit.router import router as audit_router
@@ -109,6 +111,8 @@ app.include_router(members_router, prefix=settings.API_V1_STR)
 app.include_router(settings_router, prefix=settings.API_V1_STR)
 app.include_router(events_router, prefix=settings.API_V1_STR)
 app.include_router(attendance_router, prefix=settings.API_V1_STR)
+app.include_router(seasons_router, prefix=settings.API_V1_STR)
+app.include_router(classes_router, prefix=settings.API_V1_STR)
 app.include_router(followup_router, prefix=settings.API_V1_STR)
 app.include_router(rewards_router, prefix=settings.API_V1_STR)
 app.include_router(birthdays_router, prefix=settings.API_V1_STR)

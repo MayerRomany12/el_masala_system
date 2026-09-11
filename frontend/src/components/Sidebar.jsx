@@ -6,6 +6,7 @@ import {
   Users,
   CreditCard,
   Calendar,
+  FolderKanban,
   QrCode,
   UserCheck,
   HeartHandshake,
@@ -33,6 +34,18 @@ export const Sidebar = ({ mobileOpen, setMobileOpen }) => {
       path: '/members',
       icon: <Users size={19} />,
       permission: 'members:read'
+    },
+    {
+      title: 'إدارة الفصول والمجموعات',
+      path: '/classes',
+      icon: <FolderKanban size={19} />,
+      permission: 'classes:manage'
+    },
+    {
+      title: 'قطاع النشاط الصيفي',
+      path: '/summer-activities',
+      icon: <Calendar size={19} />,
+      permission: 'classes:manage'
     },
     {
       title: 'بطاقات العضوية و QR',

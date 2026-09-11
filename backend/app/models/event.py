@@ -39,3 +39,12 @@ class EventRegistration(Base):
     __table_args__ = (
         UniqueConstraint("event_id", "member_id", name="uq_event_member_registration"),
     )
+
+
+class EventTargetClass(Base):
+    __tablename__ = "event_target_classes"
+
+    event_id = Column(String(20), ForeignKey("events.event_id", ondelete="CASCADE"), primary_key=True)
+    class_id = Column(String(30), ForeignKey("class_groups.class_id", ondelete="CASCADE"), primary_key=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+

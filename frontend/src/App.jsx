@@ -18,6 +18,9 @@ import { BirthdayManagement } from './pages/BirthdayManagement';
 import { ReportManagement } from './pages/ReportManagement';
 import { QRScanner } from './components/QRScanner';
 
+import { ClassManagement } from './pages/ClassManagement';
+import { SummerActivityManagement } from './pages/SummerActivityManagement';
+
 const ProtectedLayout = () => {
   const { user, loading } = useAuth();
   const [mobileOpen, setMobileOpen] = React.useState(false);
@@ -53,6 +56,8 @@ const ProtectedLayout = () => {
             <Route path="/" element={<DashboardOverview />} />
             <Route path="/users" element={<UserManagement />} />
             <Route path="/members" element={<MemberManagement />} />
+            <Route path="/classes" element={<ClassManagement />} />
+            <Route path="/summer-activities" element={<SummerActivityManagement />} />
             <Route path="/cards" element={<CardManagement />} />
             <Route path="/scan" element={<QRScanner />} />
             <Route path="/events" element={<EventManagement />} />

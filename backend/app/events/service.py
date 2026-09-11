@@ -89,16 +89,28 @@ class EventService:
         if member["status"] != "Active":
             raise BadRequestException(f"يمكن فقط تسجيل الأطفال النشطين في الأنشطة والرحلات (حالة الطفل الحالية: {member['status']})")
 
-        # 3. Check if member is already registered in this event
+        # 3. Check target classes constraint (EventTargetClass)
+        target_class_ids = await self.event_repo.get_event_target_class_ids(event_id)
+        if target_class_ids:
+            is_in_target = await self.event_repo.is_member_in_target_classes(data.member_id, target_class_ids)
+            if not is_in_target:
+                # Require admin override or explicit override flag
+                is_override = getattr(data, "is_override", False) or False
+                if not is_override:
+                    raise BadRequestException(
+                        f"المخدوم ({member['full_name']}) غير مقيد في الفصول المستهدفة لهذا النشاط. يستلزم تفعيل التجاوز الإداري (Override)."
+                    )
+
+        # 4. Check if member is already registered in this event
         existing_reg = await self.event_repo.get_registration_by_event_and_member(event_id, data.member_id)
         if existing_reg:
             raise BadRequestException(f"المخدوم ({member['full_name']}) مسجل بالفعل في هذه الفعالية برقم {existing_reg['registration_id']}")
 
-        # 4. Resolve amount_due (default to event fee if not passed)
+        # 5. Resolve amount_due (default to event fee if not passed)
         amount_due = data.amount_due if data.amount_due is not None else float(event["fee"])
         amount_paid = float(data.amount_paid or 0.0)
 
-        # 5. Check payment bounds
+        # 6. Check payment bounds
         if amount_paid > amount_due:
             raise BadRequestException(f"المبلغ المدفوع ({amount_paid} جم) يتجاوز المبلغ المستحق المطلـوب ({amount_due} جم)")
 

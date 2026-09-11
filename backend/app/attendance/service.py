@@ -73,23 +73,37 @@ class AttendanceService:
         return {"total": total, "page": page, "limit": limit, "items": items}
 
     async def update_session_status(self, session_id: str, new_status: str) -> Dict[str, Any]:
-        if new_status not in ["Open", "Closed"]:
-            raise BadRequestException("حالة الجلسة غير صالحة (مسموح: Open أو Closed)")
+        valid_statuses = ["Scheduled", "Open", "Completed", "Closed", "Cancelled", "Void"]
+        if new_status not in valid_statuses:
+            raise BadRequestException(f"حالة الجلسة غير صالحة. الحالات المتاحة: {', '.join(valid_statuses)}")
+
         session = await self.repo.get_session_by_id(session_id)
         if not session:
             raise NotFoundException(f"جلسة الحضور برقم {session_id} غير موجودة")
 
-        updated = await self.repo.update_session_status(session_id, new_status)
+        current_status = session.get("status")
+        target_status = "Completed" if new_status == "Closed" else new_status
 
-        # M5 ↔ M6 Async Auto Detector Trigger on Session Close (Post-Commit Background Task)
-        if new_status == "Closed":
+        # FSM Transition Rules Validation
+        if current_status == "Completed" and target_status == "Open":
+            # Reopening completed session allowed with notification/audit
+            pass
+        elif current_status == "Void" and target_status != "Void":
+            raise BadRequestException("لا يمكن إعادة فتح أو تغيير حالة جلسة تالفة (Void)")
+        elif current_status == "Cancelled" and target_status != "Cancelled":
+            raise BadRequestException("لا يمكن إعادة فتح أو تغيير حالة جلسة ملغاة (Cancelled)")
+
+        updated = await self.repo.update_session_status(session_id, target_status)
+
+        # Trigger absence detector on Completed/Closed
+        if target_status == "Completed":
             try:
                 from app.followup.service import FollowupService
                 followup_service = FollowupService(self.db)
                 stage = session.get("stage")
                 await followup_service.run_absence_detector(stage=stage if stage != "ALL" else None)
             except Exception:
-                pass  # Independent background trigger failure must not rollback session closure
+                pass
 
         return updated
 

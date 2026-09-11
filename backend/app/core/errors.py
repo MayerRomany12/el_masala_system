@@ -22,6 +22,11 @@ class BadRequestException(AppException):
         super().__init__(message=message, status_code=status.HTTP_400_BAD_REQUEST)
 
 
+class ConflictException(AppException):
+    def __init__(self, message: str = "تعارض في البيانات"):
+        super().__init__(message=message, status_code=status.HTTP_409_CONFLICT)
+
+
 async def app_exception_handler(request: Request, exc: AppException):
     logger.warning(f"AppException on {request.url.path}: {exc.message}")
     return JSONResponse(

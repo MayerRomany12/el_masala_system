@@ -137,7 +137,26 @@ class AttendanceRepository:
 
         raise AppException(message="تعذر إنشاء جلسة حضور جديدة")
 
+    async def _evaluate_lazy_void(self):
+        """Atomic Lazy Void Evaluation to eliminate race conditions"""
+        now_ts = datetime.now(timezone.utc)
+        today_date = date.today()
+        stmt = (
+            update(AttendanceSession)
+            .where(
+                AttendanceSession.status == "Scheduled",
+                or_(
+                    and_(AttendanceSession.scheduled_end_time != None, AttendanceSession.scheduled_end_time < now_ts),
+                    and_(AttendanceSession.session_date < today_date, AttendanceSession.opened_at == None)
+                )
+            )
+            .values(status="Void", updated_at=now_ts)
+        )
+        await self.db.execute(stmt)
+        await self.db.flush()
+
     async def get_session_by_id(self, session_id: str) -> Optional[Dict[str, Any]]:
+        await self._evaluate_lazy_void()
         res = await self.db.execute(select(AttendanceSession).where(AttendanceSession.session_id == session_id))
         s_row = res.scalar_one_or_none()
         if not s_row:
@@ -156,10 +175,33 @@ class AttendanceRepository:
         )
         present_count = (await self.db.execute(present_q)).scalar_one()
 
-        # Targeted active members count for stage
-        target_q = select(func.count(Member.member_id)).where(Member.status == "Active")
-        if s_row.stage and s_row.stage != "ALL":
-            target_q = target_q.where(Member.stage.ilike(f"%{s_row.stage.split('-')[0].strip()}%"))
+        # Historical Target Formula (Timestamp-based)
+        session_ts = s_row.opened_at or s_row.scheduled_start_time
+        if not session_ts:
+            if isinstance(s_row.session_date, datetime):
+                session_ts = s_row.session_date
+            elif isinstance(s_row.session_date, date):
+                session_ts = datetime.combine(s_row.session_date, datetime.min.time()).replace(tzinfo=timezone.utc)
+            else:
+                session_ts = datetime.now(timezone.utc)
+
+        if s_row.class_id:
+            from app.models.class_group import ClassGroupMember
+            target_q = (
+                select(func.count(ClassGroupMember.membership_id))
+                .where(
+                    ClassGroupMember.class_id == s_row.class_id,
+                    ClassGroupMember.joined_at <= session_ts,
+                    or_(
+                        ClassGroupMember.left_at == None,
+                        ClassGroupMember.left_at > session_ts
+                    )
+                )
+            )
+        else:
+            target_q = select(func.count(Member.member_id)).where(Member.status == "Active")
+            if s_row.stage and s_row.stage != "ALL":
+                target_q = target_q.where(Member.stage.ilike(f"%{s_row.stage.split('-')[0].strip()}%"))
 
         targeted_count = (await self.db.execute(target_q)).scalar_one()
         pct = round((present_count / targeted_count * 100), 1) if targeted_count > 0 else 0.0
@@ -167,7 +209,12 @@ class AttendanceRepository:
         return {
             "session_id": s_row.session_id,
             "event_id": s_row.event_id,
+            "class_id": s_row.class_id,
             "session_date": s_row.session_date.isoformat() if isinstance(s_row.session_date, (date, datetime)) else str(s_row.session_date),
+            "scheduled_start_time": s_row.scheduled_start_time,
+            "scheduled_end_time": s_row.scheduled_end_time,
+            "opened_at": s_row.opened_at,
+            "closed_at": s_row.closed_at,
             "title": s_row.title,
             "stage": s_row.stage,
             "recurrence": getattr(s_row, "recurrence", "Weekly") or "Weekly",
@@ -198,6 +245,7 @@ class AttendanceRepository:
         skip: int = 0,
         limit: int = 50,
     ) -> Tuple[List[Dict[str, Any]], int]:
+        await self._evaluate_lazy_void()
         query = select(AttendanceSession)
 
         if status:
@@ -228,10 +276,18 @@ class AttendanceRepository:
         return items, total
 
     async def update_session_status(self, session_id: str, new_status: str) -> Optional[Dict[str, Any]]:
+        now_ts = datetime.now(timezone.utc)
+        update_vals = {"status": new_status, "updated_at": now_ts}
+        if new_status == "Open":
+            update_vals["opened_at"] = now_ts
+        elif new_status in ["Completed", "Closed"]:
+            update_vals["closed_at"] = now_ts
+            update_vals["status"] = "Completed"
+
         await self.db.execute(
             update(AttendanceSession)
             .where(AttendanceSession.session_id == session_id)
-            .values(status=new_status, updated_at=datetime.now(timezone.utc))
+            .values(**update_vals)
         )
         await self.db.flush()
         return await self.get_session_by_id(session_id)

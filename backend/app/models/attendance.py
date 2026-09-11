@@ -19,16 +19,21 @@ class AuthorizedDevice(Base):
 class AttendanceSession(Base):
     __tablename__ = "attendance_sessions"
 
-    session_id   = Column(String(30), primary_key=True, index=True)
-    event_id     = Column(String(20), ForeignKey("events.event_id", ondelete="SET NULL"), nullable=True, index=True)
-    session_date = Column(Date, nullable=False, index=True)
-    title        = Column(String(200), nullable=False)
-    stage        = Column(String(100), nullable=False, default="ALL", index=True)
-    recurrence   = Column(String(30), nullable=False, default="Weekly", index=True) # Daily, Weekly, Monthly, OneTime
-    created_by   = Column(String(50), ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
-    status       = Column(String(20), nullable=False, default="Open", index=True) # Open, Closed
-    created_at   = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at   = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    session_id           = Column(String(30), primary_key=True, index=True)
+    event_id             = Column(String(20), ForeignKey("events.event_id", ondelete="SET NULL"), nullable=True, index=True)
+    class_id             = Column(String(30), ForeignKey("class_groups.class_id", ondelete="SET NULL"), nullable=True, index=True)
+    session_date         = Column(Date, nullable=False, index=True)
+    title                = Column(String(200), nullable=False)
+    stage                = Column(String(100), nullable=False, default="ALL", index=True)
+    recurrence           = Column(String(30), nullable=False, default="Weekly", index=True) # Daily, Weekly, Monthly, OneTime
+    scheduled_start_time = Column(DateTime(timezone=True), nullable=True)
+    scheduled_end_time   = Column(DateTime(timezone=True), nullable=True)
+    opened_at            = Column(DateTime(timezone=True), nullable=True)
+    closed_at            = Column(DateTime(timezone=True), nullable=True)
+    created_by           = Column(String(50), ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
+    status               = Column(String(20), nullable=False, default="Open", index=True) # Scheduled, Open, Completed, Cancelled, Void
+    created_at           = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at           = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
 class AttendanceSessionServant(Base):

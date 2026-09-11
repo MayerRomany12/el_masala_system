@@ -47,8 +47,13 @@ async def init_db():
         await conn.execute(text("ALTER TABLE events ADD COLUMN IF NOT EXISTS is_free BOOLEAN DEFAULT FALSE;"))
         await conn.execute(text("ALTER TABLE events ADD COLUMN IF NOT EXISTS recurrence VARCHAR(30) DEFAULT 'OneTime';"))
 
-        # Migrations for AttendanceSession recurrence
+        # Migrations for AttendanceSession recurrence & class binding
         await conn.execute(text("ALTER TABLE attendance_sessions ADD COLUMN IF NOT EXISTS recurrence VARCHAR(30) DEFAULT 'Weekly';"))
+        await conn.execute(text("ALTER TABLE attendance_sessions ADD COLUMN IF NOT EXISTS class_id VARCHAR(30);"))
+        await conn.execute(text("ALTER TABLE attendance_sessions ADD COLUMN IF NOT EXISTS scheduled_start_time TIMESTAMPTZ;"))
+        await conn.execute(text("ALTER TABLE attendance_sessions ADD COLUMN IF NOT EXISTS scheduled_end_time TIMESTAMPTZ;"))
+        await conn.execute(text("ALTER TABLE attendance_sessions ADD COLUMN IF NOT EXISTS opened_at TIMESTAMPTZ;"))
+        await conn.execute(text("ALTER TABLE attendance_sessions ADD COLUMN IF NOT EXISTS closed_at TIMESTAMPTZ;"))
 
         # Migrations for Member date_of_birth, total_points, photo_url, archiving, and extra phones
         await conn.execute(text("ALTER TABLE members ADD COLUMN IF NOT EXISTS qr_token VARCHAR(64);"))
@@ -66,13 +71,37 @@ async def init_db():
             logger.exception(f"فشل تطبيق التحديث الهيكلي لجدول members: {e}")
             raise e
 
-
         # Approved Partial Unique Index for M6 Followup Task Deduplication
         await conn.execute(text("""
             CREATE UNIQUE INDEX IF NOT EXISTS uq_member_active_followup
             ON followup_tasks (member_id)
             WHERE status IN ('Pending', 'Escalated');
         """))
+
+        # Approved Partial Unique Indexes for ClassGroup Memberships
+        try:
+            try:
+                await conn.execute(text("ALTER TABLE class_group_servants RENAME COLUMN user_id TO servant_id;"))
+            except Exception:
+                pass
+            await conn.execute(text("ALTER TABLE class_group_servants ADD COLUMN IF NOT EXISTS servant_id VARCHAR(50);"))
+            await conn.execute(text("ALTER TABLE class_group_servants ADD COLUMN IF NOT EXISTS role VARCHAR(50) DEFAULT 'Servant';"))
+            await conn.execute(text("ALTER TABLE class_group_servants ADD COLUMN IF NOT EXISTS joined_at TIMESTAMPTZ DEFAULT NOW();"))
+            await conn.execute(text("ALTER TABLE class_group_servants ADD COLUMN IF NOT EXISTS left_at TIMESTAMPTZ;"))
+
+            await conn.execute(text("""
+                CREATE UNIQUE INDEX IF NOT EXISTS uq_active_class_member
+                ON class_group_members (class_id, member_id)
+                WHERE is_active = TRUE;
+            """))
+            await conn.execute(text("""
+                CREATE UNIQUE INDEX IF NOT EXISTS uq_active_class_servant
+                ON class_group_servants (class_id, servant_id)
+                WHERE is_active = TRUE;
+            """))
+            logger.info("تم التحقق من تفعيل Partial Unique Indexes لقوائم عضوية الفصول النشطة بنجاح")
+        except Exception as e:
+            logger.exception(f"فشل تطبيق Partial Unique Indexes لعضوية الفصول: {e}")
 
     # Ensure church logo exists in frontend assets safely
     import shutil, os
