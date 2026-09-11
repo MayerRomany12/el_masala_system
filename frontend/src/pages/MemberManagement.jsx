@@ -27,12 +27,22 @@ import {
   Camera,
   Archive,
   Download,
-  QrCode
+  QrCode,
+  Copy,
+  Check
 } from 'lucide-react';
 
 // ─── Modal after newly creating a member with QR code & download button ──────
 const CreatedMemberQRModal = ({ member, onClose }) => {
   const qrCanvasRef = useRef(null);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyId = () => {
+    if (!member?.member_id) return;
+    navigator.clipboard.writeText(member.member_id);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2200);
+  };
 
   useEffect(() => {
     if (qrCanvasRef.current && member) {
@@ -200,19 +210,56 @@ const CreatedMemberQRModal = ({ member, onClose }) => {
             {member.full_name}
           </div>
 
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'center' }}>
-            <span style={{
-              fontFamily: 'monospace',
-              fontSize: '1rem',
-              fontWeight: 900,
-              color: '#38bdf8',
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.5rem',
               background: 'rgba(56, 189, 248, 0.15)',
-              padding: '0.25rem 0.75rem',
+              padding: '0.25rem 0.6rem 0.25rem 0.75rem',
               borderRadius: '8px',
               border: '1px solid rgba(56, 189, 248, 0.3)'
             }}>
-              {member.member_id}
-            </span>
+              <span style={{
+                fontFamily: 'monospace',
+                fontSize: '1.05rem',
+                fontWeight: 900,
+                color: '#38bdf8'
+              }}>
+                {member.member_id}
+              </span>
+              <button
+                type="button"
+                onClick={handleCopyId}
+                title="نسخ كود المخدوم"
+                style={{
+                  background: copied ? 'rgba(52, 211, 153, 0.25)' : 'rgba(255, 255, 255, 0.12)',
+                  border: copied ? '1px solid rgba(52, 211, 153, 0.4)' : '1px solid rgba(56, 189, 248, 0.3)',
+                  borderRadius: '6px',
+                  color: copied ? '#34d399' : '#38bdf8',
+                  padding: '3px 8px',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                {copied ? (
+                  <>
+                    <Check size={13} />
+                    <span>تم النسخ</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy size={13} />
+                    <span>نسخ</span>
+                  </>
+                )}
+              </button>
+            </div>
 
             <span style={{
               fontSize: '0.82rem',
