@@ -18,9 +18,11 @@ import {
   Cake,
   Award,
   Settings,
-  ArrowRight
+  ArrowRight,
+  CalendarCheck
 } from 'lucide-react';
 import churchLogo from '../assets/church_logo.png';
+import serviceLogo from '../assets/service_logo.png';
 
 export const DashboardOverview = () => {
   const { user } = useAuth();
@@ -36,117 +38,141 @@ export const DashboardOverview = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const loadOverviewMetrics = async () => {
+    const fetchMetrics = async () => {
       try {
-        const [memRes, sessRes, flwRes, bdayRes] = await Promise.allSettled([
-          membersApi.getStats(),
-          attendanceApi.getSessions({ limit: 10 }),
-          followupApi.getTasks({ status: 'Pending', limit: 1 }),
-          birthdaysApi.getBirthdays({ period: 'week' })
+        const [membersRes, sessionsRes, followupsRes, birthdaysRes] = await Promise.allSettled([
+          membersApi.getAll({ limit: 1 }),
+          attendanceApi.listSessions({ limit: 1 }),
+          followupApi.getStats(),
+          birthdaysApi.getUpcoming({ days: 30 })
         ]);
 
         setMetrics({
-          totalMembers: memRes.status === 'fulfilled' && memRes.value.success ? memRes.value.data.total_members : 0,
-          activeSessions: sessRes.status === 'fulfilled' && sessRes.value.success ? sessRes.value.data.items.filter(s => s.status === 'Open').length : 0,
-          pendingFollowups: flwRes.status === 'fulfilled' && flwRes.value.success ? flwRes.value.data.total : 0,
-          upcomingBirthdays: bdayRes.status === 'fulfilled' && bdayRes.value.success ? bdayRes.value.data.total : 0
+          totalMembers: membersRes.status === 'fulfilled' ? (membersRes.value.total || 0) : 0,
+          activeSessions: sessionsRes.status === 'fulfilled' ? (sessionsRes.value.data?.length || 0) : 0,
+          pendingFollowups: followupsRes.status === 'fulfilled' ? (followupsRes.value.data?.total_open || 0) : 0,
+          upcomingBirthdays: birthdaysRes.status === 'fulfilled' ? (birthdaysRes.value.data?.length || 0) : 0
         });
-      } catch (e) {} finally {
+      } catch (err) {
+        console.error("Failed to load dashboard overview data", err);
+      } finally {
         setLoading(false);
       }
     };
-    loadOverviewMetrics();
+
+    fetchMetrics();
   }, []);
 
   const stats = [
     {
-      title: 'إجمالي الأطفال المخدومين',
+      title: 'إجمالي المخدومين المسجلين',
       value: metrics.totalMembers,
-      label: 'مخدوم مسجل بالنظام',
-      icon: <Users color="#38bdf8" size={26} />,
-      bgColor: 'rgba(56, 189, 248, 0.15)',
-      onClick: () => navigate('/members')
+      icon: <Users size={24} color="#38bdf8" />,
+      link: '/members',
+      desc: 'سجلات المخدومين بكافة الفصول'
     },
     {
-      title: 'جلسات الحضور المفتوحة',
+      title: 'جلسات الحضور النشطة',
       value: metrics.activeSessions,
-      label: 'جلسة تسجل الآن M5',
-      icon: <UserCheck color="#34d399" size={26} />,
-      bgColor: 'rgba(52, 211, 153, 0.15)',
-      onClick: () => navigate('/attendance')
+      icon: <CalendarCheck size={24} color="#34d399" />,
+      link: '/attendance',
+      desc: 'الجلسات المسجلة حديثاً'
     },
     {
-      title: 'مهام افتقاد معلقة',
+      title: 'مهام افتقاد مفتوحة',
       value: metrics.pendingFollowups,
-      label: 'غائبين بحاجة لمتابعة M6',
-      icon: <HeartHandshake color="#f87171" size={26} />,
-      bgColor: 'rgba(248, 113, 113, 0.15)',
-      onClick: () => navigate('/followup')
+      icon: <HeartHandshake size={24} color="#facc15" />,
+      link: '/followup',
+      desc: 'حالات غياب تحتاج متابعة ورعاية'
     },
     {
-      title: 'أعياد ميلاد هذا الأسبوع',
+      title: 'أعياد ميلاد قادمة (30 يوم)',
       value: metrics.upcomingBirthdays,
-      label: 'خلال الـ 7 أيام القادمة M8',
-      icon: <Cake color="#fbbf24" size={26} />,
-      bgColor: 'rgba(251, 191, 36, 0.15)',
-      onClick: () => navigate('/birthdays')
+      icon: <Gift size={24} color="#f472b6" />,
+      link: '/birthdays',
+      desc: 'فرص مباركة وتكريم المخدومين'
     }
   ];
 
   return (
-    <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
+    <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       
-      {/* Welcome Banner */}
+      {/* Welcome Church Header Banner */}
       <div className="glass-card" style={{
-        background: 'linear-gradient(135deg, rgba(122, 8, 29, 0.45) 0%, rgba(26, 10, 16, 0.95) 100%)',
-        border: '1px solid rgba(212, 175, 55, 0.4)',
-        boxShadow: '0 10px 30px rgba(122, 8, 29, 0.3)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         flexWrap: 'wrap',
         gap: '1.5rem',
-        padding: '1.75rem 2rem'
+        background: 'linear-gradient(135deg, rgba(8, 28, 54, 0.9) 0%, rgba(4, 15, 30, 0.95) 100%)',
+        border: '1px solid rgba(250, 204, 21, 0.3)',
+        boxShadow: '0 10px 30px rgba(2, 132, 199, 0.3)'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-          <div style={{
-            position: 'relative',
-            width: '80px',
-            height: '80px',
-            borderRadius: '50%',
-            padding: '3px',
-            background: 'linear-gradient(135deg, #d4af37 0%, #7a081d 100%)',
-            boxShadow: '0 0 20px rgba(212, 175, 55, 0.4)'
-          }}>
-            <img
-              src={churchLogo}
-              alt="شعار الكنيسة"
-              style={{
-                width: '100%',
-                height: '100%',
-                borderRadius: '50%',
-                objectFit: 'cover'
-              }}
-            />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+          {/* Dual Logos */}
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <div style={{
+              position: 'relative',
+              width: '74px',
+              height: '74px',
+              borderRadius: '50%',
+              padding: '3px',
+              background: 'linear-gradient(135deg, #facc15 0%, #0284c7 100%)',
+              boxShadow: '0 0 20px rgba(250, 204, 21, 0.45)',
+              zIndex: 2
+            }}>
+              <img
+                src={churchLogo}
+                alt="شعار الكنيسة"
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  borderRadius: '50%',
+                  objectFit: 'cover'
+                }}
+              />
+            </div>
+            <div style={{
+              position: 'relative',
+              width: '64px',
+              height: '64px',
+              borderRadius: '50%',
+              padding: '2px',
+              background: 'linear-gradient(135deg, #38bdf8 0%, #facc15 100%)',
+              boxShadow: '0 0 15px rgba(56, 189, 248, 0.4)',
+              marginRight: '-18px',
+              zIndex: 1
+            }}>
+              <img
+                src={serviceLogo}
+                alt="شعار الخدمة"
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  borderRadius: '50%',
+                  objectFit: 'cover'
+                }}
+              />
+            </div>
           </div>
 
           <div>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-gold-light)', fontSize: '0.88rem', fontWeight: 800, marginBottom: '0.3rem' }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-yellow-light)', fontSize: '0.88rem', fontWeight: 800, marginBottom: '0.3rem' }}>
               <Sparkles size={18} />
-              <span>مرحباً بك في لوحة تحكم خدمة مدارس الأحد</span>
+              <span>مرحباً بك في منظومة خدمة مدارس الأحد</span>
             </div>
-            <h1 style={{ fontSize: '1.75rem', fontWeight: 900, color: 'var(--text-main)', marginBottom: '0.3rem' }}>
+            <h1 style={{ fontSize: '1.65rem', fontWeight: 900, color: 'var(--text-main)', marginBottom: '0.3rem' }}>
               أهلاً بك، {user?.full_name} 👋
             </h1>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.92rem', maxWidth: '650px', margin: 0 }}>
-              نظام المسلة المركزي — كنيسة السيدة العذراء مريم والأنبا بولا أول السواح بالمسلة (مطرانية أسوان).
+            <p style={{ color: '#93c5fd', fontSize: '0.9rem', maxWidth: '680px', margin: 0, fontWeight: 600 }}>
+              كنيسة الشهيد العظيم مارجرجس الروماني والأنبا شنودة رئيس المتوحدين — عزبة شنوده بالكرور (أسوان).
             </p>
           </div>
         </div>
 
         <div style={{
-          background: 'rgba(13, 5, 8, 0.7)',
-          border: '1px solid rgba(212, 175, 55, 0.3)',
+          background: 'rgba(6, 20, 38, 0.85)',
+          border: '1px solid rgba(250, 204, 21, 0.3)',
           borderRadius: 'var(--radius-md)',
           padding: '1rem 1.25rem',
           textAlign: 'center'

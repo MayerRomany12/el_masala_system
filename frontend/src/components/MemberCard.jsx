@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import { Church, Sparkles, Calendar, ShieldCheck, User } from 'lucide-react';
 import churchLogo from '../assets/church_logo.png';
+import serviceLogo from '../assets/service_logo.png';
 import { getPhotoUrl } from '../utils/photo';
 
 // Dynamic stage color resolution (prefix/substring matching)
@@ -105,15 +106,15 @@ export const MemberCard = ({ member, activeSide = 'front' }) => {
             {/* Header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(212, 175, 55, 0.25)', paddingBottom: '6px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{ width: '32px', height: '32px', borderRadius: '50%', padding: '1px', background: 'linear-gradient(135deg, #d4af37 0%, #7a081d 100%)', boxShadow: '0 0 10px rgba(212, 175, 55, 0.4)' }}>
+                <div style={{ width: '34px', height: '34px', borderRadius: '50%', padding: '1px', background: 'linear-gradient(135deg, #facc15 0%, #0284c7 100%)', boxShadow: '0 0 10px rgba(250, 204, 21, 0.4)' }}>
                   <img src={churchLogo} alt="شعار الكنيسة" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
                 </div>
                 <div>
-                  <div style={{ fontSize: '0.74rem', fontWeight: 900, color: 'var(--color-gold-light)', lineHeight: 1.1 }}>
-                    كنيسة العذراء مريم والأنبا بولا
+                  <div style={{ fontSize: '0.74rem', fontWeight: 900, color: 'var(--color-yellow-light)', lineHeight: 1.1 }}>
+                    كنيسة مارجرجس والأنبا شنودة
                   </div>
-                  <div style={{ fontSize: '0.62rem', color: theme.accent, fontWeight: 700 }}>
-                    نظام خدمة مدارس الأحد بالمسلة
+                  <div style={{ fontSize: '0.62rem', color: '#38bdf8', fontWeight: 700 }}>
+                    خدمة مدارس الأحد — الكرور أسوان
                   </div>
                 </div>
               </div>
@@ -209,8 +210,8 @@ export const MemberCard = ({ member, activeSide = 'front' }) => {
             {/* Back Header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '4px' }}>
               <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#e2e8f0', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <ShieldCheck size={14} style={{ color: theme.accent }} />
-                <span>بطاقة عضوية معتمدة — كنيسة المسلة</span>
+                <ShieldCheck size={14} style={{ color: '#facc15' }} />
+                <span>بطاقة عضوية معتمدة — كنيسة مارجرجس والأنبا شنودة بالكرور</span>
               </div>
               <div style={{ fontFamily: 'monospace', fontSize: '0.75rem', fontWeight: 800, color: theme.accent }}>
                 {member.member_id}

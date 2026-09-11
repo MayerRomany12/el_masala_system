@@ -153,7 +153,7 @@ export const CommunicationHubModal = ({ isOpen, onClose, usersList = [] }) => {
           <button
             onClick={() => setActiveTab('compose')}
             className={`btn ${activeTab === 'compose' ? 'btn-primary' : 'btn-secondary'}`}
-            style={{ fontSize: '0.85rem', gap: '0.4rem', background: activeTab === 'compose' ? 'linear-gradient(135deg, #d4af37 0%, #7a081d 100%)' : undefined }}
+            style={{ fontSize: '0.85rem', gap: '0.4rem', background: activeTab === 'compose' ? 'linear-gradient(135deg, #facc15 0%, #0284c7 100%)' : undefined, color: activeTab === 'compose' ? '#0f172a' : undefined, fontWeight: 800 }}
           >
             <PlusCircle size={16} />
             <span>إرسال رسالة / تكليف مهمة ✍️</span>

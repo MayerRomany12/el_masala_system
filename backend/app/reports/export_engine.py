@@ -110,9 +110,9 @@ def generate_pdf_html(
         cards_html = '<div style="display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap;">'
         for c in summary_cards:
             cards_html += f'''
-            <div style="flex: 1; min-width: 180px; padding: 12px 15px; background: #fff8f8; border: 1px solid #d4af37; border-radius: 8px; text-align: center;">
-                <div style="font-size: 12px; color: #7a081d; font-weight: bold;">{c.get("label")}</div>
-                <div style="font-size: 20px; font-weight: 900; color: #3b000b; margin-top: 4px;">{c.get("value")}</div>
+            <div style="flex: 1; min-width: 180px; padding: 12px 15px; background: #f0f9ff; border: 1px solid #facc15; border-radius: 8px; text-align: center;">
+                <div style="font-size: 12px; color: #0284c7; font-weight: bold;">{c.get("label")}</div>
+                <div style="font-size: 20px; font-weight: 900; color: #0f172a; margin-top: 4px;">{c.get("value")}</div>
             </div>
             '''
         cards_html += '</div>'
@@ -125,7 +125,7 @@ def generate_pdf_html(
             rows_html += f'<td style="padding: 8px 12px; border-bottom: 1px solid #eee; text-align: right;">{val}</td>'
         rows_html += '</tr>'
 
-    headers_html = "".join([f'<th style="padding: 10px 12px; background: #7a081d; color: #fbeea9; text-align: right;">{headers_map[k]}</th>' for k in header_keys])
+    headers_html = "".join([f'<th style="padding: 10px 12px; background: #0284c7; color: #fef08a; text-align: right;">{headers_map[k]}</th>' for k in header_keys])
 
     html_content = f'''<!DOCTYPE html>
 <html dir="rtl" lang="ar">
@@ -134,13 +134,13 @@ def generate_pdf_html(
     <title>{title}</title>
     <style>
         body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #fff; color: #222; margin: 0; padding: 20px; }}
-        .header-box {{ display: flex; align-items: center; justify-content: space-between; border-bottom: 3px double #d4af37; padding-bottom: 15px; margin-bottom: 20px; }}
-        .logo-title {{ display: flex; alignItems: center; gap: 15px; }}
-        .title-main {{ font-size: 22px; font-weight: 900; color: #7a081d; margin: 0; }}
-        .sub-title {{ font-size: 13px; color: #666; margin-top: 3px; }}
-        .date-box {{ font-size: 11px; color: #888; text-align: left; }}
+        .header-box {{ display: flex; align-items: center; justify-content: space-between; border-bottom: 3px double #facc15; padding-bottom: 15px; margin-bottom: 20px; }}
+        .logo-title {{ display: flex; align-items: center; gap: 15px; }}
+        .title-main {{ font-size: 20px; font-weight: 900; color: #0284c7; margin: 0; }}
+        .sub-title {{ font-size: 13px; color: #64748b; margin-top: 4px; font-weight: bold; }}
+        .date-box {{ font-size: 11px; color: #64748b; text-align: left; }}
         table {{ width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px; }}
-        .footer-note {{ margin-top: 30px; font-size: 11px; color: #999; border-top: 1px solid #ddd; padding-top: 10px; text-align: center; }}
+        .footer-note {{ margin-top: 30px; font-size: 11px; color: #64748b; border-top: 1px solid #e2e8f0; padding-top: 10px; text-align: center; }}
         @media print {{
             body {{ padding: 0; }}
             .no-print {{ display: none; }}
@@ -149,7 +149,7 @@ def generate_pdf_html(
 </head>
 <body>
     <div class="no-print" style="margin-bottom: 15px; text-align: left;">
-        <button onclick="window.print()" style="padding: 8px 18px; background: #7a081d; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">
+        <button onclick="window.print()" style="padding: 8px 18px; background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); border: 1px solid #facc15; color: #fff; border-radius: 6px; cursor: pointer; font-weight: bold;">
             طباعة التقرير / حفظ PDF 🖨️
         </button>
     </div>
@@ -158,12 +158,12 @@ def generate_pdf_html(
         <div class="logo-title">
             <div>
                 <h1 class="title-main">{church_name}</h1>
-                <div class="sub-title">نظام المسلة الكنسي المركزي — {title}</div>
+                <div class="sub-title">خدمة مدارس الأحد بالكرور — {title}</div>
             </div>
         </div>
         <div class="date-box">
             <div>تاريخ التصدير: {now_str}</div>
-            <div>تقرير رسمي معتمد</div>
+            <div>تقرير كنسي معتمد</div>
         </div>
     </div>
 
@@ -179,7 +179,7 @@ def generate_pdf_html(
     </table>
 
     <div class="footer-note">
-        تم استخراج هذا التقرير آلياً من نظام المسلة — كنيسة السيدة العذراء مريم والأنبا بولا بالمسلة (مطرانية أسوان).
+        تم استخراج هذا التقرير آلياً من منظومة الخدمة — كنيسة الشهيد العظيم مارجرجس الروماني والأنبا شنودة رئيس المتوحدين بعزبة شنوده الكرور - أسوان.
     </div>
 </body>
 </html>'''

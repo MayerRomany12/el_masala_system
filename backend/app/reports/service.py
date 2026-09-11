@@ -40,7 +40,7 @@ class ReportsService:
         تُرجع: (محتوى الملف, MIME Type, اسم الملف)
         """
         church_name = await self.settings_repo.get_setting_value(
-            "church_name", "كنيسة السيدة العذراء مريم والأنبا بولا بالمسلة"
+            "church_name", "كنيسة الشهيد العظيم مارجرجس الروماني والقديس العظيم الأنبا شنودة رئيس المتوحدين"
         )
 
         headers_map = {}

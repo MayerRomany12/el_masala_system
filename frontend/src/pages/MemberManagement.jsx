@@ -82,19 +82,19 @@ const CreatedMemberQRModal = ({ member, onClose }) => {
     ctx.fillRect(0, 0, 600, 700);
 
     // 2. Card Border
-    ctx.strokeStyle = '#38bdf8';
+    ctx.strokeStyle = '#facc15';
     ctx.lineWidth = 6;
     ctx.strokeRect(12, 12, 576, 676);
 
     // 3. Header Title
     ctx.fillStyle = '#f8fafc';
-    ctx.font = 'bold 24px Cairo, system-ui, sans-serif';
+    ctx.font = 'bold 22px Cairo, system-ui, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('كنيسة العذراء مريم والأنبا بولا بالمسلة', 300, 55);
+    ctx.fillText('كنيسة مارجرجس والأنبا شنودة بالكرور', 300, 55);
 
     ctx.fillStyle = '#38bdf8';
     ctx.font = 'bold 18px Cairo, system-ui, sans-serif';
-    ctx.fillText('بطاقة مخدوم - نظام الحضور الذكي ⛪', 300, 88);
+    ctx.fillText('بطاقة مخدوم - خدمة مدارس الأحد ⛪', 300, 88);
 
     // 4. Divider Line
     ctx.strokeStyle = 'rgba(56, 189, 248, 0.3)';

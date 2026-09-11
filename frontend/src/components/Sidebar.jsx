@@ -159,10 +159,11 @@ export const Sidebar = ({ mobileOpen, setMobileOpen }) => {
                   padding: '0.72rem 1rem',
                   fontSize: '0.88rem',
                   borderRadius: 'var(--radius-sm)',
-                  border: isActive ? '1px solid rgba(212, 175, 55, 0.4)' : '1px solid transparent',
-                  background: isActive ? 'linear-gradient(135deg, #7a081d 0%, #a80f2d 100%)' : 'transparent',
+                  border: isActive ? '1px solid rgba(250, 204, 21, 0.45)' : '1px solid transparent',
+                  borderRight: isActive ? '4px solid #facc15' : '1px solid transparent',
+                  background: isActive ? 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)' : 'transparent',
                   color: isActive ? '#ffffff' : 'var(--text-muted)',
-                  boxShadow: isActive ? '0 4px 15px rgba(122, 8, 29, 0.5)' : 'none',
+                  boxShadow: isActive ? '0 4px 15px rgba(2, 132, 199, 0.5)' : 'none',
                   fontWeight: isActive ? 800 : 600,
                   transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
                 })}

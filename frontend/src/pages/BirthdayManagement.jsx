@@ -465,7 +465,7 @@ export const BirthdayManagement = () => {
                               const name = m.full_name;
                               const stage = m.stage;
                               const ageStr = m.age !== null && m.age !== undefined ? ` الـ ${m.age}` : '';
-                              setWaMessageText(`🎉🎂 كل سنة وانت طيب يا ${name}! 🎂🎉\n\nأسرة ${stage} بكنيسة المسلة تهنئك بعيد ميلادك${ageStr} سنة ✨\n\nربنا يبارك حياتك وتفضل دايماً منور الكنيسة والخدمة ✝️❤️`);
+                              setWaMessageText(`🎉🎂 كل سنة وانت طيب يا ${name}! 🎂🎉\n\nأسرة ${stage} بكنيسة مارجرجس والأنبا شنودة بالكرور تهنئك بعيد ميلادك${ageStr} سنة ✨\n\nربنا يبارك حياتك وتفضل دايماً منور الكنيسة والخدمة ✝️❤️`);
                             }}
                             className="btn btn-secondary"
                             style={{

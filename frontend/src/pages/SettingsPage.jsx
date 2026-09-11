@@ -26,7 +26,7 @@ export const SettingsPage = () => {
     absence_threshold_weeks: '2',
     discount_high_pct: '30.0',
     discount_medium_pct: '15.0',
-    church_name: 'كنيسة السيدة العذراء مريم والأنبا بولا بالمسلة'
+    church_name: 'كنيسة الشهيد العظيم مارجرجس الروماني والقديس العظيم الأنبا شنودة رئيس المتوحدين'
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -301,7 +301,7 @@ export const SettingsPage = () => {
               <input
                 type="text"
                 className="form-input"
-                value={settings.church_name || 'كنيسة السيدة العذراء مريم والأنبا بولا بالمسلة'}
+                value={settings.church_name || 'كنيسة الشهيد العظيم مارجرجس الروماني والقديس العظيم الأنبا شنودة رئيس المتوحدين'}
                 onChange={(e) => setSettings({ ...settings, church_name: e.target.value })}
                 required
               />

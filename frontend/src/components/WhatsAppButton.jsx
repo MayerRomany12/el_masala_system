@@ -23,7 +23,7 @@ export function WhatsAppButton({
   const getTemplateText = () => {
     if (customText) return customText;
 
-    const church = "كنيسة السيدة العذراء مريم والأنبا بولا بالمسلة ⛪";
+    const church = "كنيسة الشهيد العظيم مارجرجس الروماني والأنبا شنودة رئيس المتوحدين بالكرور ⛪";
     
     switch (template) {
       case 'card':

@@ -136,12 +136,15 @@ async def init_db():
             ("absence_threshold_weeks", "2", "عدد أسابيع الغياب المتتالية لبدء الافتقاد التلقائي"),
             ("discount_high_pct", "30.0", "نسبة الخصم المالي للانتظام المرتفع (90%+)"),
             ("discount_medium_pct", "15.0", "نسبة الخصم المالي للانتظام المتوسط (75%-89%)"),
-            ("church_name", "كنيسة السيدة العذراء مريم والأنبا بولا بالمسلة", "اسم الكنيسة المطبوع بالبطاقات والتقارير")
+            ("church_name", "كنيسة الشهيد العظيم مارجرجس الروماني والقديس العظيم الأنبا شنودة رئيس المتوحدين", "اسم الكنيسة المطبوع بالبطاقات والتقارير")
         ]
         for key, val, desc in default_settings:
             q = await session.execute(select(setting.SystemSetting).where(setting.SystemSetting.key == key))
-            if not q.scalar_one_or_none():
+            existing_s = q.scalar_one_or_none()
+            if not existing_s:
                 session.add(setting.SystemSetting(key=key, value=val, description=desc))
+            elif key == "church_name" and ("مارجرجس" not in (existing_s.value or "")):
+                existing_s.value = val
 
         # ─── Seed 13 Default ClassGroups (slug = stable identity, name = editable) ───
         from app.models.class_group import ClassGroup

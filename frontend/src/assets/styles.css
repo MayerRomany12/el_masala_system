@@ -1,42 +1,52 @@
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Tajawal:wght@400;500;700;800&display=swap');
 
 :root {
-  /* ── Color Palette Derived from Church Logo ────────────────────────────────── */
-  /* Royal Maroon / Crimson */
-  --color-maroon-dark: #3b000b;
-  --color-maroon-main: #7a081d;
-  --color-maroon-bright: #9e0e29;
-  --color-maroon-glow: rgba(158, 14, 41, 0.35);
-
-  /* Orthodox Warm Gold */
-  --color-gold-light: #fbeea9;
-  --color-gold-main: #d4af37;
-  --color-gold-dark: #b8860b;
-  --color-gold-glow: rgba(212, 175, 55, 0.3);
-
-  /* St. Mary Royal Blue Accent */
-  --color-blue-royal: #1d4ed8;
+  /* ── Color Palette: Light Blue & Warm Yellow / Gold ────────────────────────── */
+  /* Primary Light Blue / Cerulean / Cyan (اللبني الكنسي) */
+  --color-blue-dark: #032b57;
+  --color-blue-main: #0284c7;
   --color-blue-bright: #38bdf8;
-  --color-blue-glow: rgba(56, 189, 248, 0.25);
+  --color-blue-light: #e0f2fe;
+  --color-blue-glow: rgba(56, 189, 248, 0.35);
 
-  /* Deep Canvas Background */
-  --bg-gradient: radial-gradient(circle at 50% 0%, #290812 0%, #120509 45%, #080204 100%);
-  --surface-color: rgba(26, 10, 16, 0.72);
-  --surface-border: rgba(212, 175, 55, 0.2);
-  --surface-hover: rgba(50, 18, 28, 0.85);
+  /* Warm Sunshine Yellow / Orthodox Gold (الأصفر المبهج والذهب) */
+  --color-yellow-light: #fef08a;
+  --color-yellow-main: #facc15;
+  --color-yellow-dark: #ca8a04;
+  --color-yellow-glow: rgba(250, 204, 21, 0.35);
+
+  /* Unified Aliases for backward & seamless component compatibility */
+  --color-gold-light: #fef08a;
+  --color-gold-main: #facc15;
+  --color-gold-dark: #ca8a04;
+  --color-gold-glow: rgba(250, 204, 21, 0.35);
+
+  --color-maroon-dark: #032b57;
+  --color-maroon-main: #0284c7;
+  --color-maroon-bright: #38bdf8;
+  --color-maroon-glow: rgba(56, 189, 248, 0.35);
+
+  --color-blue-royal: #0284c7;
+
+  /* Deep Royal Midnight-Blue Canvas Background */
+  --bg-gradient: radial-gradient(circle at 50% 0%, #0d2847 0%, #061930 45%, #020c19 100%);
+  --surface-color: rgba(9, 29, 54, 0.78);
+  --surface-border: rgba(250, 204, 21, 0.24);
+  --surface-hover: rgba(14, 43, 80, 0.88);
 
   /* Status Colors */
   --success-color: #34d399;
   --success-glow: rgba(52, 211, 153, 0.2);
-  --warning-color: #fbbf24;
+  --warning-color: #facc15;
   --danger-color: #f87171;
   --danger-glow: rgba(248, 113, 113, 0.2);
 
   /* Typography */
-  --text-main: #fcfcfc;
+  --text-main: #f8fafc;
   --text-muted: #cbd5e1;
   --text-subtle: #94a3b8;
-  --text-gold: #fde047;
+  --text-gold: #fef08a;
+  --text-blue: #38bdf8;
 
   --font-family: 'Cairo', 'Tajawal', system-ui, -apple-system, sans-serif;
   
@@ -45,8 +55,8 @@
   --radius-lg: 24px;
   
   --shadow-sm: 0 4px 15px rgba(0, 0, 0, 0.4);
-  --shadow-glow: 0 10px 35px -5px rgba(122, 8, 29, 0.45);
-  --shadow-gold-glow: 0 0 25px rgba(212, 175, 55, 0.25);
+  --shadow-glow: 0 10px 35px -5px rgba(2, 132, 199, 0.45);
+  --shadow-gold-glow: 0 0 25px rgba(250, 204, 21, 0.25);
 }
 
 * {
@@ -66,23 +76,23 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Custom Gold-Glow Scrollbar */
+/* Custom Yellow & Light Blue Scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(8, 2, 4, 0.8);
+  background: rgba(2, 12, 25, 0.85);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, var(--color-gold-dark) 0%, var(--color-maroon-main) 100%);
+  background: linear-gradient(180deg, var(--color-yellow-main) 0%, var(--color-blue-main) 100%);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-gold-main);
+  background: var(--color-yellow-light);
 }
 
 /* Layout Shell */
@@ -119,7 +129,7 @@ body {
 }
 
 .glass-card:hover {
-  border-color: rgba(212, 175, 55, 0.45);
+  border-color: rgba(250, 204, 21, 0.5);
   box-shadow: var(--shadow-glow);
 }
 
@@ -154,29 +164,30 @@ p {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--color-maroon-main) 0%, var(--color-maroon-bright) 100%);
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
   color: #ffffff;
-  border: 1px solid rgba(212, 175, 55, 0.35);
-  box-shadow: 0 4px 15px rgba(122, 8, 29, 0.4);
+  border: 1px solid rgba(250, 204, 21, 0.4);
+  box-shadow: 0 4px 15px rgba(2, 132, 199, 0.4);
 }
 
 .btn-primary:hover {
   transform: translateY(-2px);
-  background: linear-gradient(135deg, var(--color-maroon-bright) 0%, #bd1234 100%);
-  box-shadow: 0 8px 25px rgba(158, 14, 41, 0.6);
-  border-color: var(--color-gold-main);
+  background: linear-gradient(135deg, #38bdf8 0%, #0284c7 100%);
+  box-shadow: 0 8px 25px rgba(56, 189, 248, 0.55);
+  border-color: var(--color-yellow-main);
+  color: #ffffff;
 }
 
 .btn-secondary {
   background: rgba(255, 255, 255, 0.05);
   color: var(--text-main);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(250, 204, 21, 0.25);
 }
 
 .btn-secondary:hover {
-  background: rgba(212, 175, 55, 0.12);
-  border-color: rgba(212, 175, 55, 0.4);
-  color: var(--color-gold-light);
+  background: rgba(250, 204, 21, 0.12);
+  border-color: rgba(250, 204, 21, 0.5);
+  color: var(--color-yellow-light);
 }
 
 /* Form Controls */
@@ -197,8 +208,8 @@ p {
 .form-control {
   width: 100%;
   padding: 0.75rem 1rem;
-  background: rgba(13, 5, 8, 0.75);
-  border: 1px solid rgba(212, 175, 55, 0.25);
+  background: rgba(6, 20, 38, 0.85);
+  border: 1px solid rgba(250, 204, 21, 0.25);
   border-radius: var(--radius-sm);
   color: var(--text-main);
   font-family: var(--font-family);
@@ -209,18 +220,18 @@ p {
 .form-input:focus,
 .form-control:focus {
   outline: none;
-  border-color: var(--color-gold-main);
-  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.25);
-  background: rgba(26, 10, 16, 0.95);
+  border-color: var(--color-yellow-main);
+  box-shadow: 0 0 0 3px rgba(250, 204, 21, 0.25);
+  background: rgba(9, 29, 54, 0.95);
 }
 
-/* ── Custom Styled Selects (Consistent across entire system) ─────────────────── */
+/* ── Custom Styled Selects (Consistent Light Blue & Yellow theme) ─────────────── */
 select.form-input,
 select.form-control {
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23d4af37' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23facc15' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: left 0.85rem center;
   background-size: 16px;
@@ -237,8 +248,8 @@ select.form-control:disabled {
 
 select.form-input option,
 select.form-control option {
-  background-color: #1a0a10;
-  color: #fcfcfc;
+  background-color: #061930;
+  color: #f8fafc;
   padding: 0.6rem 0.9rem;
 }
 
@@ -246,8 +257,8 @@ select.form-input option:checked,
 select.form-control option:checked,
 select.form-input option:hover,
 select.form-control option:hover {
-  background: #7a081d !important;
-  color: #fbeea9 !important;
+  background: #0284c7 !important;
+  color: #fef08a !important;
 }
 
 /* ── Alert System ───────────────────────────────────────────────────────────── */
@@ -325,9 +336,9 @@ select.form-control option:hover {
 }
 
 .custom-table th {
-  background: rgba(59, 0, 11, 0.75);
+  background: rgba(8, 32, 60, 0.9);
   padding: 1rem;
-  color: var(--color-gold-light);
+  color: var(--color-yellow-light);
   font-weight: 700;
   font-size: 0.85rem;
   border-bottom: 1px solid var(--surface-border);
@@ -341,7 +352,7 @@ select.form-control option:hover {
 }
 
 .custom-table tr:hover td {
-  background: rgba(212, 175, 55, 0.04);
+  background: rgba(56, 189, 248, 0.08);
 }
 
 /* Micro Animations */
@@ -372,7 +383,7 @@ select.form-control option:hover {
   bottom: 0;
   width: 100vw;
   height: 100vh;
-  background-color: rgba(8, 2, 4, 0.88);
+  background-color: rgba(2, 10, 22, 0.88);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   display: flex;
@@ -390,8 +401,8 @@ select.form-control option:hover {
   margin: auto;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(145deg, rgba(26, 10, 16, 0.98) 0%, rgba(13, 5, 8, 0.98) 100%);
-  border: 1px solid rgba(212, 175, 55, 0.4);
+  background: linear-gradient(145deg, rgba(9, 29, 54, 0.98) 0%, rgba(4, 15, 30, 0.98) 100%);
+  border: 1px solid rgba(250, 204, 21, 0.4);
   box-shadow: 0 25px 70px rgba(0, 0, 0, 0.9);
   border-radius: var(--radius-md);
   overflow: hidden;
@@ -402,8 +413,8 @@ select.form-control option:hover {
 
 .modal-header {
   padding: 1.25rem 1.5rem;
-  background: linear-gradient(135deg, rgba(122, 8, 29, 0.6) 0%, rgba(26, 10, 16, 0.8) 100%);
-  border-bottom: 1px solid rgba(212, 175, 55, 0.3);
+  background: linear-gradient(135deg, rgba(2, 132, 199, 0.65) 0%, rgba(9, 29, 54, 0.9) 100%);
+  border-bottom: 1px solid rgba(250, 204, 21, 0.3);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -432,9 +443,9 @@ select.form-control option:hover {
 /* Sidebar Default Desktop & Mobile Drawer Styles */
 .app-sidebar {
   width: 270px;
-  background: rgba(18, 5, 9, 0.95);
+  background: rgba(5, 19, 36, 0.96);
   backdrop-filter: blur(20px);
-  border-left: 1px solid rgba(212, 175, 55, 0.2);
+  border-left: 1px solid rgba(250, 204, 21, 0.2);
   padding: 1.5rem 1rem;
   display: flex;
   flex-direction: column;

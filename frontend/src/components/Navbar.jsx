@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { LogOut, User, MessageSquare, Menu } from 'lucide-react';
 import churchLogo from '../assets/church_logo.png';
+import serviceLogo from '../assets/service_logo.png';
 import { messagesApi } from '../api/messages';
 import { CommunicationHubModal } from './CommunicationHubModal';
 
@@ -50,12 +51,12 @@ export const Navbar = ({ onToggleMobileSidebar }) => {
           position: 'sticky',
           top: 0,
           zIndex: 100,
-          background: 'rgba(26, 10, 16, 0.92)',
-          borderBottom: '1px solid rgba(212, 175, 55, 0.35)',
+          background: 'rgba(7, 23, 44, 0.94)',
+          borderBottom: '1px solid rgba(250, 204, 21, 0.35)',
           boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)'
         }}
       >
-        {/* Mobile Sidebar Toggle & Church Branding & Logo */}
+        {/* Mobile Sidebar Toggle & Church Branding & Dual Logos */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <button
             onClick={onToggleMobileSidebar}
@@ -63,42 +64,71 @@ export const Navbar = ({ onToggleMobileSidebar }) => {
             style={{
               padding: '0.45rem',
               borderRadius: 'var(--radius-sm)',
-              color: 'var(--color-gold-light)',
-              borderColor: 'rgba(212, 175, 55, 0.3)'
+              color: 'var(--color-yellow-light)',
+              borderColor: 'rgba(250, 204, 21, 0.3)'
             }}
             title="القائمة"
           >
             <Menu size={22} />
           </button>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-            <div style={{
-              position: 'relative',
-              width: '44px',
-              height: '44px',
-              borderRadius: '50%',
-              padding: '2px',
-              background: 'linear-gradient(135deg, #d4af37 0%, #7a081d 100%)',
-              boxShadow: '0 0 12px rgba(212, 175, 55, 0.4)',
-              flexShrink: 0
-            }}>
-              <img
-                src={churchLogo}
-                alt="شعار الكنيسة"
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  borderRadius: '50%',
-                  objectFit: 'cover'
-                }}
-              />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            {/* Logos: Church Seal & Sunday School Service */}
+            <div style={{ display: 'flex', alignItems: 'center', position: 'relative' }}>
+              <div style={{
+                position: 'relative',
+                width: '46px',
+                height: '46px',
+                borderRadius: '50%',
+                padding: '2px',
+                background: 'linear-gradient(135deg, #facc15 0%, #0284c7 100%)',
+                boxShadow: '0 0 14px rgba(250, 204, 21, 0.45)',
+                flexShrink: 0,
+                zIndex: 2
+              }}>
+                <img
+                  src={churchLogo}
+                  alt="شعار الكنيسة"
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    borderRadius: '50%',
+                    objectFit: 'cover'
+                  }}
+                />
+              </div>
+
+              <div style={{
+                position: 'relative',
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                padding: '2px',
+                background: 'linear-gradient(135deg, #38bdf8 0%, #facc15 100%)',
+                boxShadow: '0 0 10px rgba(56, 189, 248, 0.4)',
+                marginRight: '-12px',
+                flexShrink: 0,
+                zIndex: 1
+              }}>
+                <img
+                  src={serviceLogo}
+                  alt="شعار الخدمة"
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    borderRadius: '50%',
+                    objectFit: 'cover'
+                  }}
+                />
+              </div>
             </div>
+
             <div>
-              <h2 style={{ fontSize: '1.05rem', fontWeight: 900, color: 'var(--color-gold-light)', margin: 0, lineHeight: 1.2, textShadow: '0 2px 10px rgba(212, 175, 55, 0.3)' }}>
-                نظام المسلة الكنسي
+              <h2 style={{ fontSize: '1rem', fontWeight: 900, color: 'var(--color-yellow-light)', margin: 0, lineHeight: 1.25, textShadow: '0 2px 10px rgba(250, 204, 21, 0.3)' }}>
+                كنيسة الشهيد العظيم مارجرجس الروماني والأنبا شنودة رئيس المتوحدين
               </h2>
-              <p className="navbar-subtitle" style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0, fontWeight: 600 }}>
-                كنيسة السيدة العذراء مريم والأنبا بولا أول السواح بالمسلة — مطرانية أسوان
+              <p className="navbar-subtitle" style={{ fontSize: '0.73rem', color: '#93c5fd', margin: 0, fontWeight: 700 }}>
+                عزبة شنوده - الكرور - أسوان | خدمة مدارس الأحد
               </p>
             </div>
           </div>

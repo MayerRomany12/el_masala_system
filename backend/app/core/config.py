@@ -1,7 +1,7 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "Church Child & Member Management System - نظام المسلة"
+    PROJECT_NAME: str = "منظومة خدمة مدارس الأحد - كنيسة مارجرجس والأنبا شنودة"
     API_V1_STR: str = "/api/v1"
     SECRET_KEY: str = "church-almasalla-super-secret-jwt-key-min-32-chars-key"
     ALGORITHM: str = "HS256"
@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     INITIAL_SUPERADMIN_PASSWORD: str = "SuperAdmin$()456"
     INITIAL_SUPERADMIN_EMAIL: str = "romanymayer3@gmail.com"
 
-    CHURCH_NAME: str = "كنيسة السيدة العذراء مريم والأنبا بولا اول السواح بالمسلة"
+    CHURCH_NAME: str = "كنيسة الشهيد العظيم مارجرجس الروماني والقديس العظيم الأنبا شنودة رئيس المتوحدين"
 
     model_config = SettingsConfigDict(
         env_file=".env",
