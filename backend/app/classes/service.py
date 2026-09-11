@@ -29,13 +29,17 @@ class ClassService:
         group_type: Optional[str] = None,
         season_id: Optional[str] = None,
         stage: Optional[str] = None,
-        is_active: Optional[bool] = None
+        status: Optional[str] = None,
+        is_active: Optional[bool] = None,
+        limit: int = 100
     ) -> List[Dict[str, Any]]:
         return await self.repo.list_classes(
             group_type=group_type,
             season_id=season_id,
             stage=stage,
-            is_active=is_active
+            status=status,
+            is_active=is_active,
+            limit=limit
         )
 
     async def update_class_group(self, class_id: str, data: ClassGroupUpdate) -> Dict[str, Any]:

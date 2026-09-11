@@ -322,27 +322,14 @@ const CreatedMemberQRModal = ({ member, onClose }) => {
 };
 
 
-const STAGE_OPTIONS = [
-  'حضانة (KG1 & KG2)',
-  'ابتدائي - الصف الأول',
-  'ابتدائي - الصف الثاني',
-  'ابتدائي - الصف الثالث',
-  'ابتدائي - الصف الرابع',
-  'ابتدائي - الصف الخامس',
-  'ابتدائي - الصف السادس',
-  'إعدادي - الصف الأول',
-  'إعدادي - الصف الثاني',
-  'إعدادي - الصف الثالث',
-  'ثانوي',
-  'جامعة وخريجين',
-  'خدمات خاصة'
-];
+// ——— No more hardcoded STAGE_OPTIONS — classes come from API ———
 
 export const MemberManagement = () => {
   const { hasPermission } = useAuth();
 
   // Data States
   const [members, setMembers] = useState([]);
+  const [classes, setClasses] = useState([]);  // الفصول الديناميكية من API
   const [stats, setStats] = useState({
     total_members: 0,
     active_members: 0,
@@ -354,7 +341,7 @@ export const MemberManagement = () => {
 
   // Filters State
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedStage, setSelectedStage] = useState('');
+  const [selectedClassId, setSelectedClassId] = useState('');  // بدل selectedStage
   const [selectedStatus, setSelectedStatus] = useState('');
   const [page, setPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
@@ -371,7 +358,7 @@ export const MemberManagement = () => {
     full_name: '',
     gender: 'ذكر',
     date_of_birth: '',
-    stage: 'ابتدائي - الصف الأول',
+    class_id: '',       // بدل stage — الفصل من ClassGroup
     group_name: '',
     phone: '',
     whatsapp_phone: '',
@@ -383,6 +370,20 @@ export const MemberManagement = () => {
   const [modalError, setModalError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  // جلب الفصول الديناميكية من API مرة واحدة عند التحميل
+  useEffect(() => {
+    apiClient.get('/classes/?status=Active&limit=50')
+      .then(res => {
+        const data = res?.data?.data?.items || res?.data?.items || [];
+        setClasses(data);
+        // اضبط القيمة الافتراضية للفورم لأول فصل
+        if (data.length > 0) {
+          setFormData(prev => ({ ...prev, class_id: prev.class_id || data[0].class_id }));
+        }
+      })
+      .catch(() => setClasses([]));
+  }, []);
+
   // Fetch Data
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -391,7 +392,7 @@ export const MemberManagement = () => {
       const [membersRes, statsRes] = await Promise.all([
         membersApi.getMembers({
           search: searchTerm,
-          stage: selectedStage,
+          stage: selectedClassId,   // بيمرر class_id كـ stage filter لحين تحديث الباكيند
           status: selectedStatus,
           page,
           limit: 20
@@ -411,7 +412,7 @@ export const MemberManagement = () => {
     } finally {
       setLoading(false);
     }
-  }, [searchTerm, selectedStage, selectedStatus, page]);
+  }, [searchTerm, selectedClassId, selectedStatus, page]);
 
   useEffect(() => {
     fetchData();
@@ -424,7 +425,7 @@ export const MemberManagement = () => {
       full_name: '',
       gender: 'ذكر',
       date_of_birth: '',
-      stage: 'ابتدائي - الصف الأول',
+      class_id: classes.length > 0 ? classes[0].class_id : '',
       group_name: '',
       phone: '',
       secondary_phone: '',
@@ -442,11 +443,12 @@ export const MemberManagement = () => {
   // Open Edit Modal
   const handleOpenEdit = (member) => {
     setEditingMember(member);
+    // نجيب الفصل النشط الحالي للطفل من ClassGroupMember (class_id مش موجودة على member مباشرة)
     setFormData({
       full_name: member.full_name || '',
       gender: member.gender || 'ذكر',
       date_of_birth: member.date_of_birth || '',
-      stage: member.stage || 'ابتدائي - الصف الأول',
+      class_id: member.active_class_id || (classes.length > 0 ? classes[0].class_id : ''),
       group_name: member.group_name || '',
       phone: member.phone || '',
       secondary_phone: member.secondary_phone || '',
@@ -490,6 +492,12 @@ export const MemberManagement = () => {
       return;
     }
 
+    // التحقق من اختيار الفصل
+    if (!formData.class_id) {
+      setModalError('يرجى اختيار الفصل الخدمي أولاً');
+      return;
+    }
+
     setSubmitting(true);
 
     const payload = {
@@ -517,6 +525,17 @@ export const MemberManagement = () => {
         fetchData();
         const createdData = res?.data || res;
         if (createdData && (createdData.member_id || createdData.id)) {
+          // إضافة الطفل للفصل المختار عبر ClassGroupMember
+          if (formData.class_id) {
+            try {
+              await apiClient.post(`/classes/${formData.class_id}/members`, {
+                member_id: createdData.member_id || createdData.id
+              });
+            } catch (classErr) {
+              // لا نوقف التسجيل لو فشل إضافة الفصل — يتم الإضافة يدوياًً لاحقاً
+              console.warn('تحذير: فشل إضافة الطفل للفصل تلقائياً — يمكن الإضافة من شاشة إدارة الفصول', classErr);
+            }
+          }
           setCreatedMember(createdData);
         }
       }
@@ -675,16 +694,16 @@ export const MemberManagement = () => {
           />
         </div>
 
-        {/* Stage Filter */}
-        <div style={{ flex: '0 1 200px' }}>
+        {/* Class Filter - Dynamic from API */}
+        <div style={{ flex: '0 1 220px' }}>
           <select
             className="form-input"
-            value={selectedStage}
-            onChange={(e) => { setSelectedStage(e.target.value); setPage(1); }}
+            value={selectedClassId}
+            onChange={(e) => { setSelectedClassId(e.target.value); setPage(1); }}
           >
-            <option value="">كل المراحل الدراسية</option>
-            {STAGE_OPTIONS.map((stg) => (
-              <option key={stg} value={stg}>{stg}</option>
+            <option value="">كل الفصول الخدمية</option>
+            {classes.map((cls) => (
+              <option key={cls.class_id} value={cls.class_id}>{cls.name}</option>
             ))}
           </select>
         </div>
@@ -1004,10 +1023,18 @@ export const MemberManagement = () => {
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                   <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">المرحلة الدراسية / الخدمية*</label>
-                    <select className="form-input" value={formData.stage} onChange={(e) => setFormData({ ...formData, stage: e.target.value })}>
-                      {STAGE_OPTIONS.map((stg) => (
-                        <option key={stg} value={stg}>{stg}</option>
+                    <label className="form-label">الفصل الخدمي (التدريسي أو الخدمة)*</label>
+                    <select
+                      className="form-input"
+                      value={formData.class_id}
+                      onChange={(e) => setFormData({ ...formData, class_id: e.target.value })}
+                      required
+                    >
+                      <option value="">— اختر الفصل —</option>
+                      {classes.map((cls) => (
+                        <option key={cls.class_id} value={cls.class_id}>
+                          {cls.name}
+                        </option>
                       ))}
                     </select>
                   </div>

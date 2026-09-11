@@ -34,6 +34,7 @@ async def init_db():
     """Create all tables on startup and apply missing column migrations."""
     # Import all models so SQLAlchemy registers them
     from app.models import user, member, event, attendance, followup, rewards, setting, birthday, internal_messages, audit_log  # noqa
+    from app.models import class_group  # noqa
     from sqlalchemy import text, select
 
     async with engine.begin() as conn:
@@ -78,30 +79,42 @@ async def init_db():
             WHERE status IN ('Pending', 'Escalated');
         """))
 
-        # Approved Partial Unique Indexes for ClassGroup Memberships
-        try:
-            try:
-                await conn.execute(text("ALTER TABLE class_group_servants RENAME COLUMN user_id TO servant_id;"))
-            except Exception:
-                pass
-            await conn.execute(text("ALTER TABLE class_group_servants ADD COLUMN IF NOT EXISTS servant_id VARCHAR(50);"))
-            await conn.execute(text("ALTER TABLE class_group_servants ADD COLUMN IF NOT EXISTS role VARCHAR(50) DEFAULT 'Servant';"))
-            await conn.execute(text("ALTER TABLE class_group_servants ADD COLUMN IF NOT EXISTS joined_at TIMESTAMPTZ DEFAULT NOW();"))
-            await conn.execute(text("ALTER TABLE class_group_servants ADD COLUMN IF NOT EXISTS left_at TIMESTAMPTZ;"))
 
-            await conn.execute(text("""
-                CREATE UNIQUE INDEX IF NOT EXISTS uq_active_class_member
-                ON class_group_members (class_id, member_id)
-                WHERE is_active = TRUE;
-            """))
-            await conn.execute(text("""
-                CREATE UNIQUE INDEX IF NOT EXISTS uq_active_class_servant
-                ON class_group_servants (class_id, servant_id)
-                WHERE is_active = TRUE;
-            """))
-            logger.info("تم التحقق من تفعيل Partial Unique Indexes لقوائم عضوية الفصول النشطة بنجاح")
-        except Exception as e:
-            logger.exception(f"فشل تطبيق Partial Unique Indexes لعضوية الفصول: {e}")
+        # ── Safe RENAME COLUMN in isolated block (won't abort main transaction) ──
+        try:
+            async with engine.connect() as iso_conn:
+                await iso_conn.execute(text("ALTER TABLE class_group_servants RENAME COLUMN user_id TO servant_id;"))
+                await iso_conn.commit()
+        except Exception:
+            pass  # Column already renamed or doesn't exist — both are fine
+
+        # ── ClassGroup servants schema & slug migrations ──
+        await conn.execute(text("ALTER TABLE class_group_servants ADD COLUMN IF NOT EXISTS servant_id VARCHAR(50);"))
+        await conn.execute(text("ALTER TABLE class_group_servants ADD COLUMN IF NOT EXISTS role VARCHAR(50) DEFAULT 'Servant';"))
+        await conn.execute(text("ALTER TABLE class_group_servants ADD COLUMN IF NOT EXISTS joined_at TIMESTAMPTZ DEFAULT NOW();"))
+        await conn.execute(text("ALTER TABLE class_group_servants ADD COLUMN IF NOT EXISTS left_at TIMESTAMPTZ;"))
+        await conn.execute(text("ALTER TABLE class_group_servants ADD COLUMN IF NOT EXISTS last_assigned_at TIMESTAMPTZ;"))
+
+        # slug column + UNIQUE constraint (stable class identity — slug never changes)
+        await conn.execute(text("ALTER TABLE class_groups ADD COLUMN IF NOT EXISTS slug VARCHAR(50);"))
+        await conn.execute(text("""
+            CREATE UNIQUE INDEX IF NOT EXISTS uq_class_group_slug
+            ON class_groups (slug)
+            WHERE slug IS NOT NULL;
+        """))
+
+        # Partial Unique Indexes for ClassGroup memberships
+        await conn.execute(text("""
+            CREATE UNIQUE INDEX IF NOT EXISTS uq_active_class_member
+            ON class_group_members (class_id, member_id)
+            WHERE is_active = TRUE;
+        """))
+        await conn.execute(text("""
+            CREATE UNIQUE INDEX IF NOT EXISTS uq_active_class_servant
+            ON class_group_servants (class_id, servant_id)
+            WHERE is_active = TRUE;
+        """))
+        logger.info("Migrations for ClassGroup schema applied successfully.")
 
     # Ensure church logo exists in frontend assets safely
     import shutil, os
@@ -129,6 +142,38 @@ async def init_db():
             q = await session.execute(select(setting.SystemSetting).where(setting.SystemSetting.key == key))
             if not q.scalar_one_or_none():
                 session.add(setting.SystemSetting(key=key, value=val, description=desc))
+
+        # ─── Seed 13 Default ClassGroups (slug = stable identity, name = editable) ───
+        from app.models.class_group import ClassGroup
+        DEFAULT_CLASSES = [
+            ("CLS-KG",           "KG",               "حضانة"),
+            ("CLS-PRI-12",       "PRIMARY_1_2",       "أولى وتانية ابتدائي"),
+            ("CLS-PRI-34",       "PRIMARY_3_4",       "تالتة ورابعة ابتدائي"),
+            ("CLS-PRI-56",       "PRIMARY_5_6",       "خامسة وسادسة ابتدائي"),
+            ("CLS-PREP-1",       "PREP_1",            "أولى إعدادي"),
+            ("CLS-PREP-2",       "PREP_2",            "تانية إعدادي"),
+            ("CLS-PREP-3",       "PREP_3",            "تالتة إعدادي"),
+            ("CLS-SEC-1",        "SECONDARY_1",       "أولى ثانوي"),
+            ("CLS-SEC-2",        "SECONDARY_2",       "تانية ثانوي"),
+            ("CLS-SEC-3",        "SECONDARY_3",       "تالتة ثانوي"),
+            ("CLS-UNI",          "UNIVERSITY_GRADS",  "جامعيين وخريجين"),
+            ("CLS-DEACONS",      "DEACONS_HYMNS",     "حصة ألحان الشمامسة"),
+            ("CLS-LITURGY",      "DIVINE_LITURGY",    "قداس إلهي"),
+        ]
+        for class_id, slug, name in DEFAULT_CLASSES:
+            existing = await session.execute(
+                select(ClassGroup).where(ClassGroup.slug == slug)
+            )
+            if not existing.scalar_one_or_none():
+                session.add(ClassGroup(
+                    class_id=class_id,
+                    slug=slug,
+                    name=name,
+                    group_type="Standard",
+                    status="Active",
+                ))
+                logger.info(f"Seeded default class: [{slug}] {name}")
+        # ─────────────────────────────────────────────────────────────────────────────
 
         # Ensure Initial Super Admin User exists & credentials match config
         from app.models.user import User

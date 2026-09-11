@@ -22,7 +22,9 @@ async def list_classes(
     group_type: Optional[str] = Query(None, description="نوع المجموعة: Regular أو Summer"),
     season_id: Optional[str] = Query(None, description="تصفية بحسب الموسم الخدمي"),
     stage: Optional[str] = Query(None, description="تصفية بالمرحلة الدراسية"),
+    status: Optional[str] = Query(None, description="تصفية بالحالة: Active, Inactive, Archived"),
     is_active: Optional[bool] = Query(None, description="تصفية بالحالة النشطة"),
+    limit: Optional[int] = Query(100, description="الحد الأقصى للنتائج"),
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
@@ -31,9 +33,12 @@ async def list_classes(
         group_type=group_type,
         season_id=season_id,
         stage=stage,
-        is_active=is_active
+        status=status,
+        is_active=is_active,
+        limit=limit
     )
     return success_response(data={"items": items, "total": len(items)}, message="تم جلب قائمة الفصول والمجموعات بنجاح")
+
 
 
 @router.post("", response_model=dict, status_code=status.HTTP_201_CREATED)

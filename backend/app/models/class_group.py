@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Boolean, DateTime, Text, ForeignKey, DateTime
+from sqlalchemy import Column, String, Boolean, DateTime, Text, ForeignKey, UniqueConstraint
 from sqlalchemy.sql import func
 from app.core.database import Base
 
@@ -7,6 +7,7 @@ class ClassGroup(Base):
     __tablename__ = "class_groups"
 
     class_id    = Column(String(30), primary_key=True, index=True)
+    slug        = Column(String(50), nullable=True, unique=True, index=True)  # ثابت، لا يتغير أبداً
     name        = Column(String(200), nullable=False, index=True)
     group_type  = Column(String(50), nullable=False, default="Standard", index=True) # Standard, Summer, Ministry, Other
     season_id   = Column(String(30), ForeignKey("seasons.season_id", ondelete="SET NULL"), nullable=True, index=True)
@@ -21,15 +22,16 @@ class ClassGroup(Base):
 class ClassGroupServant(Base):
     __tablename__ = "class_group_servants"
 
-    assignment_id = Column(String(30), primary_key=True, index=True)
-    class_id      = Column(String(30), ForeignKey("class_groups.class_id", ondelete="CASCADE"), nullable=False, index=True)
-    servant_id    = Column(String(50), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False, index=True)
-    role          = Column(String(50), nullable=False, default="Servant") # LeadServant, Servant
-    joined_at     = Column(DateTime(timezone=True), server_default=func.now())
-    left_at       = Column(DateTime(timezone=True), nullable=True)
-    assigned_by   = Column(String(50), ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
-    is_active     = Column(Boolean, nullable=False, default=True, index=True)
-    created_at    = Column(DateTime(timezone=True), server_default=func.now())
+    assignment_id    = Column(String(30), primary_key=True, index=True)
+    class_id         = Column(String(30), ForeignKey("class_groups.class_id", ondelete="CASCADE"), nullable=False, index=True)
+    servant_id       = Column(String(50), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False, index=True)
+    role             = Column(String(50), nullable=False, default="Servant") # LeadServant, Servant
+    joined_at        = Column(DateTime(timezone=True), server_default=func.now())
+    left_at          = Column(DateTime(timezone=True), nullable=True)
+    assigned_by      = Column(String(50), ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
+    last_assigned_at = Column(DateTime(timezone=True), nullable=True)  # آخر مرة أُسند إليه مهمة — للـ Tiebreaker
+    is_active        = Column(Boolean, nullable=False, default=True, index=True)
+    created_at       = Column(DateTime(timezone=True), server_default=func.now())
 
 
 class ClassGroupMember(Base):

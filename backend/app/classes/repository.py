@@ -70,7 +70,9 @@ class ClassRepository:
         group_type: Optional[str] = None,
         season_id: Optional[str] = None,
         stage: Optional[str] = None,
-        is_active: Optional[bool] = None
+        status: Optional[str] = None,
+        is_active: Optional[bool] = None,
+        limit: int = 100
     ) -> List[Dict[str, Any]]:
         query = (
             select(
@@ -89,7 +91,8 @@ class ClassRepository:
                 and_(ClassGroupServant.class_id == ClassGroup.class_id, ClassGroupServant.is_active == True)
             )
             .group_by(ClassGroup.class_id, Season.name)
-            .order_by(ClassGroup.created_at.desc())
+            .order_by(ClassGroup.class_id)   # ترتيب ثابت بالـ ID
+            .limit(limit)
         )
 
         filters = []
@@ -99,6 +102,8 @@ class ClassRepository:
             filters.append(ClassGroup.season_id == season_id)
         if stage:
             filters.append(ClassGroup.stage == stage)
+        if status:
+            filters.append(ClassGroup.status == status)
         if is_active is not None:
             filters.append(ClassGroup.is_active == is_active)
 
@@ -116,6 +121,7 @@ class ClassRepository:
             results.append(d)
 
         return results
+
 
     async def update_class_group(self, class_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         if not data:
