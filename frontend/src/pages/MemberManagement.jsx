@@ -391,9 +391,9 @@ export const MemberManagement = () => {
     try {
       const [membersRes, statsRes] = await Promise.all([
         membersApi.getMembers({
-          search: searchTerm,
-          stage: selectedClassId,   // بيمرر class_id كـ stage filter لحين تحديث الباكيند
-          status: selectedStatus,
+          search: searchTerm || undefined,
+          class_id: selectedClassId || undefined,
+          status: selectedStatus || undefined,
           page,
           limit: 20
         }),
@@ -812,9 +812,32 @@ export const MemberManagement = () => {
                       </div>
                     </td>
                     <td>
-                      <div style={{ fontSize: '0.88rem', fontWeight: 600 }}>{member.stage}</div>
-                      {member.group_name && (
-                        <div style={{ fontSize: '0.78rem', color: 'var(--text-subtle)' }}>فصل: {member.group_name}</div>
+                      {member.active_classes && member.active_classes.length > 0 ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                          {member.active_classes.map((ac) => (
+                            <span
+                              key={ac.class_id}
+                              className="badge"
+                              style={{
+                                fontSize: '0.78rem',
+                                padding: '0.2rem 0.5rem',
+                                background: ac.group_type === 'Summer' ? 'rgba(245, 158, 11, 0.18)' : 'rgba(122, 8, 29, 0.25)',
+                                color: ac.group_type === 'Summer' ? '#fbbf24' : 'var(--color-gold-light)',
+                                border: ac.group_type === 'Summer' ? '1px solid rgba(245, 158, 11, 0.35)' : '1px solid rgba(212, 175, 55, 0.35)',
+                                maxWidth: 'fit-content'
+                              }}
+                            >
+                              {ac.class_name}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <div>
+                          <div style={{ fontSize: '0.88rem', fontWeight: 600 }}>{member.stage || 'عام'}</div>
+                          {member.group_name && (
+                            <div style={{ fontSize: '0.78rem', color: 'var(--text-subtle)' }}>{member.group_name}</div>
+                          )}
+                        </div>
                       )}
                     </td>
                     <td>

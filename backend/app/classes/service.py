@@ -63,16 +63,26 @@ class ClassService:
         return await self.repo.list_class_servants(class_id, active_only=active_only)
 
     # Member Management
-    async def add_member(self, class_id: str, data: AddMemberRequest) -> Dict[str, Any]:
+    async def add_member(self, class_id: str, data: Any) -> Dict[str, Any]:
         existing = await self.repo.get_by_id(class_id)
         if not existing:
             raise NotFoundException("الفصل غير موجود")
-        return await self.repo.add_member(class_id, data.member_id)
+        member_id = getattr(data, "member_id", data)
+        return await self.repo.add_member(class_id, member_id)
 
-    async def transfer_member(self, data: TransferMemberRequest) -> Dict[str, Any]:
-        if data.from_class_id == data.to_class_id:
+    async def transfer_member(self, from_class_or_req: Any, to_class_id: Optional[str] = None, member_id: Optional[str] = None) -> Dict[str, Any]:
+        if hasattr(from_class_or_req, "from_class_id"):
+            from_class = from_class_or_req.from_class_id
+            to_class = from_class_or_req.to_class_id
+            m_id = from_class_or_req.member_id
+        else:
+            from_class = from_class_or_req
+            to_class = to_class_id
+            m_id = member_id
+
+        if from_class == to_class:
             raise BadRequestException("لا يمكن نقل المخدوم لنفس الفصل الحالي")
-        return await self.repo.transfer_member(data.from_class_id, data.to_class_id, data.member_id)
+        return await self.repo.transfer_member(from_class, to_class, m_id)
 
     async def remove_member(self, class_id: str, member_id: str) -> bool:
         return await self.repo.remove_member(class_id, member_id)

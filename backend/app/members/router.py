@@ -54,6 +54,7 @@ async def scan_qr_card(
 async def list_members(
     search: Optional[str] = Query(None),
     stage: Optional[str] = Query(None),
+    class_id: Optional[str] = Query(None, description="تصفية بحسب الفصل الخدمي"),
     status: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     limit: int = Query(50, ge=1, le=100),
@@ -62,7 +63,7 @@ async def list_members(
 ):
     service = MemberService(db)
     result = await service.list_members(
-        search=search, stage=stage, status=status, page=page, limit=limit
+        search=search, stage=stage, class_id=class_id, status=status, page=page, limit=limit
     )
     return success_response(data=result, message="تم جلب قائمة المخدومين بنجاح")
 

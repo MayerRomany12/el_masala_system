@@ -85,7 +85,7 @@ async def get_birthday_report(
 
 @router.get("/export/excel")
 async def export_excel(
-    report_type: str = Query("attendance", description="نوع التقرير: attendance, financials"),
+    report_type: str = Query("attendance", description="نوع التقرير: attendance, financials, members, followup, birthdays"),
     stage: Optional[str] = Query(None),
     event_type: Optional[str] = Query(None),
     from_date: Optional[date] = Query(None),
@@ -111,7 +111,7 @@ async def export_excel(
 
 @router.get("/export/csv")
 async def export_csv(
-    report_type: str = Query("attendance", description="نوع التقرير: attendance, financials"),
+    report_type: str = Query("attendance", description="نوع التقرير: attendance, financials, members, followup, birthdays"),
     stage: Optional[str] = Query(None),
     event_type: Optional[str] = Query(None),
     from_date: Optional[date] = Query(None),
@@ -137,7 +137,7 @@ async def export_csv(
 
 @router.get("/export/pdf")
 async def export_pdf(
-    report_type: str = Query("attendance", description="نوع التقرير: attendance, financials"),
+    report_type: str = Query("attendance", description="نوع التقرير: attendance, financials, members, followup, birthdays"),
     stage: Optional[str] = Query(None),
     event_type: Optional[str] = Query(None),
     from_date: Optional[date] = Query(None),
@@ -154,4 +154,9 @@ async def export_pdf(
         from_date=from_date,
         to_date=to_date
     )
-    return Response(content=content, media_type=media_type)
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": f"inline; filename={filename}"}
+    )
+

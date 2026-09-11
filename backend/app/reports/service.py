@@ -90,6 +90,67 @@ class ReportsService:
                 {"label": "المتبقي", "value": f"{t_rem:.2f} جم"}
             ]
 
+        elif report_type == "members":
+            title = "سجل المخدومين الشامل والفصول الخدمية"
+            data_list = await self.repo.get_members_master_report(stage=stage)
+            headers_map = {
+                "member_id": "رمز المخدوم",
+                "full_name": "الاسم الكامل",
+                "active_classes": "الفصول والمجموعات المسكن بها",
+                "stage": "المرحلة الدراسية",
+                "gender": "الجنس",
+                "date_of_birth": "تاريخ الميلاد",
+                "phone": "تليفون ولي الأمر الأساسي",
+                "secondary_phone": "التليفون الآخر",
+                "member_phone": "تليفون الطفل",
+                "whatsapp_phone": "رقم الواتساب",
+                "father_of_confession": "أب الاعتراف",
+                "address": "العنوان",
+                "status": "الحالة",
+                "created_at": "تاريخ التسجيل"
+            }
+            summary_cards = [
+                {"label": "إجمالي الأطفال بالسجل", "value": f"{len(data_list)} طفل"}
+            ]
+
+        elif report_type == "followup":
+            title = "تقرير أداء الافتقاد ومتابعة الغائبين"
+            data_list = await self.repo.get_followup_detailed_report()
+            headers_map = {
+                "task_id": "رمز المهمة",
+                "member_name": "اسم المخدوم",
+                "assigned_to": "الخادم المكلف",
+                "stage": "المرحلة",
+                "reason": "سبب الافتقاد",
+                "priority": "الأولوية",
+                "status": "حالة المهمة",
+                "due_date": "الموعد المحدد",
+                "created_at": "تاريخ التكليف"
+            }
+            summary_cards = [
+                {"label": "إجمالي مهام الافتقاد", "value": f"{len(data_list)} مهمة"}
+            ]
+
+        elif report_type == "birthdays":
+            title = "تقرير أعياد الميلاد وتوزيع الهدايا"
+            data_list = await self.repo.get_birthdays_detailed_report()
+            headers_map = {
+                "member_id": "رمز المخدوم",
+                "full_name": "اسم الطفل",
+                "date_of_birth": "تاريخ الميلاد",
+                "stage": "المرحلة",
+                "gift_status": "حالة تسليم الهدية",
+                "delivered_at": "تاريخ الاستلام",
+                "delivered_by": "المستلم بواسطة",
+                "phone": "تليفون ولي الأمر"
+            }
+            delivered_cnt = sum(1 for d in data_list if "تم التسليم" in str(d.get("gift_status", "")))
+            summary_cards = [
+                {"label": "إجمالي أعياد الميلاد", "value": f"{len(data_list)} طفل"},
+                {"label": "الهدايا المسلمة", "value": f"{delivered_cnt}"},
+                {"label": "الهدايا المتبقية", "value": f"{len(data_list) - delivered_cnt}"}
+            ]
+
         else:
             raise BadRequestException(f"نوع التقرير ({report_type}) غير مدعوم بالتصدير المباشر")
 

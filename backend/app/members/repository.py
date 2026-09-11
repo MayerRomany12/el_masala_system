@@ -2,11 +2,12 @@ import secrets
 from typing import Optional, List, Tuple, Dict, Any
 from datetime import datetime, timezone
 
-from sqlalchemy import select, update, func, or_, String
+from sqlalchemy import select, update, func, or_, String, exists
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 
 from app.models.member import Member
+from app.models.class_group import ClassGroup, ClassGroupMember
 from app.core.errors import AppException
 
 
@@ -35,6 +36,7 @@ def _row_to_dict(row: Member) -> Dict[str, Any]:
         "total_points": row.total_points,
         "created_at": row.created_at,
         "updated_at": row.updated_at,
+        "active_classes": []
     }
 
 
@@ -73,12 +75,44 @@ class MemberRepository:
             select(Member).where(func.upper(Member.member_id) == clean_id)
         )
         row = result.scalar_one_or_none()
-        return _row_to_dict(row) if row else None
+        if not row:
+            return None
+
+        member_dict = _row_to_dict(row)
+        # Fetch active classes with deterministic ordering
+        cgm_query = (
+            select(
+                ClassGroupMember.class_id,
+                ClassGroup.name.label("class_name"),
+                ClassGroup.group_type,
+                ClassGroup.stage,
+                ClassGroupMember.joined_at
+            )
+            .join(ClassGroup, ClassGroupMember.class_id == ClassGroup.class_id)
+            .where(
+                ClassGroupMember.member_id == clean_id,
+                ClassGroupMember.is_active == True
+            )
+            .order_by(ClassGroup.group_type.asc(), ClassGroupMember.joined_at.asc(), ClassGroup.name.asc())
+        )
+        cgm_res = await self.db.execute(cgm_query)
+        member_dict["active_classes"] = [
+            {
+                "class_id": r.class_id,
+                "class_name": r.class_name,
+                "group_type": r.group_type,
+                "stage": r.stage,
+                "joined_at": r.joined_at.isoformat() if r.joined_at else None
+            }
+            for r in cgm_res.all()
+        ]
+        return member_dict
 
     async def get_members(
         self,
         search: Optional[str] = None,
         stage: Optional[str] = None,
+        class_id: Optional[str] = None,
         status: Optional[str] = None,
         include_archived: bool = False,
         skip: int = 0,
@@ -96,6 +130,18 @@ class MemberRepository:
 
         if stage:
             query = query.where(Member.stage == stage)
+
+        if class_id:
+            query = query.where(
+                exists(
+                    select(1).select_from(ClassGroupMember).where(
+                        ClassGroupMember.member_id == Member.member_id,
+                        ClassGroupMember.class_id == class_id,
+                        ClassGroupMember.is_active == True
+                    )
+                )
+            )
+
         if search:
             pattern = f"%{search.strip()}%"
             query = query.where(
@@ -114,6 +160,38 @@ class MemberRepository:
         query = query.order_by(Member.created_at.desc()).offset(skip).limit(limit)
         items_result = await self.db.execute(query)
         items = [_row_to_dict(r) for r in items_result.scalars().all()]
+
+        # Batch load active classes for all retrieved members with deterministic ordering
+        if items:
+            member_ids = [item["member_id"] for item in items]
+            cgm_query = (
+                select(
+                    ClassGroupMember.member_id,
+                    ClassGroupMember.class_id,
+                    ClassGroup.name.label("class_name"),
+                    ClassGroup.group_type,
+                    ClassGroup.stage,
+                    ClassGroupMember.joined_at
+                )
+                .join(ClassGroup, ClassGroupMember.class_id == ClassGroup.class_id)
+                .where(
+                    ClassGroupMember.member_id.in_(member_ids),
+                    ClassGroupMember.is_active == True
+                )
+                .order_by(ClassGroup.group_type.asc(), ClassGroupMember.joined_at.asc(), ClassGroup.name.asc())
+            )
+            cgm_res = await self.db.execute(cgm_query)
+            classes_by_member = {mid: [] for mid in member_ids}
+            for r in cgm_res.all():
+                classes_by_member[r.member_id].append({
+                    "class_id": r.class_id,
+                    "class_name": r.class_name,
+                    "group_type": r.group_type,
+                    "stage": r.stage,
+                    "joined_at": r.joined_at.isoformat() if r.joined_at else None
+                })
+            for item in items:
+                item["active_classes"] = classes_by_member.get(item["member_id"], [])
 
         return items, total
 

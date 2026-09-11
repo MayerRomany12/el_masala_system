@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { reportsApi } from '../api/reports';
+import { apiClient } from '../api/client';
 import {
   FileBarChart,
   Download,
@@ -7,28 +8,24 @@ import {
   FileSpreadsheet,
   RefreshCw,
   Filter,
-  AlertCircle
+  AlertCircle,
+  Users,
+  Calendar
 } from 'lucide-react';
 
 const STAGE_OPTIONS = [
   'ALL',
-  'حضانة (KG1 & KG2)',
-  'ابتدائي - الصف الأول',
-  'ابتدائي - الصف الثاني',
-  'ابتدائي - الصف الثالث',
-  'ابتدائي - الصف الرابع',
-  'ابتدائي - الصف الخامس',
-  'ابتدائي - الصف السادس',
-  'إعدادي - الصف الأول',
-  'إعدادي - الصف الثاني',
-  'إعدادي - الصف الثالث',
+  'حضانة',
+  'ابتدائي',
+  'إعدادي',
   'ثانوي',
-  'جامعة وخريجين'
+  'جامعيين وخريجين',
+  'أنشطة عامة'
 ];
 
 export const ReportManagement = () => {
-  // Active Report Tab: 'attendance', 'financials', 'followup', 'birthdays'
-  const [reportType, setReportType] = useState('attendance');
+  // Active Report Tab: 'members', 'attendance', 'financials', 'followup', 'birthdays'
+  const [reportType, setReportType] = useState('members');
 
   // Filters
   const [selectedStage, setSelectedStage] = useState('');
@@ -40,6 +37,7 @@ export const ReportManagement = () => {
   const [dataList, setDataList] = useState([]);
   const [summaryData, setSummaryData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const [error, setError] = useState('');
 
   // Fetch Report Data
@@ -47,9 +45,20 @@ export const ReportManagement = () => {
     setLoading(true);
     setError('');
     try {
-      if (reportType === 'attendance') {
+      if (reportType === 'members') {
+        const res = await apiClient.get('/members', {
+          params: {
+            stage: selectedStage && selectedStage !== 'ALL' ? selectedStage : undefined,
+            limit: 100
+          }
+        });
+        if (res.data && res.data.success) {
+          setDataList(res.data.data.items || []);
+          setSummaryData({ total_count: res.data.data.total });
+        }
+      } else if (reportType === 'attendance') {
         const res = await reportsApi.getAttendanceReport({
-          stage: selectedStage || null,
+          stage: selectedStage && selectedStage !== 'ALL' ? selectedStage : null,
           from_date: fromDate || null,
           to_date: toDate || null
         });
@@ -91,77 +100,127 @@ export const ReportManagement = () => {
     fetchReportData();
   }, [fetchReportData]);
 
-  // Export Action Triggers using Unified Dataset Parameters
-  const handleExport = (format) => {
-    const params = {};
-    if (selectedStage) params.stage = selectedStage;
-    if (selectedEventType) params.event_type = selectedEventType;
-    if (fromDate) params.from_date = fromDate;
-    if (toDate) params.to_date = toDate;
+  // Export Action with Authenticated Blob Download & Header Filename Extraction
+  const handleExport = async (format) => {
+    try {
+      setExporting(true);
+      const params = {};
+      if (selectedStage && selectedStage !== 'ALL') params.stage = selectedStage;
+      if (selectedEventType && selectedEventType !== 'ALL') params.event_type = selectedEventType;
+      if (fromDate) params.from_date = fromDate;
+      if (toDate) params.to_date = toDate;
 
-    const url = reportsApi.getExportUrl(reportType, format, params);
-    if (format === 'pdf') {
-      window.open(url, '_blank');
-    } else {
-      window.location.href = url;
+      const res = await reportsApi.downloadExport(reportType, format, params);
+
+      // Extract filename from Content-Disposition header if returned
+      let filename = `report_${reportType}_${new Date().toISOString().split('T')[0]}.${format === 'excel' ? 'xlsx' : (format === 'csv' ? 'csv' : 'html')}`;
+      const disposition = res.headers ? (res.headers['content-disposition'] || res.headers['Content-Disposition']) : null;
+      if (disposition) {
+        const match = disposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+        if (match && match[1]) {
+          filename = match[1].replace(/['"]/g, '').trim();
+        }
+      }
+
+      const mimeType = format === 'pdf'
+        ? 'text/html;charset=utf-8;'
+        : (format === 'excel'
+          ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+          : 'text/csv;charset=utf-8;');
+
+      const blob = new Blob([res.data], { type: mimeType });
+      const blobUrl = window.URL.createObjectURL(blob);
+
+      if (format === 'pdf') {
+        // Open printable preview in new tab
+        const printWin = window.open(blobUrl, '_blank');
+        if (!printWin) {
+          const a = document.createElement('a');
+          a.href = blobUrl;
+          a.download = filename;
+          a.click();
+        }
+      } else {
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
+      setTimeout(() => window.URL.revokeObjectURL(blobUrl), 10000);
+    } catch (err) {
+      alert('فشل تنزيل التقرير. يرجى التحقق من الصلاحيات والاتصال بالسيرفر.');
+    } finally {
+      setExporting(false);
     }
   };
 
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      
       {/* 1. Header & Actions */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h1 style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <FileBarChart size={28} style={{ color: '#d4af37' }} />
+            <FileBarChart size={28} style={{ color: 'var(--color-gold-main)' }} />
             <span>نظام التقارير الشاملة والإحصائيات الكنسية</span>
           </h1>
-          <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)' }}>
-            تقارير مجمعة ومحسوبة مباشرة من واقع البيانات الأصلية (M1-M8) مع محرك التصدير الثلاثي المعترف به
+          <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+            سجلات تفصيلية وإحصائيات موحدة من واقع قاعدة البيانات مع إمكانية التصدير والطباعة
           </p>
         </div>
 
         {/* Unified Export Buttons */}
-        <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
           <button
             onClick={() => handleExport('excel')}
+            disabled={exporting}
             className="btn btn-secondary"
             style={{ color: '#34d399', borderColor: 'rgba(52, 211, 153, 0.4)', gap: '0.4rem' }}
-            title="تحميل ملف إكسل منسق عربي"
+            title="تحميل ملف إكسل منسق عربي RTL"
           >
             <FileSpreadsheet size={17} />
-            <span>تحميل Excel 📊</span>
+            <span>{exporting ? 'جاري التصدير...' : 'تحميل Excel 📊'}</span>
           </button>
 
           <button
             onClick={() => handleExport('pdf')}
+            disabled={exporting}
             className="btn btn-primary"
             style={{ gap: '0.4rem' }}
-            title="معاينة وتصدير تقرير PDF رسمي مروس بشعار الكنيسة"
+            title="معاينة وتصدير تقرير رسمي مروس بشعار الكنيسة جاهز للطباعة"
           >
             <Printer size={17} />
-            <span>تقرير PDF رسمي 📄</span>
+            <span>معاينة / طباعة التقرير (Print / PDF) 📄</span>
           </button>
 
           <button
             onClick={() => handleExport('csv')}
+            disabled={exporting}
             className="btn btn-secondary"
             style={{ color: '#38bdf8', borderColor: 'rgba(56, 189, 248, 0.4)', gap: '0.4rem' }}
-            title="تحميل ملف بيانات CSV خام"
+            title="تحميل ملف بيانات CSV خام بترميز UTF-8 BOM"
           >
             <Download size={17} />
             <span>تحميل CSV 📁</span>
           </button>
 
-          <button onClick={fetchReportData} className="btn btn-secondary">
-            <RefreshCw size={16} />
+          <button onClick={fetchReportData} className="btn btn-secondary" disabled={loading} title="تحديث البيانات">
+            <RefreshCw size={16} className={loading ? 'pulse-gold' : ''} />
           </button>
         </div>
       </div>
 
       {/* 2. Report Type Tabs */}
       <div className="glass-card" style={{ padding: '0.75rem', display: 'flex', gap: '0.5rem', overflowX: 'auto' }}>
+        <button
+          onClick={() => setReportType('members')}
+          className={`btn ${reportType === 'members' ? 'btn-primary' : 'btn-secondary'}`}
+          style={{ fontSize: '0.88rem' }}
+        >
+          سجل المخدومين الشامل 📜
+        </button>
+
         <button
           onClick={() => setReportType('attendance')}
           className={`btn ${reportType === 'attendance' ? 'btn-primary' : 'btn-secondary'}`}
@@ -191,7 +250,7 @@ export const ReportManagement = () => {
           className={`btn ${reportType === 'birthdays' ? 'btn-primary' : 'btn-secondary'}`}
           style={{ fontSize: '0.88rem' }}
         >
-          تقرير أعياد الميلاد وهدايا 2026 🎁
+          تقرير أعياد الميلاد وتوزيع الهدايا 🎁
         </button>
       </div>
 
@@ -199,29 +258,28 @@ export const ReportManagement = () => {
       <div className="glass-card" style={{ padding: '1rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--color-gold-light)', fontWeight: 700, fontSize: '0.88rem' }}>
           <Filter size={18} />
-          <span>تصفية التقارير:</span>
+          <span>تصفية التقرير:</span>
         </div>
 
-        {reportType === 'attendance' && (
+        {(reportType === 'members' || reportType === 'attendance') && (
           <div style={{ flex: '0 1 200px' }}>
             <select
               className="form-input"
-              style={{ fontSize: '0.85rem' }}
               value={selectedStage}
               onChange={(e) => setSelectedStage(e.target.value)}
             >
-              {STAGE_OPTIONS.map((stg) => (
-                <option key={stg} value={stg === 'ALL' ? '' : stg}>{stg}</option>
+              <option value="">جميع المراحل الدراسية</option>
+              {STAGE_OPTIONS.filter(s => s !== 'ALL').map((stg) => (
+                <option key={stg} value={stg}>{stg}</option>
               ))}
             </select>
           </div>
         )}
 
         {reportType === 'financials' && (
-          <div style={{ flex: '0 1 180px' }}>
+          <div style={{ flex: '0 1 200px' }}>
             <select
               className="form-input"
-              style={{ fontSize: '0.85rem' }}
               value={selectedEventType}
               onChange={(e) => setSelectedEventType(e.target.value)}
             >
@@ -239,7 +297,6 @@ export const ReportManagement = () => {
               <input
                 type="date"
                 className="form-input"
-                style={{ fontSize: '0.85rem' }}
                 value={fromDate}
                 onChange={(e) => setFromDate(e.target.value)}
                 placeholder="من تاريخ"
@@ -250,7 +307,6 @@ export const ReportManagement = () => {
               <input
                 type="date"
                 className="form-input"
-                style={{ fontSize: '0.85rem' }}
                 value={toDate}
                 onChange={(e) => setToDate(e.target.value)}
                 placeholder="إلى تاريخ"
@@ -261,8 +317,8 @@ export const ReportManagement = () => {
       </div>
 
       {error && (
-        <div style={{ padding: '0.85rem 1.25rem', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: '12px', color: '#fca5a5' }}>
-          <AlertCircle size={18} style={{ display: 'inline', marginLeft: '6px' }} />
+        <div className="alert alert-error">
+          <AlertCircle size={18} />
           <span>{error}</span>
         </div>
       )}
@@ -270,7 +326,6 @@ export const ReportManagement = () => {
       {/* 4. Financial Explicit 6 Metrics Summary Banner */}
       {reportType === 'financials' && summaryData && (
         <div className="glass-card animate-fade-in" style={{ padding: '1.25rem', background: 'linear-gradient(145deg, rgba(59, 0, 11, 0.6) 0%, rgba(13, 5, 8, 0.9) 100%)', border: '1px solid rgba(212, 175, 55, 0.35)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1.25rem' }}>
-          
           <div>
             <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block' }}>إجمالي السعر الأساسي</span>
             <strong style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-main)' }}>{summaryData.total_base_fee} جم</strong>
@@ -305,7 +360,76 @@ export const ReportManagement = () => {
 
       {/* 5. Report Table Renderers */}
       <div className="glass-card" style={{ padding: '1.25rem' }}>
-        
+        {/* Members Master Directory Table */}
+        {reportType === 'members' && (
+          <div className="table-container">
+            <table className="custom-table">
+              <thead>
+                <tr>
+                  <th>رمز المخدوم</th>
+                  <th>الاسم الكامل للطفل</th>
+                  <th>الفصول المسكن بها</th>
+                  <th>المرحلة</th>
+                  <th>تاريخ الميلاد</th>
+                  <th>تليفون ولي الأمر</th>
+                  <th>الحالة</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={7} style={{ textAlign: 'center', padding: '2rem' }}>جاري استعلام سجل المخدومين...</td>
+                  </tr>
+                ) : dataList.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>لا يوجد أطفال مسجلين مطابقين للتصفية.</td>
+                  </tr>
+                ) : (
+                  dataList.map((row) => (
+                    <tr key={row.member_id}>
+                      <td><span style={{ fontFamily: 'monospace', fontWeight: 800, color: '#38bdf8' }}>{row.member_id}</span></td>
+                      <td style={{ fontWeight: 700, color: 'var(--text-main)' }}>{row.full_name}</td>
+                      <td>
+                        {row.active_classes && row.active_classes.length > 0 ? (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px' }}>
+                            {row.active_classes.map((ac) => (
+                              <span
+                                key={ac.class_id}
+                                className="badge"
+                                style={{
+                                  fontSize: '0.75rem',
+                                  padding: '0.15rem 0.45rem',
+                                  background: ac.group_type === 'Summer' ? 'rgba(245, 158, 11, 0.18)' : 'rgba(122, 8, 29, 0.25)',
+                                  color: ac.group_type === 'Summer' ? '#fbbf24' : 'var(--color-gold-light)',
+                                  border: '1px solid rgba(212, 175, 55, 0.3)'
+                                }}
+                              >
+                                {ac.class_name}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span style={{ color: 'var(--text-subtle)', fontSize: '0.82rem' }}>—</span>
+                        )}
+                      </td>
+                      <td>{row.stage || 'عام'}</td>
+                      <td style={{ color: 'var(--text-muted)' }}>{row.date_of_birth || '—'}</td>
+                      <td>
+                        <span style={{ color: '#38bdf8', fontWeight: 600 }}>{row.phone}</span>
+                      </td>
+                      <td>
+                        <span className="badge" style={{ background: row.status === 'Active' ? 'rgba(52, 211, 153, 0.18)' : 'rgba(239, 68, 68, 0.18)', color: row.status === 'Active' ? '#34d399' : '#f87171' }}>
+                          {row.status === 'Active' ? 'نشط' : 'غير نشط'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
         {/* Attendance Report Table */}
         {reportType === 'attendance' && (
           <div className="table-container">
@@ -316,8 +440,8 @@ export const ReportManagement = () => {
                   <th>تاريخ الجلسة</th>
                   <th>المرحلة الخدمية</th>
                   <th>عنوان الجلسة</th>
-                  <th>الأطفال المستهدفين (Targeted Active)</th>
-                  <th>عدد الحاضرين (Valid Present)</th>
+                  <th>الأطفال المستهدفين</th>
+                  <th>عدد الحاضرين</th>
                   <th>نسبة الحضور (%)</th>
                 </tr>
               </thead>
@@ -461,3 +585,5 @@ export const ReportManagement = () => {
     </div>
   );
 };
+
+export default ReportManagement;

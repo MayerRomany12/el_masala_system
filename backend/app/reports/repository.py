@@ -161,3 +161,113 @@ class ReportsRepository:
             "pending_gifts_count": pending,
             "delivery_rate_pct": rate
         }
+
+    async def get_members_master_report(self, stage: Optional[str] = None) -> List[Dict[str, Any]]:
+        query = select(Member).where(Member.is_archived == False)
+        if stage and stage != "ALL":
+            query = query.where(Member.stage == stage)
+        query = query.order_by(Member.stage.asc(), Member.full_name.asc())
+        members = (await self.db.execute(query)).scalars().all()
+
+        if not members:
+            return []
+
+        member_ids = [m.member_id for m in members]
+        from app.models.class_group import ClassGroup, ClassGroupMember
+        cgm_query = (
+            select(
+                ClassGroupMember.member_id,
+                ClassGroup.name.label("class_name")
+            )
+            .join(ClassGroup, ClassGroupMember.class_id == ClassGroup.class_id)
+            .where(
+                ClassGroupMember.member_id.in_(member_ids),
+                ClassGroupMember.is_active == True
+            )
+            .order_by(ClassGroup.group_type.asc(), ClassGroupMember.joined_at.asc(), ClassGroup.name.asc())
+        )
+        cgm_res = await self.db.execute(cgm_query)
+        classes_map = {}
+        for row in cgm_res.all():
+            classes_map.setdefault(row.member_id, []).append(row.class_name)
+
+        results = []
+        for m in members:
+            classes_list = classes_map.get(m.member_id, [])
+            classes_str = " | ".join(classes_list) if classes_list else (m.stage or "غير مسكن")
+            results.append({
+                "member_id": m.member_id,
+                "full_name": m.full_name,
+                "active_classes": classes_str,
+                "gender": m.gender or "—",
+                "date_of_birth": str(m.date_of_birth) if m.date_of_birth else "—",
+                "stage": m.stage or "—",
+                "phone": m.phone or "—",
+                "secondary_phone": m.secondary_phone or "—",
+                "member_phone": m.member_phone or "—",
+                "whatsapp_phone": m.whatsapp_phone or "—",
+                "father_of_confession": m.father_of_confession or "—",
+                "address": m.address or "—",
+                "notes": m.notes or "—",
+                "status": "نشط" if m.status == "Active" else ("غير نشط" if m.status == "Inactive" else m.status),
+                "created_at": m.created_at.strftime("%Y/%m/%d") if m.created_at else "—"
+            })
+        return results
+
+    async def get_followup_detailed_report(self) -> List[Dict[str, Any]]:
+        from app.models.user import User
+        query = (
+            select(FollowupTask, Member.full_name.label("member_name"), Member.stage, User.full_name.label("servant_name"))
+            .join(Member, FollowupTask.member_id == Member.member_id)
+            .outerjoin(User, FollowupTask.assigned_servant_id == User.user_id)
+            .order_by(FollowupTask.created_at.desc())
+        )
+        res = await self.db.execute(query)
+        results = []
+        for task, mem_name, stg, srv_name in res.all():
+            results.append({
+                "task_id": task.task_id,
+                "member_name": mem_name,
+                "assigned_to": srv_name or "غير مكلف",
+                "stage": stg or "—",
+                "reason": task.reason or task.task_type or "غياب",
+                "priority": task.priority or "Normal",
+                "status": task.status or "Pending",
+                "due_date": str(task.due_date) if task.due_date else "—",
+                "created_at": task.created_at.strftime("%Y/%m/%d") if task.created_at else "—"
+            })
+        return results
+
+    async def get_birthdays_detailed_report(self, year: Optional[int] = None) -> List[Dict[str, Any]]:
+        target_year = year or date.today().year
+        from app.models.user import User
+        query = (
+            select(
+                Member,
+                BirthdayGiftDelivery.delivery_id,
+                BirthdayGiftDelivery.delivered_at,
+                User.full_name.label("servant_name")
+            )
+            .outerjoin(
+                BirthdayGiftDelivery,
+                (BirthdayGiftDelivery.member_id == Member.member_id) & (BirthdayGiftDelivery.year == target_year)
+            )
+            .outerjoin(User, BirthdayGiftDelivery.delivered_by == User.user_id)
+            .where(Member.status == "Active", Member.date_of_birth.isnot(None))
+            .order_by(Member.full_name.asc())
+        )
+        res = await self.db.execute(query)
+        results = []
+        for mem, deliv_id, deliv_at, srv_name in res.all():
+            results.append({
+                "member_id": mem.member_id,
+                "full_name": mem.full_name,
+                "date_of_birth": str(mem.date_of_birth) if mem.date_of_birth else "—",
+                "stage": mem.stage or "—",
+                "gift_status": "تم التسليم 🎁" if deliv_id else "معلق لم يستلم ⏳",
+                "delivered_at": deliv_at.strftime("%Y/%m/%d") if deliv_at else "—",
+                "delivered_by": srv_name or "—",
+                "phone": mem.phone or "—"
+            })
+        return results
+

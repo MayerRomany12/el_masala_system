@@ -93,6 +93,7 @@ class MemberService:
         self,
         search: Optional[str] = None,
         stage: Optional[str] = None,
+        class_id: Optional[str] = None,
         status: Optional[str] = None,
         page: int = 1,
         limit: int = 50,
@@ -102,7 +103,7 @@ class MemberService:
         skip = (page - 1) * limit
 
         items, total = await self.repository.get_members(
-            search=search, stage=stage, status=status, skip=skip, limit=limit
+            search=search, stage=stage, class_id=class_id, status=status, skip=skip, limit=limit
         )
         return {"total": total, "page": page, "limit": limit, "items": items}
 

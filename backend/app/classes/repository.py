@@ -105,7 +105,10 @@ class ClassRepository:
         if status:
             filters.append(ClassGroup.status == status)
         if is_active is not None:
-            filters.append(ClassGroup.is_active == is_active)
+            if is_active:
+                filters.append(ClassGroup.status == "Active")
+            else:
+                filters.append(ClassGroup.status != "Active")
 
         if filters:
             query = query.where(and_(*filters))
@@ -363,14 +366,16 @@ class ClassRepository:
         return members
 
     def _row_to_dict(self, cg: ClassGroup) -> Dict[str, Any]:
+        status_val = getattr(cg, "status", "Active")
         return {
             "class_id": cg.class_id,
             "name": cg.name,
+            "slug": getattr(cg, "slug", None),
             "group_type": cg.group_type,
             "season_id": cg.season_id,
             "stage": cg.stage,
-            "educational_year": cg.educational_year,
             "description": cg.description,
-            "is_active": cg.is_active,
+            "status": status_val,
+            "is_active": (status_val == "Active"),
             "created_at": cg.created_at
         }

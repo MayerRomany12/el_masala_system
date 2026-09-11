@@ -25,12 +25,14 @@ export const reportsApi = {
     return response.data;
   },
 
-  // Export URLs for direct file download or HTML print preview
-  getExportUrl: (reportType, format, params = {}) => {
-    const query = new URLSearchParams({
-      report_type: reportType,
-      ...params
-    }).toString();
-    return `/api/v1/reports/export/${format}?${query}`;
+  // GET /reports/export/{format} — Authenticated Blob Download
+  downloadExport: async (reportType, format, params = {}) => {
+    const response = await apiClient.get(`/reports/export/${format}`, {
+      params: { report_type: reportType, ...params },
+      responseType: 'blob'
+    });
+    return response;
   }
 };
+
+export default reportsApi;
