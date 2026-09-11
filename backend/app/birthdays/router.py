@@ -16,11 +16,12 @@ async def get_birthdays(
     period: str = Query("today", description="الفترة الزمنية: today (اليوم), week (الـ 7 أيام القادمة), month (هذا الشهر)"),
     stage: Optional[str] = Query(None, description="المرحلة الدراسية"),
     gift_status: Optional[str] = Query(None, description="حالة الهدية: Delivered, Pending"),
+    month: Optional[int] = Query(None, ge=1, le=12, description="شهر الميلاد (1 إلى 12)"),
     db: AsyncSession = Depends(get_db),
     current_user=Depends(require_permission("birthdays:read"))
 ):
     service = BirthdayService(db)
-    items = await service.get_birthdays(period=period, stage=stage, gift_status=gift_status)
+    items = await service.get_birthdays(period=period, stage=stage, gift_status=gift_status, month=month)
     return success_response(
         data={"items": items, "total": len(items)},
         message="تم جلب قائمة أعياد الميلاد وحالات تسليم الهدايا بنجاح"

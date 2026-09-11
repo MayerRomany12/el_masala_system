@@ -49,10 +49,10 @@ class BirthdayRepository:
         self,
         period: str = "today",  # today, week, month, all
         stage: Optional[str] = None,
-        gift_status: Optional[str] = None  # Delivered, Pending
+        gift_status: Optional[str] = None,  # Delivered, Pending
+        month: Optional[int] = None
     ) -> List[Dict[str, Any]]:
         query = select(Member).where(
-            Member.status == "Active",
             Member.is_archived == False,
             Member.date_of_birth.isnot(None)
         )
@@ -82,31 +82,31 @@ class BirthdayRepository:
             if not dob_val:
                 continue
 
-            # Calculate Age
-            age = current_year - dob_val.year - (
-                (today_dt.month, today_dt.day) < (dob_val.month, dob_val.day)
-            )
-
-            # Filter by Period
-            is_match = False
             b_month, b_day = dob_val.month, dob_val.day
 
-            if period == "today":
-                is_match = (b_month == today_dt.month and b_day == today_dt.day)
-            elif period == "week":
-                for i in range(7):
-                    target_d = today_dt + timedelta(days=i)
-                    if b_month == target_d.month and b_day == target_d.day:
-                        is_match = True
-                        break
-            elif period == "month":
-                is_match = (b_month == today_dt.month and b_day >= today_dt.day)
+            # If specific month is requested (1-12)
+            if month is not None:
+                if b_month != month:
+                    continue
             else:
-                # "all" or any other value → include everything
-                is_match = True
+                # Filter by Period
+                is_match = False
+                if period == "today":
+                    is_match = (b_month == today_dt.month and b_day == today_dt.day)
+                elif period == "week":
+                    for i in range(7):
+                        target_d = today_dt + timedelta(days=i)
+                        if b_month == target_d.month and b_day == target_d.day:
+                            is_match = True
+                            break
+                elif period == "month":
+                    is_match = (b_month == today_dt.month)
+                else:
+                    # "all"
+                    is_match = True
 
-            if not is_match:
-                continue
+                if not is_match:
+                    continue
 
             # Check Gift Delivery Status
             deliv_tuple = deliveries_map.get(m.member_id)
@@ -131,9 +131,12 @@ class BirthdayRepository:
                 "member_id": m.member_id,
                 "full_name": m.full_name,
                 "stage": m.stage,
-                "date_of_birth": m.date_of_birth,
-                "age": age,
+                "group_name": m.group_name,
+                "photo_url": m.photo_url,
+                "date_of_birth": dob_val.isoformat() if isinstance(dob_val, (date, datetime)) else str(dob_val),
                 "phone": m.phone,
+                "secondary_phone": m.secondary_phone,
+                "member_phone": m.member_phone,
                 "whatsapp_phone": m.whatsapp_phone,
                 "birthday_day": b_day,
                 "birthday_month": b_month,

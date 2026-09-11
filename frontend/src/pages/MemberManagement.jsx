@@ -427,6 +427,8 @@ export const MemberManagement = () => {
       stage: 'ابتدائي - الصف الأول',
       group_name: '',
       phone: '',
+      secondary_phone: '',
+      member_phone: '',
       whatsapp_phone: '',
       father_of_confession: '',
       address: '',
@@ -447,6 +449,8 @@ export const MemberManagement = () => {
       stage: member.stage || 'ابتدائي - الصف الأول',
       group_name: member.group_name || '',
       phone: member.phone || '',
+      secondary_phone: member.secondary_phone || '',
+      member_phone: member.member_phone || '',
       whatsapp_phone: member.whatsapp_phone || '',
       father_of_confession: member.father_of_confession || '',
       address: member.address || '',
@@ -468,15 +472,21 @@ export const MemberManagement = () => {
       return;
     }
 
-    // 2. Egyptian phone validation
+    // 2. Primary Egyptian phone validation
     if (!isValidEgyptianMobile(formData.phone)) {
-      setModalError('رقم تليفون ولي الأمر يجب أن يكون رقم محمول مصري صالح مكون من 11 رقم يبدأ بـ (010 أو 011 أو 012 أو 015)');
+      setModalError('رقم تليفون ولي الأمر الرئيسي يجب أن يكون رقم محمول مصري صالح مكون من 11 رقم يبدأ بـ (010 أو 011 أو 012 أو 015)');
       return;
     }
 
-    // 3. Optional WhatsApp validation
-    if (formData.whatsapp_phone && !isValidEgyptianMobile(formData.whatsapp_phone)) {
-      setModalError('رقم الواتساب غير صالح. يرجى إدخال رقم محمول مصري مكون من 11 رقم يبدأ بـ (010 أو 011 أو 012 أو 015)');
+    // 3. Optional secondary parent phone validation
+    if (formData.secondary_phone && !isValidEgyptianMobile(formData.secondary_phone)) {
+      setModalError('الرقم الآخر لولي الأمر غير صالح. يرجى إدخال رقم محمول مصري مكون من 11 رقم يبدأ بـ (010 أو 011 أو 012 أو 015)');
+      return;
+    }
+
+    // 4. Optional child's own phone validation
+    if (formData.member_phone && !isValidEgyptianMobile(formData.member_phone)) {
+      setModalError('رقم الطفل المخدوم غير صالح. يرجى إدخال رقم محمول مصري مكون من 11 رقم يبدأ بـ (010 أو 011 أو 012 أو 015)');
       return;
     }
 
@@ -491,7 +501,9 @@ export const MemberManagement = () => {
       address: formData.address?.trim() || null,
       notes: formData.notes?.trim() || null,
       phone: normalizePhone(formData.phone),
-      whatsapp_phone: formData.whatsapp_phone ? normalizePhone(formData.whatsapp_phone) : normalizePhone(formData.phone)
+      secondary_phone: formData.secondary_phone ? normalizePhone(formData.secondary_phone) : null,
+      member_phone: formData.member_phone ? normalizePhone(formData.member_phone) : null,
+      whatsapp_phone: formData.whatsapp_phone ? normalizePhone(formData.whatsapp_phone) : (formData.member_phone ? normalizePhone(formData.member_phone) : normalizePhone(formData.phone))
     };
 
     try {
@@ -1010,7 +1022,7 @@ export const MemberManagement = () => {
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label">تليفون ولي الأمر الرئيسي*</label>
                     <input
@@ -1021,11 +1033,20 @@ export const MemberManagement = () => {
                   </div>
 
                   <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">رقم الواتساب (اختياري)</label>
+                    <label className="form-label">رقم آخر لولي الأمر (اختياري)</label>
                     <input
-                      type="tel" className="form-input" value={formData.whatsapp_phone}
-                      onChange={(e) => setFormData({ ...formData, whatsapp_phone: e.target.value })}
-                      placeholder="012XXXXXXXX"
+                      type="tel" className="form-input" value={formData.secondary_phone}
+                      onChange={(e) => setFormData({ ...formData, secondary_phone: e.target.value })}
+                      placeholder="010XXXXXXXX"
+                    />
+                  </div>
+
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">رقم الطفل نفسه (اختياري)</label>
+                    <input
+                      type="tel" className="form-input" value={formData.member_phone}
+                      onChange={(e) => setFormData({ ...formData, member_phone: e.target.value })}
+                      placeholder="015XXXXXXXX"
                     />
                   </div>
                 </div>

@@ -50,7 +50,7 @@ async def init_db():
         # Migrations for AttendanceSession recurrence
         await conn.execute(text("ALTER TABLE attendance_sessions ADD COLUMN IF NOT EXISTS recurrence VARCHAR(30) DEFAULT 'Weekly';"))
 
-        # Migrations for Member date_of_birth, total_points, photo_url, and archiving
+        # Migrations for Member date_of_birth, total_points, photo_url, archiving, and extra phones
         await conn.execute(text("ALTER TABLE members ADD COLUMN IF NOT EXISTS qr_token VARCHAR(64);"))
         await conn.execute(text("ALTER TABLE members ADD COLUMN IF NOT EXISTS card_issued_at TIMESTAMPTZ;"))
         await conn.execute(text("ALTER TABLE members ADD COLUMN IF NOT EXISTS total_points INT DEFAULT 0;"))
@@ -58,6 +58,13 @@ async def init_db():
         await conn.execute(text("ALTER TABLE members ADD COLUMN IF NOT EXISTS is_archived BOOLEAN DEFAULT FALSE;"))
         await conn.execute(text("ALTER TABLE members ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ;"))
         await conn.execute(text("ALTER TABLE members ADD COLUMN IF NOT EXISTS archived_by VARCHAR(50);"))
+        try:
+            await conn.execute(text("ALTER TABLE members ADD COLUMN IF NOT EXISTS secondary_phone VARCHAR(30);"))
+            await conn.execute(text("ALTER TABLE members ADD COLUMN IF NOT EXISTS member_phone VARCHAR(30);"))
+            logger.info("تم التحقق من إضافة عمودي secondary_phone و member_phone لجدول members بنجاح")
+        except Exception as e:
+            logger.exception(f"فشل تطبيق التحديث الهيكلي لجدول members: {e}")
+            raise e
 
 
         # Approved Partial Unique Index for M6 Followup Task Deduplication

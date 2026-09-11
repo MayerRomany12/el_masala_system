@@ -19,6 +19,8 @@ def _row_to_dict(row: Member) -> Dict[str, Any]:
         "stage": row.stage,
         "group_name": row.group_name,
         "phone": row.phone,
+        "secondary_phone": row.secondary_phone,
+        "member_phone": row.member_phone,
         "whatsapp_phone": row.whatsapp_phone,
         "father_of_confession": row.father_of_confession,
         "address": row.address,

@@ -14,6 +14,8 @@ class Member(Base):
     stage                = Column(String(100), nullable=False, index=True) # Canonical Stage Code or String
     group_name           = Column(String(200), nullable=True)
     phone                = Column(String(30),  nullable=False)
+    secondary_phone      = Column(String(30),  nullable=True)
+    member_phone         = Column(String(30),  nullable=True)
     whatsapp_phone       = Column(String(30),  nullable=True)
     father_of_confession = Column(String(200), nullable=True)
     address              = Column(Text, nullable=True)

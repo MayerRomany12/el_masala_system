@@ -29,8 +29,9 @@ class AttendanceService:
     # ─── Sessions ─────────────────────────────────────────────────────────────
 
     async def create_session(self, data: AttendanceSessionCreate, current_user_id: str) -> Dict[str, Any]:
+        clean_event_id = data.event_id.strip() if (data.event_id and isinstance(data.event_id, str) and data.event_id.strip()) else None
         session_dict = {
-            "event_id": data.event_id,
+            "event_id": clean_event_id,
             "session_date": data.session_date,
             "title": data.title,
             "stage": data.stage,

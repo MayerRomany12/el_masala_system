@@ -18,6 +18,8 @@ class MemberBase(BaseModel):
     stage: str = Field(..., description="المرحلة الخدمية/الدراسية")
     group_name: Optional[str] = Field(default=None, description="اسم أسرة الخادم / الفصل / المجموعة")
     phone: str = Field(..., description="رقم تليفون ولي الأمر الرئيسي")
+    secondary_phone: Optional[str] = Field(default=None, description="رقم آخر لولي الأمر")
+    member_phone: Optional[str] = Field(default=None, description="رقم الطفل المخدوم نفسه")
     whatsapp_phone: Optional[str] = Field(default=None, description="رقم واتساب المتابعة")
     father_of_confession: Optional[str] = Field(default=None, description="اسم أب الاعتراف")
     address: Optional[str] = Field(default=None, description="عنوان السكن")
@@ -38,6 +40,8 @@ class MemberUpdate(BaseModel):
     stage: Optional[str] = None
     group_name: Optional[str] = None
     phone: Optional[str] = None
+    secondary_phone: Optional[str] = None
+    member_phone: Optional[str] = None
     whatsapp_phone: Optional[str] = None
     father_of_confession: Optional[str] = None
     address: Optional[str] = None

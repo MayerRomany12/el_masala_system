@@ -27,6 +27,13 @@ class AttendanceSessionCreate(BaseModel):
     recurrence: str = Field(default="Weekly", description="نوع وتكرار الجلسة: Daily, Weekly, Monthly, OneTime")
     authorized_user_ids: List[str] = Field(default=[], description="قائمة تعيين الخدام المصرح لهم بهذه الجلسة")
 
+    @field_validator('event_id', mode='before')
+    @classmethod
+    def normalize_event_id(cls, v):
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
+
     model_config = {"extra": "ignore"}
 
 

@@ -36,7 +36,7 @@ class MemberService:
         member_dict = data.model_dump()
 
         # Sanitize optional fields: convert empty string or whitespace to None
-        for key in ["date_of_birth", "group_name", "father_of_confession", "address", "notes", "whatsapp_phone", "photo_url"]:
+        for key in ["date_of_birth", "group_name", "father_of_confession", "address", "notes", "secondary_phone", "member_phone", "whatsapp_phone", "photo_url"]:
             if key in member_dict and member_dict[key] is not None:
                 if isinstance(member_dict[key], str) and not member_dict[key].strip():
                     member_dict[key] = None
@@ -48,19 +48,25 @@ class MemberService:
         if not validate_full_name(member_dict.get("full_name")):
             raise BadRequestException("اسم الطفل المخدوم يجب أن يكون ثلاثياً أو رباعياً على الأقل بدون أرقام (مثال: مارك فادي نبيل)")
 
-        # 2. Egyptian Phone validation
+        # 2. Primary Parent Phone validation
         raw_phone = member_dict.get("phone")
         if not is_valid_egyptian_mobile(raw_phone):
             raise BadRequestException("رقم تليفون ولي الأمر يجب أن يكون رقم محمول مصري صالح مكون من 11 رقم يبدأ بـ (010 أو 011 أو 012 أو 015)")
         member_dict["phone"] = normalize_phone_number(raw_phone)
 
-        # 3. WhatsApp Phone validation
+        # 3. Normalize optional secondary parent phone & member phone if provided
+        if member_dict.get("secondary_phone"):
+            member_dict["secondary_phone"] = normalize_phone_number(member_dict["secondary_phone"])
+        if member_dict.get("member_phone"):
+            member_dict["member_phone"] = normalize_phone_number(member_dict["member_phone"])
+
+        # 4. WhatsApp Phone validation
         if member_dict.get("whatsapp_phone"):
             if not is_valid_whatsapp_number(member_dict["whatsapp_phone"]):
                 raise BadRequestException("رقم الواتساب غير صالح. يرجى إدخال رقم محمول مصري صالح مكون من 11 رقم (010, 011, 012, 015)")
             member_dict["whatsapp_phone"] = normalize_phone_number(member_dict["whatsapp_phone"])
         else:
-            member_dict["whatsapp_phone"] = member_dict["phone"]
+            member_dict["whatsapp_phone"] = member_dict.get("member_phone") or member_dict["phone"]
 
         # 4. Auto-generate initial QR Token so the card is ready immediately
         member_dict["qr_token"] = secrets.token_hex(32)
@@ -110,7 +116,7 @@ class MemberService:
             return existing
 
         # Sanitize empty string fields to None
-        for key in ["date_of_birth", "group_name", "father_of_confession", "address", "notes", "whatsapp_phone", "photo_url"]:
+        for key in ["date_of_birth", "group_name", "father_of_confession", "address", "notes", "secondary_phone", "member_phone", "whatsapp_phone", "photo_url"]:
             if key in update_fields and update_fields[key] is not None:
                 if isinstance(update_fields[key], str) and not update_fields[key].strip():
                     update_fields[key] = None
@@ -125,6 +131,12 @@ class MemberService:
 
         if "phone" in update_fields and update_fields["phone"]:
             update_fields["phone"] = normalize_phone_number(update_fields["phone"])
+
+        if "secondary_phone" in update_fields and update_fields["secondary_phone"]:
+            update_fields["secondary_phone"] = normalize_phone_number(update_fields["secondary_phone"])
+
+        if "member_phone" in update_fields and update_fields["member_phone"]:
+            update_fields["member_phone"] = normalize_phone_number(update_fields["member_phone"])
 
         updated = await self.repository.update_member(member_id, update_fields)
         if not updated:
