@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List
-from datetime import datetime
+from typing import Optional, List, Union
+from datetime import datetime, date
 
 class MemberStatusEnum:
     ACTIVE = "Active"
@@ -14,7 +14,7 @@ class GenderEnum:
 class MemberBase(BaseModel):
     full_name: str = Field(..., min_length=2, max_length=100, description="الاسم الثلاثي أو الرباعي للطفل")
     gender: str = Field(default=GenderEnum.MALE, description="الجنس (ذكر / أنثى)")
-    date_of_birth: Optional[str] = Field(default=None, description="تاريخ الميلاد YYYY-MM-DD")
+    date_of_birth: Optional[Union[str, date]] = Field(default=None, description="تاريخ الميلاد YYYY-MM-DD")
     stage: str = Field(..., description="المرحلة الخدمية/الدراسية")
     group_name: Optional[str] = Field(default=None, description="اسم أسرة الخادم / الفصل / المجموعة")
     phone: str = Field(..., description="رقم تليفون ولي الأمر الرئيسي")
@@ -34,7 +34,7 @@ class MemberCreate(MemberBase):
 class MemberUpdate(BaseModel):
     full_name: Optional[str] = None
     gender: Optional[str] = None
-    date_of_birth: Optional[str] = None
+    date_of_birth: Optional[Union[str, date]] = None
     stage: Optional[str] = None
     group_name: Optional[str] = None
     phone: Optional[str] = None

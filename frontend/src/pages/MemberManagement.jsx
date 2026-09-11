@@ -886,12 +886,11 @@ export const MemberManagement = () => {
                           const file = e.target.files?.[0];
                           if (!file) return;
                           try {
-                            const data = new FormData();
-                            data.append('file', file);
-                            const res = await apiClient.post(`/members/${editingMember.member_id}/photo`, data);
-                            if (res.data && res.data.data) {
-                              setFormData((prev) => ({ ...prev, photo_url: res.data.data.photo_url }));
-                              alert('تم رفع صورة الطفل بنجاح');
+                            const res = await membersApi.uploadPhoto(editingMember.member_id, file);
+                            if (res && res.data) {
+                              setFormData((prev) => ({ ...prev, photo_url: res.data.photo_url }));
+                              alert('تم رفع صورة الطفل بنجاح 🖼️');
+                              fetchData();
                             }
                           } catch (err) {
                             alert(err.response?.data?.message || 'فشل رفع الصورة');

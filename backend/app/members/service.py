@@ -8,6 +8,23 @@ from app.core.errors import NotFoundException, BadRequestException
 from app.shared.utils import normalize_phone_number, is_valid_whatsapp_number
 
 
+def parse_dob(val: Any) -> Optional[Any]:
+    from datetime import datetime, date
+    if not val:
+        return None
+    if isinstance(val, date):
+        return val
+    if isinstance(val, str):
+        clean = val.strip()
+        if not clean:
+            return None
+        try:
+            return datetime.strptime(clean, "%Y-%m-%d").date()
+        except ValueError:
+            raise BadRequestException("صيغة تاريخ الميلاد غير صالحة. يرجى اختيار تاريخ صحيح (YYYY-MM-DD)")
+    return val
+
+
 class MemberService:
     def __init__(self, db: AsyncSession):
         self.repository = MemberRepository(db)
@@ -23,6 +40,9 @@ class MemberService:
             if key in member_dict and member_dict[key] is not None:
                 if isinstance(member_dict[key], str) and not member_dict[key].strip():
                     member_dict[key] = None
+
+        # Parse date_of_birth string into Python date object for asyncpg PostgreSQL DATE column
+        member_dict["date_of_birth"] = parse_dob(member_dict.get("date_of_birth"))
 
         # 1. Full name validation (at least 3 words, no numbers)
         if not validate_full_name(member_dict.get("full_name")):
@@ -94,6 +114,9 @@ class MemberService:
             if key in update_fields and update_fields[key] is not None:
                 if isinstance(update_fields[key], str) and not update_fields[key].strip():
                     update_fields[key] = None
+
+        if "date_of_birth" in update_fields:
+            update_fields["date_of_birth"] = parse_dob(update_fields["date_of_birth"])
 
         if "whatsapp_phone" in update_fields and update_fields["whatsapp_phone"]:
             if not is_valid_whatsapp_number(update_fields["whatsapp_phone"]):

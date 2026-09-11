@@ -29,5 +29,16 @@ export const membersApi = {
   updateStatus: async (memberId, status) => {
     const response = await apiClient.patch(`/members/${memberId}/status`, { status });
     return response.data;
+  },
+
+  uploadPhoto: async (memberId, file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await apiClient.post(`/members/${memberId}/photo`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
   }
 };
