@@ -11,6 +11,7 @@ class User(Base):
     username            = Column(String(100), unique=True, nullable=False, index=True)
     email               = Column(String(200), unique=True, nullable=False, index=True)
     full_name           = Column(String(200), nullable=False)
+    phone               = Column(String(30), nullable=True)
     hashed_password     = Column(Text, nullable=False)
     role                = Column(String(50), nullable=False, default="Servant")
     assigned_stages     = Column(PgARRAY(String), nullable=False, server_default="{}")

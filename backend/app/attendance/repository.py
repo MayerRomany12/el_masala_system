@@ -2,7 +2,7 @@ import secrets
 from typing import Optional, List, Tuple, Dict, Any
 from datetime import datetime, date, timezone
 
-from sqlalchemy import select, update, delete, func, or_, String, Date
+from sqlalchemy import select, update, delete, func, or_, and_, String, Date
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 
@@ -20,8 +20,14 @@ from app.core.errors import AppException
 def _parse_date(d: Any) -> date:
     if isinstance(d, date):
         return d
+    if isinstance(d, datetime):
+        return d.date()
     if isinstance(d, str):
-        return datetime.strptime(d.strip(), "%Y-%m-%d").date()
+        cleaned = d.strip().split("T")[0]
+        try:
+            return datetime.strptime(cleaned, "%Y-%m-%d").date()
+        except Exception:
+            return date.fromisoformat(cleaned)
     raise ValueError(f"Invalid date format: {d}")
 
 
@@ -109,6 +115,10 @@ class AttendanceRepository:
         max_retries = 10
         raw_date = session_data.pop("session_date")
         parsed_date = _parse_date(raw_date)
+
+        now_utc = datetime.now(timezone.utc)
+        if session_data.get("status") == "Open" and "opened_at" not in session_data:
+            session_data["opened_at"] = now_utc
 
         for _ in range(max_retries):
             rand_num = secrets.randbelow(1_000_000)
@@ -206,10 +216,17 @@ class AttendanceRepository:
         targeted_count = (await self.db.execute(target_q)).scalar_one()
         pct = round((present_count / targeted_count * 100), 1) if targeted_count > 0 else 0.0
 
+        class_name = None
+        if s_row.class_id:
+            from app.models.class_group import ClassGroup
+            cg_res = await self.db.execute(select(ClassGroup.name).where(ClassGroup.class_id == s_row.class_id))
+            class_name = cg_res.scalar_one_or_none()
+
         return {
             "session_id": s_row.session_id,
             "event_id": s_row.event_id,
             "class_id": s_row.class_id,
+            "class_name": class_name,
             "session_date": s_row.session_date.isoformat() if isinstance(s_row.session_date, (date, datetime)) else str(s_row.session_date),
             "scheduled_start_time": s_row.scheduled_start_time,
             "scheduled_end_time": s_row.scheduled_end_time,

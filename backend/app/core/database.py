@@ -40,7 +40,8 @@ async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-        # Migrations for User custom & revoked permissions
+        # Migrations for User custom & revoked permissions and phone
+        await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(30);"))
         await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS custom_permissions TEXT[] DEFAULT '{}';"))
         await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS revoked_permissions TEXT[] DEFAULT '{}';"))
 

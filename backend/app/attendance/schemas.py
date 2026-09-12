@@ -21,8 +21,9 @@ class AuthorizedDeviceResponse(BaseModel):
 
 class AttendanceSessionCreate(BaseModel):
     event_id: Optional[str] = Field(default=None, description="رمز الفعالية المربوطة (اختياري)")
+    class_id: Optional[str] = Field(default=None, description="معرف الفصل أو المجموعة الخدمية (اختياري)")
     session_date: str = Field(..., description="تاريخ الجلسة YYYY-MM-DD")
-    title: str = Field(..., min_length=2, max_length=200, description="اسم الجلسة (مثال: حضور اجتماع الأحد 15 أغسطس)")
+    title: str = Field(..., min_length=2, max_length=200, description="اسم الجلسة (مثال: حضور فصل حضانة - الأحد 15 أغسطس)")
     stage: str = Field(default="ALL", description="المرحلة المستهدفة للجلسة أو ALL")
     recurrence: str = Field(default="Weekly", description="نوع وتكرار الجلسة: Daily, Weekly, Monthly, OneTime")
     authorized_user_ids: List[str] = Field(default=[], description="قائمة تعيين الخدام المصرح لهم بهذه الجلسة")
@@ -34,6 +35,23 @@ class AttendanceSessionCreate(BaseModel):
             return None
         return v
 
+    @field_validator('class_id', mode='before')
+    @classmethod
+    def normalize_class_id(cls, v):
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
+
+    @field_validator('session_date', mode='before')
+    @classmethod
+    def normalize_session_date(cls, v):
+        if isinstance(v, str):
+            clean = v.strip().split("T")[0]
+            return clean
+        if isinstance(v, (date, datetime)):
+            return v.strftime("%Y-%m-%d")
+        return str(v)
+
     model_config = {"extra": "ignore"}
 
 
@@ -44,6 +62,8 @@ class AttendanceSessionRecurrenceUpdate(BaseModel):
 class AttendanceSessionResponse(BaseModel):
     session_id: str
     event_id: Optional[str] = None
+    class_id: Optional[str] = None
+    class_name: Optional[str] = None
     session_date: str
     title: str
     stage: str

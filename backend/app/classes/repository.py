@@ -337,8 +337,12 @@ class ClassRepository:
                 ClassGroupMember,
                 Member.full_name,
                 Member.phone,
+                Member.secondary_phone,
+                Member.member_phone,
                 Member.stage,
-                Member.educational_year
+                Member.educational_year,
+                Member.gender,
+                Member.father_of_confession
             )
             .join(Member, ClassGroupMember.member_id == Member.member_id)
             .where(ClassGroupMember.class_id == class_id)
@@ -350,15 +354,19 @@ class ClassRepository:
         res = await self.db.execute(query)
         members = []
         for row in res.all():
-            cgm, full_name, phone, stage, educational_year = row
+            cgm, full_name, phone, secondary_phone, member_phone, stage, educational_year, gender, father_of_confession = row
             members.append({
                 "membership_id": cgm.membership_id,
                 "class_id": cgm.class_id,
                 "member_id": cgm.member_id,
                 "full_name": full_name,
-                "phone": phone,
+                "phone": phone or member_phone or secondary_phone or "",
+                "secondary_phone": secondary_phone,
+                "member_phone": member_phone,
                 "stage": stage,
                 "educational_year": educational_year,
+                "gender": gender,
+                "father_of_confession": father_of_confession,
                 "is_active": cgm.is_active,
                 "joined_at": cgm.joined_at,
                 "left_at": cgm.left_at

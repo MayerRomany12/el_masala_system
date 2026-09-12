@@ -45,7 +45,7 @@ export const ClassManagement = () => {
   const [transferData, setTransferData] = useState({ from_class_id: '', to_class_id: '', member_id: '', member_name: '' });
 
   // ─── Class Detail Modal State ─────────────────────────────────────────────
-  const [activeTab, setActiveTab] = useState('members'); // 'members' | 'servants'
+  const [activeTab, setActiveTab] = useState('all'); // 'all' | 'members' | 'servants'
   const [classMembers, setClassMembers] = useState([]);
   const [classServants, setClassServants] = useState([]);
   const [loadingDetails, setLoadingDetails] = useState(false);
@@ -176,6 +176,7 @@ export const ClassManagement = () => {
   // ─── Handlers ────────────────────────────────────────────────────────────
   const handleSelectClass = async (cls) => {
     setSelectedClass(cls);
+    setActiveTab('all');
     setLoadingDetails(true);
     setMemberInput('');
     setMemberSearchResults([]);
@@ -639,15 +640,68 @@ export const ClassManagement = () => {
 
             {/* Modal Body */}
             <div className="modal-body">
+              {/* ─── Top Stats KPI Banner ────────────────────────────────── */}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+                  gap: '0.75rem',
+                  marginBottom: '1rem',
+                  background: 'rgba(0, 0, 0, 0.3)',
+                  padding: '0.85rem 1rem',
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid rgba(250, 204, 21, 0.25)'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                  <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(52, 211, 153, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#34d399' }}>
+                    <Users size={18} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>إجمالي الطلاب</div>
+                    <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#34d399' }}>{classMembers.length} طفل</div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                  <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(56, 189, 248, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#38bdf8' }}>
+                    <GraduationCap size={18} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>الخدام المشرفون</div>
+                    <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#38bdf8' }}>{classServants.length} خادم</div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                  <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(250, 204, 21, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-gold-main)' }}>
+                    <Layers size={18} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>المرحلة الخدمية</div>
+                    <div style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-main)' }}>{selectedClass.stage || 'عام'}</div>
+                  </div>
+                </div>
+              </div>
+
               {/* Tab Switcher */}
-              <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.5rem' }}>
+              <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.6rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+                <button
+                  className={`btn ${activeTab === 'all' ? 'btn-primary' : 'btn-secondary'}`}
+                  style={{ fontSize: '0.88rem', padding: '0.45rem 1rem' }}
+                  onClick={() => setActiveTab('all')}
+                >
+                  <Sparkles size={15} />
+                  نظرة شاملة (الطلاب والخدام معاً)
+                </button>
+
                 <button
                   className={`btn ${activeTab === 'members' ? 'btn-primary' : 'btn-secondary'}`}
                   style={{ fontSize: '0.88rem', padding: '0.45rem 1rem' }}
                   onClick={() => setActiveTab('members')}
                 >
-                  <Users size={16} />
-                  الأطفال والمخدومون ({classMembers.length})
+                  <Users size={15} />
+                  قائمة الطلاب ({classMembers.length})
                 </button>
 
                 <button
@@ -655,7 +709,7 @@ export const ClassManagement = () => {
                   style={{ fontSize: '0.88rem', padding: '0.45rem 1rem' }}
                   onClick={() => setActiveTab('servants')}
                 >
-                  <GraduationCap size={16} />
+                  <GraduationCap size={15} />
                   خدام الفصل ({classServants.length})
                 </button>
               </div>
@@ -665,272 +719,292 @@ export const ClassManagement = () => {
                   <RefreshCw size={28} className="pulse-gold" style={{ margin: '0 auto 0.75rem auto', display: 'block', color: 'var(--color-gold-main)' }} />
                   جاري جلب بيانات الفصل...
                 </div>
-              ) : activeTab === 'members' ? (
-                /* ─── Members Tab Content ─────────────────────────────────── */
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {/* Quick Add Member */}
-                  <div className="glass-card" style={{ padding: '0.9rem', background: 'rgba(0,0,0,0.2)' }}>
-                    <label className="form-label" style={{ marginBottom: '0.4rem', display: 'block' }}>
-                      إضافة طفل لهذا الفصل:
-                    </label>
-                    <div style={{ display: 'flex', gap: '0.5rem', position: 'relative' }}>
-                      <div style={{ flex: 1, position: 'relative' }}>
-                        <input
-                          type="text"
-                          className="form-input"
-                          placeholder="ابحث بالاسم الكامل أو أدخل رمز المخدوم (K-XXXXXX)..."
-                          value={memberInput}
-                          onChange={(e) => setMemberInput(e.target.value)}
-                        />
-
-                        {/* Search Autocomplete Popup */}
-                        {memberSearchResults.length > 0 && (
-                          <div
-                            style={{
-                              position: 'absolute',
-                              top: '100%',
-                              left: 0,
-                              right: 0,
-                              background: '#1a0a10',
-                              border: '1px solid var(--surface-border)',
-                              borderRadius: 'var(--radius-sm)',
-                              zIndex: 100,
-                              marginTop: '4px',
-                              boxShadow: '0 10px 25px rgba(0,0,0,0.8)',
-                              overflow: 'hidden'
-                            }}
-                          >
-                            {memberSearchResults.map((sm) => (
-                              <div
-                                key={sm.member_id}
-                                style={{
-                                  padding: '0.6rem 0.9rem',
-                                  cursor: 'pointer',
-                                  borderBottom: '1px solid rgba(255,255,255,0.05)',
-                                  display: 'flex',
-                                  justifyContent: 'space-between',
-                                  alignItems: 'center',
-                                  transition: 'background 0.15s ease'
-                                }}
-                                onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(212, 175, 55, 0.15)')}
-                                onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                                onClick={() => handleAddMember(sm.member_id)}
-                              >
-                                <div>
-                                  <strong style={{ color: 'var(--text-main)', fontSize: '0.9rem' }}>{sm.full_name}</strong>
-                                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginRight: '0.5rem' }}>({sm.stage || 'عام'})</span>
-                                </div>
-                                <span className="badge" style={{ background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8' }}>
-                                  {sm.member_id} + إضافة
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                  {/* ─── قسم خدام الفصل المشرفين (يظهر في الكل أو الخدام) ─── */}
+                  {(activeTab === 'all' || activeTab === 'servants') && (
+                    <div className="glass-card" style={{ padding: '1rem', background: 'rgba(56, 189, 248, 0.04)', borderColor: 'rgba(56, 189, 248, 0.2)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <GraduationCap size={18} />
+                          <span>خدام الفصل المشرفون ({classServants.length})</span>
+                        </h4>
                       </div>
 
-                      <button
-                        className="btn btn-primary"
-                        onClick={() => handleAddMember()}
-                        disabled={!memberInput.trim()}
-                        style={{ whiteSpace: 'nowrap' }}
-                      >
-                        <UserPlus size={16} />
-                        إضافة
-                      </button>
-                    </div>
-                  </div>
+                      {/* تعيين خادم جديد للفصل */}
+                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.85rem' }}>
+                        <div style={{ flex: '1 1 220px' }}>
+                          <select
+                            className="form-input"
+                            value={selectedServantId}
+                            onChange={(e) => setSelectedServantId(e.target.value)}
+                            style={{ fontSize: '0.85rem', padding: '0.45rem 0.7rem' }}
+                          >
+                            <option value="">— إضافة خادم لهذا الفصل —</option>
+                            {servantsList.map((srv) => (
+                              <option key={srv.user_id} value={srv.user_id}>
+                                {srv.full_name || srv.username} ({srv.role})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
 
-                  {/* Filter inside Class Members */}
-                  {classMembers.length > 5 && (
-                    <div style={{ position: 'relative' }}>
-                      <Search size={16} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                      <input
-                        type="text"
-                        className="form-input"
-                        style={{ paddingRight: '2.2rem', fontSize: '0.85rem', padding: '0.5rem 2.2rem 0.5rem 0.8rem' }}
-                        placeholder="تصفية أعضاء هذا الفصل بالاسم أو الرمز..."
-                        value={memberSearchTerm}
-                        onChange={(e) => setMemberSearchTerm(e.target.value)}
-                      />
+                        <div style={{ flex: '0 1 140px' }}>
+                          <select
+                            className="form-input"
+                            value={servantRole}
+                            onChange={(e) => setServantRole(e.target.value)}
+                            style={{ fontSize: '0.85rem', padding: '0.45rem 0.7rem' }}
+                          >
+                            <option value="Servant">خادم</option>
+                            <option value="LeadServant">أمين فصل ⭐</option>
+                          </select>
+                        </div>
+
+                        <button
+                          className="btn btn-primary"
+                          onClick={handleAssignServant}
+                          disabled={!selectedServantId}
+                          style={{ whiteSpace: 'nowrap', fontSize: '0.85rem', padding: '0.45rem 0.9rem' }}
+                        >
+                          <UserPlus size={15} />
+                          تعيين للفصل
+                        </button>
+                      </div>
+
+                      {/* جدول خدام الفصل */}
+                      <div className="table-container" style={{ maxHeight: '220px', overflowY: 'auto' }}>
+                        {classServants.length === 0 ? (
+                          <div style={{ textAlign: 'center', padding: '1.25rem', color: 'var(--text-muted)', fontSize: '0.88rem' }}>
+                            لم يتم تعيين خدام لهذا الفصل بعد. اختر خادماً من القائمة بالأعلى لتعيينه.
+                          </div>
+                        ) : (
+                          <table className="custom-table" style={{ fontSize: '0.85rem' }}>
+                            <thead>
+                              <tr>
+                                <th>اسم الخادم</th>
+                                <th>المسئولية</th>
+                                <th>رقم الهاتف</th>
+                                <th style={{ textAlign: 'center' }}>إجراء</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {classServants.map((s) => (
+                                <tr key={s.assignment_id || s.servant_id}>
+                                  <td>
+                                    <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>{s.full_name || s.servant_id}</div>
+                                  </td>
+                                  <td>
+                                    <span
+                                      className="badge"
+                                      style={{
+                                        background: s.role === 'LeadServant' ? 'rgba(212, 175, 55, 0.25)' : 'rgba(52, 211, 153, 0.18)',
+                                        color: s.role === 'LeadServant' ? 'var(--color-gold-light)' : '#34d399',
+                                        border: s.role === 'LeadServant' ? '1px solid rgba(212, 175, 55, 0.4)' : '1px solid rgba(52, 211, 153, 0.35)'
+                                      }}
+                                    >
+                                      {s.role === 'LeadServant' ? 'أمين فصل ⭐' : 'خادم'}
+                                    </span>
+                                  </td>
+                                  <td style={{ color: 'var(--text-muted)' }}>
+                                    {s.phone ? (
+                                      <a href={`tel:${s.phone}`} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#38bdf8', textDecoration: 'none' }}>
+                                        <Phone size={12} />
+                                        <span>{s.phone}</span>
+                                      </a>
+                                    ) : '—'}
+                                  </td>
+                                  <td style={{ textAlign: 'center' }}>
+                                    <button
+                                      className="btn btn-secondary"
+                                      style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#f87171', borderColor: 'rgba(248, 113, 113, 0.3)' }}
+                                      title="إخراج الخادم من الفصل"
+                                      onClick={() => handleUnassignServant(s.servant_id, s.full_name)}
+                                    >
+                                      إخراج
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        )}
+                      </div>
                     </div>
                   )}
 
-                  {/* Members Table */}
-                  <div className="table-container" style={{ maxHeight: '360px', overflowY: 'auto' }}>
-                    {classMembers.length === 0 ? (
-                      <div style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-muted)' }}>
-                        لا يوجد أطفال مسجلون في هذا الفصل حالياً
-                      </div>
-                    ) : filteredClassMembers.length === 0 ? (
-                      <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
-                        لا توجد نتائج مطابقة لبحث الأعضاء
-                      </div>
-                    ) : (
-                      <table className="custom-table">
-                        <thead>
-                          <tr>
-                            <th>رمز الطفل</th>
-                            <th>الاسم الكامل</th>
-                            <th>تاريخ الانضمام</th>
-                            <th>الإجراءات</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {filteredClassMembers.map((m) => (
-                            <tr key={m.membership_id || m.member_id}>
-                              <td>
-                                <span className="badge" style={{ background: 'rgba(255,255,255,0.06)' }}>
-                                  {m.member_id}
-                                </span>
-                              </td>
-                              <td style={{ fontWeight: 700 }}>{m.full_name}</td>
-                              <td style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                                {m.joined_at ? new Date(m.joined_at).toLocaleDateString('ar-EG') : '—'}
-                              </td>
-                              <td>
-                                <div style={{ display: 'flex', gap: '0.4rem' }}>
-                                  <button
-                                    className="btn btn-secondary"
-                                    style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem', gap: '0.3rem' }}
-                                    title="نقل لفصل آخر"
-                                    onClick={() => {
-                                      setTransferData({
-                                        from_class_id: selectedClass.class_id,
-                                        to_class_id: '',
-                                        member_id: m.member_id,
-                                        member_name: m.full_name
-                                      });
-                                      setShowTransferModal(true);
-                                    }}
-                                  >
-                                    <ArrowLeftRight size={13} />
-                                    <span>نقل</span>
-                                  </button>
-
-                                  <button
-                                    className="btn btn-secondary"
-                                    style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem', color: '#f87171', borderColor: 'rgba(248, 113, 113, 0.3)' }}
-                                    title="إنهاء العضوية من الفصل"
-                                    onClick={() => handleRemoveMember(m.member_id, m.full_name)}
-                                  >
-                                    <Trash2 size={13} />
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                /* ─── Servants Tab Content ────────────────────────────────── */
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {/* Assign Servant Section */}
-                  <div className="glass-card" style={{ padding: '0.9rem', background: 'rgba(0,0,0,0.2)' }}>
-                    <label className="form-label" style={{ marginBottom: '0.4rem', display: 'block' }}>
-                      تعيين خادم في هذا الفصل:
-                    </label>
-                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                      <div style={{ flex: '1 1 240px' }}>
-                        <select
-                          className="form-input"
-                          value={selectedServantId}
-                          onChange={(e) => setSelectedServantId(e.target.value)}
-                        >
-                          <option value="">— اختر الخادم من القائمة —</option>
-                          {servantsList.map((srv) => (
-                            <option key={srv.user_id} value={srv.user_id}>
-                              {srv.full_name || srv.username} ({srv.role})
-                            </option>
-                          ))}
-                        </select>
+                  {/* ─── قسم أطفال وطلاب الفصل (يظهر في الكل أو الطلاب) ─── */}
+                  {(activeTab === 'all' || activeTab === 'members') && (
+                    <div className="glass-card" style={{ padding: '1rem', background: 'rgba(52, 211, 153, 0.03)', borderColor: 'rgba(52, 211, 153, 0.2)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#34d399', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <Users size={18} />
+                          <span>الطلاب والمخدومون المقيدون ({classMembers.length})</span>
+                        </h4>
                       </div>
 
-                      <div style={{ flex: '0 1 150px' }}>
-                        <select
-                          className="form-input"
-                          value={servantRole}
-                          onChange={(e) => setServantRole(e.target.value)}
-                        >
-                          <option value="Servant">خادم</option>
-                          <option value="LeadServant">أمين فصل ⭐</option>
-                        </select>
-                      </div>
+                      {/* إضافة طفل للفصل */}
+                      <div style={{ display: 'flex', gap: '0.5rem', position: 'relative', marginBottom: '0.85rem' }}>
+                        <div style={{ flex: 1, position: 'relative' }}>
+                          <input
+                            type="text"
+                            className="form-input"
+                            placeholder="ابحث بالاسم لإضافة طفل لهذا الفصل..."
+                            value={memberInput}
+                            onChange={(e) => setMemberInput(e.target.value)}
+                            style={{ fontSize: '0.85rem', padding: '0.45rem 0.75rem' }}
+                          />
 
-                      <button
-                        className="btn btn-primary"
-                        onClick={handleAssignServant}
-                        disabled={!selectedServantId}
-                        style={{ whiteSpace: 'nowrap' }}
-                      >
-                        <UserPlus size={16} />
-                        تعيين
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Servants Table */}
-                  <div className="table-container" style={{ maxHeight: '360px', overflowY: 'auto' }}>
-                    {classServants.length === 0 ? (
-                      <div style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-muted)' }}>
-                        لا يوجد خدام معينون في هذا الفصل حالياً
-                      </div>
-                    ) : (
-                      <table className="custom-table">
-                        <thead>
-                          <tr>
-                            <th>الخادم</th>
-                            <th>الدور في الفصل</th>
-                            <th>رقم الهاتف</th>
-                            <th>الإجراءات</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {classServants.map((s) => (
-                            <tr key={s.assignment_id || s.servant_id}>
-                              <td>
-                                <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>{s.full_name || s.servant_id}</div>
-                                <div style={{ fontSize: '0.78rem', color: 'var(--text-subtle)' }}>@{s.username || s.servant_id}</div>
-                              </td>
-                              <td>
-                                <span
-                                  className="badge"
+                          {memberSearchResults.length > 0 && (
+                            <div
+                              style={{
+                                position: 'absolute',
+                                top: '100%',
+                                left: 0,
+                                right: 0,
+                                background: '#0a1d37',
+                                border: '1px solid var(--color-gold-main)',
+                                borderRadius: 'var(--radius-sm)',
+                                zIndex: 100,
+                                marginTop: '4px',
+                                boxShadow: '0 10px 25px rgba(0,0,0,0.8)',
+                                overflow: 'hidden'
+                              }}
+                            >
+                              {memberSearchResults.map((sm) => (
+                                <div
+                                  key={sm.member_id}
                                   style={{
-                                    background: s.role === 'LeadServant' ? 'rgba(212, 175, 55, 0.25)' : 'rgba(52, 211, 153, 0.18)',
-                                    color: s.role === 'LeadServant' ? 'var(--color-gold-light)' : '#34d399',
-                                    border: s.role === 'LeadServant' ? '1px solid rgba(212, 175, 55, 0.4)' : '1px solid rgba(52, 211, 153, 0.35)'
+                                    padding: '0.6rem 0.9rem',
+                                    cursor: 'pointer',
+                                    borderBottom: '1px solid rgba(255,255,255,0.05)',
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    transition: 'background 0.15s ease'
                                   }}
+                                  onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(212, 175, 55, 0.2)')}
+                                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                                  onClick={() => handleAddMember(sm.member_id)}
                                 >
-                                  {s.role === 'LeadServant' ? 'أمين فصل ⭐' : 'خادم'}
-                                </span>
-                              </td>
-                              <td style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                                {s.phone ? (
-                                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                                    <Phone size={13} style={{ color: 'var(--color-gold-main)' }} />
-                                    {s.phone}
+                                  <div>
+                                    <strong style={{ color: 'var(--text-main)', fontSize: '0.9rem' }}>{sm.full_name}</strong>
+                                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginRight: '0.5rem' }}>({sm.stage || 'عام'})</span>
+                                  </div>
+                                  <span className="badge" style={{ background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8' }}>
+                                    {sm.member_id} + إضافة
                                   </span>
-                                ) : '—'}
-                              </td>
-                              <td>
-                                <button
-                                  className="btn btn-secondary"
-                                  style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem', color: '#f87171', borderColor: 'rgba(248, 113, 113, 0.3)' }}
-                                  title="إخراج الخادم من الفصل"
-                                  onClick={() => handleUnassignServant(s.servant_id, s.full_name)}
-                                >
-                                  إخراج
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    )}
-                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        <button
+                          className="btn btn-primary"
+                          onClick={() => handleAddMember()}
+                          disabled={!memberInput.trim()}
+                          style={{ whiteSpace: 'nowrap', fontSize: '0.85rem', padding: '0.45rem 0.9rem' }}
+                        >
+                          <UserPlus size={15} />
+                          إضافة طفل
+                        </button>
+                      </div>
+
+                      {/* بحث سريع في أعضاء الفصل إذا كان العدد أكثر من 4 */}
+                      {classMembers.length > 4 && (
+                        <div style={{ position: 'relative', marginBottom: '0.75rem' }}>
+                          <Search size={15} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                          <input
+                            type="text"
+                            className="form-input"
+                            style={{ paddingRight: '2.2rem', fontSize: '0.82rem', padding: '0.4rem 2.2rem 0.4rem 0.8rem' }}
+                            placeholder="تصفية أعضاء هذا الفصل بالاسم أو الرمز..."
+                            value={memberSearchTerm}
+                            onChange={(e) => setMemberSearchTerm(e.target.value)}
+                          />
+                        </div>
+                      )}
+
+                      {/* جدول الطلاب */}
+                      <div className="table-container" style={{ maxHeight: '280px', overflowY: 'auto' }}>
+                        {classMembers.length === 0 ? (
+                          <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--text-muted)', fontSize: '0.88rem' }}>
+                            لا يوجد أطفال مسجلون في هذا الفصل حالياً. يمكنك إضافة أطفال عبر حقل البحث بالأعلى.
+                          </div>
+                        ) : filteredClassMembers.length === 0 ? (
+                          <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--text-muted)', fontSize: '0.88rem' }}>
+                            لا توجد نتائج مطابقة لبحث الأعضاء
+                          </div>
+                        ) : (
+                          <table className="custom-table" style={{ fontSize: '0.85rem' }}>
+                            <thead>
+                              <tr>
+                                <th>رمز الطفل</th>
+                                <th>الاسم الكامل</th>
+                                <th>الهاتف / ولي الأمر</th>
+                                <th>تاريخ الانضمام</th>
+                                <th style={{ textAlign: 'center' }}>الإجراءات</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {filteredClassMembers.map((m) => (
+                                <tr key={m.membership_id || m.member_id}>
+                                  <td>
+                                    <span className="badge" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                                      {m.member_id}
+                                    </span>
+                                  </td>
+                                  <td style={{ fontWeight: 700 }}>{m.full_name}</td>
+                                  <td style={{ color: 'var(--text-muted)' }}>
+                                    {m.phone ? (
+                                      <a href={`tel:${m.phone}`} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#38bdf8', textDecoration: 'none' }}>
+                                        <Phone size={12} />
+                                        <span>{m.phone}</span>
+                                      </a>
+                                    ) : '—'}
+                                  </td>
+                                  <td style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                                    {m.joined_at ? new Date(m.joined_at).toLocaleDateString('ar-EG') : '—'}
+                                  </td>
+                                  <td>
+                                    <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
+                                      <button
+                                        className="btn btn-secondary"
+                                        style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', gap: '0.25rem' }}
+                                        title="نقل لفصل آخر"
+                                        onClick={() => {
+                                          setTransferData({
+                                            from_class_id: selectedClass.class_id,
+                                            to_class_id: '',
+                                            member_id: m.member_id,
+                                            member_name: m.full_name
+                                          });
+                                          setShowTransferModal(true);
+                                        }}
+                                      >
+                                        <ArrowLeftRight size={12} />
+                                        <span>نقل</span>
+                                      </button>
+
+                                      <button
+                                        className="btn btn-secondary"
+                                        style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#f87171', borderColor: 'rgba(248, 113, 113, 0.3)' }}
+                                        title="إنهاء العضوية من الفصل"
+                                        onClick={() => handleRemoveMember(m.member_id, m.full_name)}
+                                      >
+                                        <Trash2 size={12} />
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

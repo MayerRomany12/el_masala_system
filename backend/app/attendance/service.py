@@ -30,16 +30,35 @@ class AttendanceService:
 
     async def create_session(self, data: AttendanceSessionCreate, current_user_id: str) -> Dict[str, Any]:
         clean_event_id = data.event_id.strip() if (data.event_id and isinstance(data.event_id, str) and data.event_id.strip()) else None
+        clean_class_id = data.class_id.strip() if (data.class_id and isinstance(data.class_id, str) and data.class_id.strip()) else None
+        
+        # If class_id is provided and authorized_user_ids is empty, auto-authorize class servants
+        authorized_ids = list(data.authorized_user_ids) if data.authorized_user_ids else []
+        stage_val = data.stage or "ALL"
+        
+        if clean_class_id:
+            from app.classes.repository import ClassRepository
+            class_repo = ClassRepository(self.db)
+            cls_obj = await class_repo.get_by_id(clean_class_id)
+            if cls_obj and not data.stage:
+                stage_val = cls_obj.get("stage") or "ALL"
+            if not authorized_ids:
+                servants = await class_repo.list_class_servants(clean_class_id, active_only=True)
+                for s in servants:
+                    if s.get("servant_id"):
+                        authorized_ids.append(s["servant_id"])
+
         session_dict = {
             "event_id": clean_event_id,
+            "class_id": clean_class_id,
             "session_date": data.session_date,
             "title": data.title,
-            "stage": data.stage,
+            "stage": stage_val,
             "recurrence": data.recurrence or "Weekly",
             "created_by": current_user_id,
             "status": "Open"
         }
-        return await self.repo.create_session(session_dict, data.authorized_user_ids)
+        return await self.repo.create_session(session_dict, authorized_ids)
 
     async def get_session_by_id(self, session_id: str) -> Dict[str, Any]:
         session = await self.repo.get_session_by_id(session_id)
