@@ -28,7 +28,8 @@ import {
   ShieldCheck,
   Award,
   GraduationCap,
-  Layers
+  Layers,
+  Zap
 } from 'lucide-react';
 
 const STAGE_OPTIONS = [
@@ -67,6 +68,58 @@ export const AttendanceManagement = () => {
   const [manualInput, setManualInput] = useState('');
   const [scanFeedback, setScanFeedback] = useState(null); // { type: 'success'|'warning'|'error', message: '' }
   const [scanSubmitting, setScanSubmitting] = useState(false);
+
+  // Scanner Lock & Cooldown Engine (Eliminates Jitter & Continuous Rapid Re-triggers)
+  const isScanLockedRef = useRef(false);
+  const lastScannedTokenRef = useRef('');
+  const cooldownIntervalRef = useRef(null);
+  const cooldownTimeoutRef = useRef(null);
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
+  const [recentScanResult, setRecentScanResult] = useState(null);
+
+  // Web Audio API Audio Synthesizer (Instant acoustic feedback)
+  const playFeedbackSound = useCallback((type) => {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      if (type === 'success') {
+        // High bright pleasant two-tone chime
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+        osc.frequency.setValueAtTime(880, ctx.currentTime + 0.12); // A5
+        gain.gain.setValueAtTime(0.28, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.42);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.42);
+      } else if (type === 'warning') {
+        // Warm medium double warble
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(493.88, ctx.currentTime); // B4
+        osc.frequency.setValueAtTime(415.30, ctx.currentTime + 0.14); // G#4
+        gain.gain.setValueAtTime(0.32, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.45);
+      } else if (type === 'error') {
+        // Low buzz tone
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(220, ctx.currentTime);
+        osc.frequency.setValueAtTime(155, ctx.currentTime + 0.14);
+        gain.gain.setValueAtTime(0.32, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.45);
+      }
+    } catch (e) {
+      // Audio playback fails silently if browser blocks autoplay
+    }
+  }, []);
 
   // New Session Modal
   const [isSessionModalOpen, setIsSessionModalOpen] = useState(false);
@@ -211,9 +264,45 @@ export const AttendanceManagement = () => {
     }
   }, [selectedSession, fetchRecords]);
 
-  // Start Camera QR Scanner Mode
+  // Cooldown Manager (Gives the servant 3 seconds of calm to review child attendance)
+  const startCooldown = useCallback((seconds = 3) => {
+    if (cooldownIntervalRef.current) clearInterval(cooldownIntervalRef.current);
+    if (cooldownTimeoutRef.current) clearTimeout(cooldownTimeoutRef.current);
+
+    setCooldownSeconds(seconds);
+    let remaining = seconds;
+
+    cooldownIntervalRef.current = setInterval(() => {
+      remaining -= 1;
+      if (remaining <= 0) {
+        clearInterval(cooldownIntervalRef.current);
+        setCooldownSeconds(0);
+        // Release lock for the next child
+        isScanLockedRef.current = false;
+        setTimeout(() => {
+          lastScannedTokenRef.current = '';
+        }, 400);
+      } else {
+        setCooldownSeconds(remaining);
+      }
+    }, 1000);
+  }, []);
+
+  const handleDismissCooldownNow = useCallback(() => {
+    if (cooldownIntervalRef.current) clearInterval(cooldownIntervalRef.current);
+    if (cooldownTimeoutRef.current) clearTimeout(cooldownTimeoutRef.current);
+    setCooldownSeconds(0);
+    isScanLockedRef.current = false;
+    lastScannedTokenRef.current = '';
+  }, []);
+
+  // Start Camera QR Scanner Mode (Continuous Smooth Scanning Without Tearing Down)
   const startCamera = async () => {
     setScanFeedback(null);
+    setRecentScanResult(null);
+    isScanLockedRef.current = false;
+    lastScannedTokenRef.current = '';
+
     try {
       if (!html5QrcodeRef.current) {
         html5QrcodeRef.current = new Html5Qrcode(scannerContainerId);
@@ -223,22 +312,46 @@ export const AttendanceManagement = () => {
         { facingMode: 'environment' },
         {
           fps: 10,
-          qrbox: { width: 250, height: 250 }
+          qrbox: (viewfinderWidth, viewfinderHeight) => {
+            const edgeSize = Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.72);
+            return { width: edgeSize, height: edgeSize };
+          }
         },
-        async (decodedText) => {
-          // Process scan continuous motor
-          handleProcessAttendance(decodedText, 'QR');
+        (decodedText) => {
+          // 1. SYNCHRONOUS LOCK: If in cooldown or processing, drop frame completely (eliminates jitter)
+          if (isScanLockedRef.current) return;
+          if (!decodedText || !decodedText.trim()) return;
+
+          const token = decodedText.trim();
+          // Prevent re-triggering if exact same token is still in front of lens
+          if (lastScannedTokenRef.current === token) return;
+
+          // Engage lock immediately
+          isScanLockedRef.current = true;
+          lastScannedTokenRef.current = token;
+
+          handleProcessAttendance(token, 'QR');
         },
         () => {}
       );
       setCameraActive(true);
     } catch (err) {
-      setScanFeedback({ type: 'error', message: 'تعذر فتح الكاميرا. يرجى التأكد من إعطاء إذن الكاميرا أو استخدام الإدخال اليدوي.' });
+      setRecentScanResult({
+        status: 'error',
+        title: 'تعذر تشغيل الكاميرا',
+        message: 'يرجى التأكد من إعطاء إذن الكاميرا للمتصفح، أو يمكنك استخدام الإدخال اليدوي أدناه.'
+      });
       setCameraActive(false);
     }
   };
 
   const stopCamera = async () => {
+    if (cooldownIntervalRef.current) clearInterval(cooldownIntervalRef.current);
+    if (cooldownTimeoutRef.current) clearTimeout(cooldownTimeoutRef.current);
+    isScanLockedRef.current = false;
+    lastScannedTokenRef.current = '';
+    setCooldownSeconds(0);
+
     if (html5QrcodeRef.current && cameraActive) {
       try {
         await html5QrcodeRef.current.stop();
@@ -253,13 +366,14 @@ export const AttendanceManagement = () => {
     };
   }, [cameraActive]);
 
-  // UNIFIED ATTENDANCE MOTOR CALL
+  // UNIFIED ATTENDANCE MOTOR CALL WITH ACOUSTIC & VISUAL FEEDBACK
   const handleProcessAttendance = async (tokenOrId, method = 'QR') => {
-    if (!selectedSession || !tokenOrId || !tokenOrId.trim()) return;
-    if (scanSubmitting) return; // Prevent double rapid firing
+    if (!selectedSession || !tokenOrId || !tokenOrId.trim()) {
+      isScanLockedRef.current = false;
+      return;
+    }
 
     setScanSubmitting(true);
-    setScanFeedback(null);
 
     try {
       const res = await attendanceApi.scanAttendance(
@@ -272,31 +386,58 @@ export const AttendanceManagement = () => {
       );
 
       if (res.success) {
-        setScanFeedback({
-          type: 'success',
-          message: `تم تسجيل حضور الطفل (${res.data.member_name}) بنجاح 🟢`
+        // 🟢 Case 1: نجح وتمام الطفل اتسجل
+        playFeedbackSound('success');
+        const childName = res.data?.member_name || 'الطفل';
+        setRecentScanResult({
+          status: 'success',
+          title: 'نجح وتمام! تم تسجيل حضور الطفل 🟢',
+          memberName: childName,
+          message: `تم قيد حضور ${childName} بنجاح واحتساب (+10) نقاط في رصيده 🌟`,
+          points: 10,
+          time: new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })
         });
         setManualInput('');
 
-        // Refresh records & session metrics
+        // Refresh records & session metrics in background
         fetchRecords(selectedSession.session_id);
-        const sRes = await attendanceApi.getSessionById(selectedSession.session_id);
-        if (sRes.success) setSelectedSession(sRes.data);
+        attendanceApi.getSessionById(selectedSession.session_id).then((sRes) => {
+          if (sRes.success) setSelectedSession(sRes.data);
+        });
       }
     } catch (err) {
-      const msg = err.response?.data?.message || 'فشل تسجيل الحضور';
-      if (msg.includes('مسجل حضوره بالفعل')) {
-        setScanFeedback({ type: 'warning', message: `⚠️ ${msg}` });
+      const msg = err.response?.data?.detail || err.response?.data?.message || 'فشل تسجيل الحضور';
+      
+      if (msg.includes('مسجل حضوره بالفعل') || (err.response?.status === 400 && msg.includes('بالفعل'))) {
+        // 🟡 Case 2: الطفل مسجل حضوره بالفعل
+        playFeedbackSound('warning');
+        setRecentScanResult({
+          status: 'warning',
+          title: 'الطفل مسجل حضوره بالفعل في هذه الجلسة ⚠️',
+          message: msg,
+          time: new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })
+        });
       } else {
-        setScanFeedback({ type: 'error', message: `❌ ${msg}` });
+        // 🔴 Case 3: فشل التعرف على رمز الـ QR أو غير صالح
+        playFeedbackSound('error');
+        setRecentScanResult({
+          status: 'error',
+          title: 'فشل التعرف على رمز الـ QR أو غير صالح ❌',
+          message: msg || 'رمز الـ QR غير معروف أو البطاقة غير مسجلة بالنظام.',
+          time: new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })
+        });
       }
     } finally {
       setScanSubmitting(false);
+      // Start 3-second calm cooldown so servant has plenty of time to take note
+      startCooldown(3);
     }
   };
 
   const handleManualSubmit = (e) => {
     e.preventDefault();
+    if (isScanLockedRef.current) return;
+    isScanLockedRef.current = true;
     handleProcessAttendance(manualInput, 'Manual');
   };
 
@@ -546,33 +687,160 @@ export const AttendanceManagement = () => {
               <span>وضع القارئ السريع الموحد (Fast Scanner Mode)</span>
             </h3>
             <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-              امسح بطاقة الـ QR أو ادخل الرمز يدوياً لتسجيل الحضور فوراً بالربط الثلاثي المعتمد
+              امسح بطاقة الـ QR دون انقطاع — النظام يمنحك مهلة هادئة لملاحظة الطفل دون أي اهتزاز أو تكرار عشوائي
             </p>
           </div>
 
-          {/* Feedback Banner */}
-          {scanFeedback && (
+          {/* Prominent High-Visibility Result Card */}
+          {recentScanResult && (
             <div
               className="animate-fade-in"
               style={{
                 width: '100%',
                 maxWidth: '520px',
-                padding: '0.85rem 1.25rem',
-                borderRadius: '12px',
+                padding: '1.2rem 1.4rem',
+                borderRadius: '16px',
                 textAlign: 'center',
-                fontWeight: 700,
-                fontSize: '0.95rem',
-                background: scanFeedback.type === 'success' ? 'rgba(52, 211, 153, 0.2)' : scanFeedback.type === 'warning' ? 'rgba(251, 191, 36, 0.2)' : 'rgba(239, 68, 68, 0.2)',
-                border: `1.5px solid ${scanFeedback.type === 'success' ? '#34d399' : scanFeedback.type === 'warning' ? '#fbbf24' : '#f87171'}`,
-                color: scanFeedback.type === 'success' ? '#6ee7b7' : scanFeedback.type === 'warning' ? '#fde047' : '#fca5a5'
+                background:
+                  recentScanResult.status === 'success'
+                    ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(5, 150, 105, 0.15) 100%)'
+                    : recentScanResult.status === 'warning'
+                    ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.25) 0%, rgba(217, 119, 6, 0.15) 100%)'
+                    : 'linear-gradient(135deg, rgba(239, 68, 68, 0.25) 0%, rgba(185, 28, 28, 0.15) 100%)',
+                border: `2px solid ${
+                  recentScanResult.status === 'success'
+                    ? '#34d399'
+                    : recentScanResult.status === 'warning'
+                    ? '#fbbf24'
+                    : '#f87171'
+                }`,
+                boxShadow: `0 8px 24px ${
+                  recentScanResult.status === 'success'
+                    ? 'rgba(52, 211, 153, 0.25)'
+                    : recentScanResult.status === 'warning'
+                    ? 'rgba(251, 191, 36, 0.25)'
+                    : 'rgba(248, 113, 113, 0.25)'
+                }`
               }}
             >
-              {scanFeedback.message}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                {recentScanResult.status === 'success' && <CheckCircle2 size={26} style={{ color: '#34d399' }} />}
+                {recentScanResult.status === 'warning' && <AlertTriangle size={26} style={{ color: '#fbbf24' }} />}
+                {recentScanResult.status === 'error' && <XCircle size={26} style={{ color: '#f87171' }} />}
+                <span
+                  style={{
+                    fontWeight: 900,
+                    fontSize: '1.1rem',
+                    color:
+                      recentScanResult.status === 'success'
+                        ? '#6ee7b7'
+                        : recentScanResult.status === 'warning'
+                        ? '#fde047'
+                        : '#fca5a5'
+                  }}
+                >
+                  {recentScanResult.title}
+                </span>
+              </div>
+
+              {recentScanResult.memberName && (
+                <div style={{ margin: '0.35rem 0' }}>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>اسم الطفل المسجل:</span>
+                  <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#f8fafc', letterSpacing: '0.5px' }}>
+                    {recentScanResult.memberName}
+                  </div>
+                </div>
+              )}
+
+              <p style={{ fontSize: '0.9rem', color: '#cbd5e1', margin: '0.35rem 0' }}>
+                {recentScanResult.message}
+              </p>
+
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.6rem', marginTop: '0.6rem', flexWrap: 'wrap' }}>
+                {recentScanResult.points && (
+                  <span className="badge" style={{ background: 'rgba(52, 211, 153, 0.25)', color: '#6ee7b7', border: '1px solid #34d39940', fontSize: '0.82rem', padding: '0.3rem 0.7rem' }}>
+                    🌟 +10 نقاط حضور
+                  </span>
+                )}
+                {recentScanResult.time && (
+                  <span className="badge" style={{ background: 'rgba(255, 255, 255, 0.1)', color: '#e2e8f0', fontSize: '0.82rem', padding: '0.3rem 0.7rem' }}>
+                    🕒 {recentScanResult.time}
+                  </span>
+                )}
+              </div>
+
+              {/* Cooldown Timer Bar & Next Scan Button */}
+              {cooldownSeconds > 0 ? (
+                <div style={{ marginTop: '0.85rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', fontSize: '0.8rem', color: '#94a3b8' }}>
+                    <span>⏳ مهلة التحقق والاستيعاب:</span>
+                    <span style={{ fontWeight: 800, color: '#38bdf8' }}>جاهز للمسح التالي خلال {cooldownSeconds}ث</span>
+                  </div>
+                  <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.15)', borderRadius: '2px', overflow: 'hidden' }}>
+                    <div
+                      style={{
+                        width: `${(cooldownSeconds / 3) * 100}%`,
+                        height: '100%',
+                        background: '#38bdf8',
+                        transition: 'width 1s linear'
+                      }}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleDismissCooldownNow}
+                    className="btn btn-secondary"
+                    style={{ padding: '0.35rem 0.9rem', fontSize: '0.8rem', gap: '0.4rem', marginTop: '0.25rem' }}
+                  >
+                    <Zap size={14} style={{ color: '#fde047' }} />
+                    <span>مسح الطفل التالي فوراً دون انتظار ⚡</span>
+                  </button>
+                </div>
+              ) : (
+                <div style={{ marginTop: '0.6rem', fontSize: '0.82rem', color: '#34d399', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}>
+                  <span>🟢 الكاميرا جاهزة الآن — مرر بطاقة الطفل القادم أمام العدسة</span>
+                </div>
+              )}
             </div>
           )}
 
           {/* Scanner / Camera View Container */}
           <div style={{ width: '100%', maxWidth: '380px', position: 'relative' }}>
+            {/* Live Camera State Indicator */}
+            {cameraActive && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '10px',
+                  right: '10px',
+                  zIndex: 10,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '0.3rem 0.7rem',
+                  borderRadius: '20px',
+                  fontSize: '0.74rem',
+                  fontWeight: 700,
+                  background: cooldownSeconds > 0 ? 'rgba(245, 158, 11, 0.9)' : 'rgba(16, 185, 129, 0.9)',
+                  color: '#ffffff',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                  backdropFilter: 'blur(4px)'
+                }}
+              >
+                {cooldownSeconds > 0 ? (
+                  <>
+                    <Clock size={12} />
+                    <span>مهلة ({cooldownSeconds}ث)</span>
+                  </>
+                ) : (
+                  <>
+                    <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#ffffff', display: 'inline-block', animation: 'pulse 1.5s infinite' }} />
+                    <span>كاميرا نشطة</span>
+                  </>
+                )}
+              </div>
+            )}
+
             <div
               id={scannerContainerId}
               style={{
@@ -581,10 +849,26 @@ export const AttendanceManagement = () => {
                 borderRadius: '16px',
                 overflow: 'hidden',
                 background: '#0f172a',
-                border: '2px dashed rgba(56, 189, 248, 0.4)',
+                border:
+                  recentScanResult?.status === 'success' && cooldownSeconds > 0
+                    ? '3px solid #34d399'
+                    : recentScanResult?.status === 'warning' && cooldownSeconds > 0
+                    ? '3px solid #fbbf24'
+                    : recentScanResult?.status === 'error' && cooldownSeconds > 0
+                    ? '3px solid #f87171'
+                    : '2px dashed rgba(56, 189, 248, 0.5)',
+                boxShadow:
+                  recentScanResult?.status === 'success' && cooldownSeconds > 0
+                    ? '0 0 25px rgba(52, 211, 153, 0.35)'
+                    : recentScanResult?.status === 'warning' && cooldownSeconds > 0
+                    ? '0 0 25px rgba(251, 191, 36, 0.35)'
+                    : recentScanResult?.status === 'error' && cooldownSeconds > 0
+                    ? '0 0 25px rgba(248, 113, 113, 0.35)'
+                    : 'none',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center'
+                justifyContent: 'center',
+                transition: 'border 0.3s ease, box-shadow 0.3s ease'
               }}
             />
 

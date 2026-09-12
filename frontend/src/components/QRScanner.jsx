@@ -24,13 +24,46 @@ export const QRScanner = ({ onBack }) => {
   const [error, setError] = useState('');
   const [cameraError, setCameraError] = useState('');
 
+  const isScanLockedRef = useRef(false);
   const html5QrcodeRef = useRef(null);
   const scannerContainerId = 'qr-reader-container';
 
-  // Start Camera Scanner
+  // Audio Synthesizer Feedback
+  const playSound = useCallback((type) => {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      if (type === 'success') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+        osc.frequency.setValueAtTime(880, ctx.currentTime + 0.12);
+        gain.gain.setValueAtTime(0.28, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.4);
+      } else {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(220, ctx.currentTime);
+        osc.frequency.setValueAtTime(155, ctx.currentTime + 0.14);
+        gain.gain.setValueAtTime(0.32, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.45);
+      }
+    } catch (e) {}
+  }, []);
+
+  // Start Camera Scanner (Smooth stream without closing)
   const startCamera = async () => {
     setError('');
     setCameraError('');
+    isScanLockedRef.current = false;
     try {
       if (!html5QrcodeRef.current) {
         html5QrcodeRef.current = new Html5Qrcode(scannerContainerId);
@@ -40,16 +73,20 @@ export const QRScanner = ({ onBack }) => {
         { facingMode: 'environment' },
         {
           fps: 10,
-          qrbox: { width: 250, height: 250 }
+          qrbox: (viewfinderWidth, viewfinderHeight) => {
+            const edgeSize = Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.72);
+            return { width: edgeSize, height: edgeSize };
+          }
         },
-        async (decodedText) => {
-          // Successfully scanned a QR token
-          await stopCamera();
-          handleTokenScanned(decodedText);
+        (decodedText) => {
+          // Synchronous lock: drop frame if busy or already scanned
+          if (isScanLockedRef.current) return;
+          if (!decodedText || !decodedText.trim()) return;
+
+          isScanLockedRef.current = true;
+          handleTokenScanned(decodedText.trim());
         },
-        (errorMessage) => {
-          // Ignore transient frame scanning failures
-        }
+        () => {}
       );
       setScanning(true);
     } catch (err) {
@@ -60,6 +97,7 @@ export const QRScanner = ({ onBack }) => {
 
   // Stop Camera Scanner
   const stopCamera = async () => {
+    isScanLockedRef.current = false;
     if (html5QrcodeRef.current && scanning) {
       try {
         await html5QrcodeRef.current.stop();
@@ -74,11 +112,14 @@ export const QRScanner = ({ onBack }) => {
     return () => {
       stopCamera();
     };
-  }, []);
+  }, [scanning]);
 
   // Submit scanned token to backend
   const handleTokenScanned = async (token) => {
-    if (!token || !token.trim()) return;
+    if (!token || !token.trim()) {
+      isScanLockedRef.current = false;
+      return;
+    }
     setLoading(true);
     setError('');
     setScannedMember(null);
@@ -86,11 +127,14 @@ export const QRScanner = ({ onBack }) => {
     try {
       const res = await cardsApi.scanQRToken(token.trim());
       if (res.success) {
+        playSound('success');
         setScannedMember(res.data);
       } else {
+        playSound('error');
         setError(res.message || 'رمز QR غير معروف');
       }
     } catch (err) {
+      playSound('error');
       setError(err.response?.data?.message || 'تعذر التحقق من رمز QR. قد يكون الرمز خاطئاً أو غير مسجل.');
     } finally {
       setLoading(false);
@@ -99,6 +143,8 @@ export const QRScanner = ({ onBack }) => {
 
   const handleManualSubmit = (e) => {
     e.preventDefault();
+    if (isScanLockedRef.current) return;
+    isScanLockedRef.current = true;
     handleTokenScanned(manualToken);
   };
 
@@ -106,7 +152,10 @@ export const QRScanner = ({ onBack }) => {
     setScannedMember(null);
     setError('');
     setManualToken('');
-    startCamera();
+    isScanLockedRef.current = false;
+    if (!scanning) {
+      startCamera();
+    }
   };
 
   return (
