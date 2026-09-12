@@ -264,6 +264,88 @@ export const AttendanceManagement = () => {
     }
   }, [selectedSession, fetchRecords]);
 
+  // Concise Error Classification & Actionable Guidance
+  const formatAttendanceError = useCallback((err) => {
+    const status = err.response?.status;
+    const raw = (err.response?.data?.detail || err.response?.data?.message || err.message || '').toString();
+
+    // 1. Already Registered
+    if (raw.includes('مسجل حضوره بالفعل') || raw.includes('بالفعل')) {
+      const timeMatch = raw.match(/الساعة\s*([0-9:AMP]+|\d+:\d+\s*[صم])/i);
+      const timeStr = timeMatch ? `(${timeMatch[0]})` : '';
+      return {
+        status: 'warning',
+        title: 'الطفل مسجل حضوره بالفعل ⚠️',
+        message: `تم قيد حضور هذا الطفل مسبقاً في هذه الجلسة ${timeStr}`,
+        actionTip: 'لا داعي لإعادة المسح، تم حفظ الحضور'
+      };
+    }
+
+    // 2. Member Not Found / Invalid Token
+    if (
+      status === 404 ||
+      raw.includes('تعذر العثور') ||
+      raw.includes('غير موجود') ||
+      raw.includes('غير مسجل') ||
+      raw.includes('Not Found')
+    ) {
+      return {
+        status: 'error',
+        title: 'كارت غير مسجل ❌',
+        message: 'رمز الـ QR غير مسجل في قاعدة بيانات الكنيسة',
+        actionTip: 'تأكد من كارت الطفل أو ابحث عنه يدويًا بالاسم'
+      };
+    }
+
+    // 3. Inactive Member Account
+    if (raw.includes('غير نشط') || raw.includes('Inactive') || raw.includes('Archived')) {
+      return {
+        status: 'warning',
+        title: 'حساب الطفل معطل ⚠️',
+        message: 'ملف المخدوم غير نشط في النظام حالياً',
+        actionTip: 'راجع أمين الخدمة لإعادة تفعيل حساب الطفل'
+      };
+    }
+
+    // 4. Closed Session
+    if (raw.includes('مغلقة') || raw.includes('closed') || raw.includes('Void')) {
+      return {
+        status: 'warning',
+        title: 'الجلسة مغلقة حالياً 🔒',
+        message: 'لا يمكن تسجيل الحضور وجلسة الفصل مغلقة',
+        actionTip: 'اضغط على زر (إعادة فتح الجلسة) بالأعلى أولاً'
+      };
+    }
+
+    // 5. Unauthorized Servant
+    if (status === 403 || raw.includes('غير مصرح') || raw.includes('Unauthorized') || raw.includes('Forbidden')) {
+      return {
+        status: 'warning',
+        title: 'غير مصرح لك بهذا الفصل ✋',
+        message: 'هذه الجلسة مخصصة لخدام آخرين مشرفين على الفصل',
+        actionTip: 'راجع أمين الخدمة لإضافتك لقائمة خدام الفصل'
+      };
+    }
+
+    // 6. Network Connection Issue
+    if (!err.response || err.code === 'ECONNABORTED' || raw.includes('Network Error')) {
+      return {
+        status: 'error',
+        title: 'انقطع الاتصال بالسيرفر 📡',
+        message: 'تعذر الوصول لخادم الكنيسة عبر الشبكة',
+        actionTip: 'تحقق من اتصال الواي فاي أو شبكة الإنترنت'
+      };
+    }
+
+    // 7. Generic Fallback
+    return {
+      status: 'error',
+      title: 'تعذر قيد الحضور ❌',
+      message: raw.length > 55 ? raw.substring(0, 52) + '...' : (raw || 'لم نتمكن من قراءة بيانات البطاقة'),
+      actionTip: 'أعد تمرير الكارت أو سجل اسم الطفل يدويًا'
+    };
+  }, []);
+
   // Cooldown Manager (Gives the servant 3 seconds of calm to review child attendance)
   const startCooldown = useCallback((seconds = 3) => {
     if (cooldownIntervalRef.current) clearInterval(cooldownIntervalRef.current);
@@ -281,7 +363,7 @@ export const AttendanceManagement = () => {
         isScanLockedRef.current = false;
         setTimeout(() => {
           lastScannedTokenRef.current = '';
-        }, 400);
+        }, 300);
       } else {
         setCooldownSeconds(remaining);
       }
@@ -296,7 +378,7 @@ export const AttendanceManagement = () => {
     lastScannedTokenRef.current = '';
   }, []);
 
-  // Start Camera QR Scanner Mode (Continuous Smooth Scanning Without Tearing Down)
+  // Start Camera QR Scanner Mode (Instant-Scan Hardware-Accelerated Motor)
   const startCamera = async () => {
     setScanFeedback(null);
     setRecentScanResult(null);
@@ -305,16 +387,27 @@ export const AttendanceManagement = () => {
 
     try {
       if (!html5QrcodeRef.current) {
-        html5QrcodeRef.current = new Html5Qrcode(scannerContainerId);
+        html5QrcodeRef.current = new Html5Qrcode(scannerContainerId, {
+          experimentalFeatures: {
+            useBarCodeDetectorIfSupported: true
+          },
+          verbose: false
+        });
       }
 
       await html5QrcodeRef.current.start(
         { facingMode: 'environment' },
         {
-          fps: 10,
+          fps: 25, // High frame rate: checks 25 frames per second for instantaneous detection
           qrbox: (viewfinderWidth, viewfinderHeight) => {
-            const edgeSize = Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.72);
+            // Generous scanning area so card is caught immediately anywhere in frame
+            const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+            const edgeSize = Math.floor(minEdge * 0.85);
             return { width: edgeSize, height: edgeSize };
+          },
+          aspectRatio: 1.0,
+          experimentalFeatures: {
+            useBarCodeDetectorIfSupported: true // Native GPU / C++ barcode detector in mobile browsers
           }
         },
         (decodedText) => {
@@ -338,8 +431,9 @@ export const AttendanceManagement = () => {
     } catch (err) {
       setRecentScanResult({
         status: 'error',
-        title: 'تعذر تشغيل الكاميرا',
-        message: 'يرجى التأكد من إعطاء إذن الكاميرا للمتصفح، أو يمكنك استخدام الإدخال اليدوي أدناه.'
+        title: 'تعذر تشغيل الكاميرا 📷',
+        message: 'يرجى منح المتصفح إذن الوصول للكاميرا',
+        actionTip: 'يمكنك استخدام الإدخال اليدوي السريع أدناه'
       });
       setCameraActive(false);
     }
@@ -391,9 +485,10 @@ export const AttendanceManagement = () => {
         const childName = res.data?.member_name || 'الطفل';
         setRecentScanResult({
           status: 'success',
-          title: 'نجح وتمام! تم تسجيل حضور الطفل 🟢',
+          title: 'تم تسجيل الحضور بنجاح 🟢',
           memberName: childName,
-          message: `تم قيد حضور ${childName} بنجاح واحتساب (+10) نقاط في رصيده 🌟`,
+          message: `تم قيد حضور ${childName} واحتساب النقاط`,
+          actionTip: 'تم تحديث رصيد الطفل وإضافته لكشف الحاضرين',
           points: 10,
           time: new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })
         });
@@ -406,27 +501,13 @@ export const AttendanceManagement = () => {
         });
       }
     } catch (err) {
-      const msg = err.response?.data?.detail || err.response?.data?.message || 'فشل تسجيل الحضور';
-      
-      if (msg.includes('مسجل حضوره بالفعل') || (err.response?.status === 400 && msg.includes('بالفعل'))) {
-        // 🟡 Case 2: الطفل مسجل حضوره بالفعل
-        playFeedbackSound('warning');
-        setRecentScanResult({
-          status: 'warning',
-          title: 'الطفل مسجل حضوره بالفعل في هذه الجلسة ⚠️',
-          message: msg,
-          time: new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })
-        });
-      } else {
-        // 🔴 Case 3: فشل التعرف على رمز الـ QR أو غير صالح
-        playFeedbackSound('error');
-        setRecentScanResult({
-          status: 'error',
-          title: 'فشل التعرف على رمز الـ QR أو غير صالح ❌',
-          message: msg || 'رمز الـ QR غير معروف أو البطاقة غير مسجلة بالنظام.',
-          time: new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })
-        });
-      }
+      // Concise error classification per user request
+      const formatted = formatAttendanceError(err);
+      playFeedbackSound(formatted.status);
+      setRecentScanResult({
+        ...formatted,
+        time: new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })
+      });
     } finally {
       setScanSubmitting(false);
       // Start 3-second calm cooldown so servant has plenty of time to take note
@@ -768,6 +849,25 @@ export const AttendanceManagement = () => {
                   </span>
                 )}
               </div>
+
+              {recentScanResult.actionTip && (
+                <div style={{ marginTop: '0.6rem' }}>
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      background: 'rgba(255, 255, 255, 0.08)',
+                      padding: '0.25rem 0.75rem',
+                      borderRadius: '20px',
+                      fontSize: '0.8rem',
+                      color: '#94a3b8'
+                    }}
+                  >
+                    💡 {recentScanResult.actionTip}
+                  </span>
+                </div>
+              )}
 
               {/* Cooldown Timer Bar & Next Scan Button */}
               {cooldownSeconds > 0 ? (

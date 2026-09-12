@@ -59,23 +59,33 @@ export const QRScanner = ({ onBack }) => {
     } catch (e) {}
   }, []);
 
-  // Start Camera Scanner (Smooth stream without closing)
+  // Start Camera Scanner (Smooth stream without closing, instant detection)
   const startCamera = async () => {
     setError('');
     setCameraError('');
     isScanLockedRef.current = false;
     try {
       if (!html5QrcodeRef.current) {
-        html5QrcodeRef.current = new Html5Qrcode(scannerContainerId);
+        html5QrcodeRef.current = new Html5Qrcode(scannerContainerId, {
+          experimentalFeatures: {
+            useBarCodeDetectorIfSupported: true
+          },
+          verbose: false
+        });
       }
 
       await html5QrcodeRef.current.start(
         { facingMode: 'environment' },
         {
-          fps: 10,
+          fps: 25, // Fast scanning: 25 checks per second
           qrbox: (viewfinderWidth, viewfinderHeight) => {
-            const edgeSize = Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.72);
+            const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+            const edgeSize = Math.floor(minEdge * 0.85);
             return { width: edgeSize, height: edgeSize };
+          },
+          aspectRatio: 1.0,
+          experimentalFeatures: {
+            useBarCodeDetectorIfSupported: true
           }
         },
         (decodedText) => {
@@ -90,7 +100,7 @@ export const QRScanner = ({ onBack }) => {
       );
       setScanning(true);
     } catch (err) {
-      setCameraError('تعذر فتح الكاميرا. يرجى التأكد من السماح بإذن الكاميرا أو كتابة الرمز يدوياً.');
+      setCameraError('تعذر تشغيل الكاميرا. يرجى التأكد من السماح بإذن الكاميرا للمتصفح.');
       setScanning(false);
     }
   };
@@ -131,11 +141,16 @@ export const QRScanner = ({ onBack }) => {
         setScannedMember(res.data);
       } else {
         playSound('error');
-        setError(res.message || 'رمز QR غير معروف');
+        setError(res.message || 'رمز QR غير مسجل في النظام');
       }
     } catch (err) {
       playSound('error');
-      setError(err.response?.data?.message || 'تعذر التحقق من رمز QR. قد يكون الرمز خاطئاً أو غير مسجل.');
+      const rawMsg = (err.response?.data?.message || err.response?.data?.detail || err.message || '').toString();
+      let concise = 'رمز الـ QR غير مسجل في قاعدة بيانات الكنيسة';
+      if (rawMsg.includes('غير نشط')) concise = 'حساب الطفل معطل أو غير نشط';
+      else if (!err.response || rawMsg.includes('Network')) concise = 'تعذر الاتصال بالسيرفر، تحقق من الشبكة';
+      else if (rawMsg.length > 0 && rawMsg.length < 50) concise = rawMsg;
+      setError(concise);
     } finally {
       setLoading(false);
     }
