@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import {
   Sun,
@@ -8,10 +9,12 @@ import {
   Award,
   CheckCircle,
   AlertCircle,
-  FolderKanban
+  FolderKanban,
+  Eye
 } from 'lucide-react';
 
 export const SummerActivityManagement = () => {
+  const navigate = useNavigate();
   const [seasons, setSeasons] = useState([]);
   const [selectedSeason, setSelectedSeason] = useState('');
   const [summerGroups, setSummerGroups] = useState([]);
@@ -181,7 +184,7 @@ export const SummerActivityManagement = () => {
                 {grp.description || 'لا يوجد وصف مضاف لهذا النشاط'}
               </p>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', background: 'rgba(0,0,0,0.3)', padding: '0.6rem 0.8rem', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', background: 'rgba(0,0,0,0.3)', padding: '0.6rem 0.8rem', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem', marginBottom: '0.75rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   <Users size={16} style={{ color: '#f39c12' }} />
                   <span>المشاركون: <strong>{grp.active_members_count} طفل</strong></span>
@@ -191,6 +194,25 @@ export const SummerActivityManagement = () => {
                   <span>المرحلة: <strong>{grp.stage}</strong></span>
                 </div>
               </div>
+
+              <button
+                className="btn btn-secondary"
+                style={{
+                  width: '100%',
+                  padding: '0.45rem',
+                  fontSize: '0.85rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.4rem',
+                  borderColor: 'rgba(243, 156, 18, 0.35)',
+                  color: '#fbbf24'
+                }}
+                onClick={() => navigate(`/classes/${grp.class_id}`)}
+              >
+                <Eye size={15} />
+                <span>عرض قائمة المشاركين والتفاصيل</span>
+              </button>
             </div>
           ))}
         </div>

@@ -35,145 +35,128 @@ export const LoginPage = () => {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      padding: '1.5rem',
-      background: 'radial-gradient(circle at center, #0e3057 0%, #061930 50%, #020c19 100%)'
+      padding: '1.25rem',
+      background: 'var(--bg-main)'
     }}>
       <div className="glass-card animate-fade-in" style={{
         width: '100%',
-        maxWidth: '480px',
-        padding: '2.5rem 2rem',
-        borderRadius: 'var(--radius-lg)',
-        background: 'rgba(8, 26, 49, 0.92)',
-        border: '1px solid rgba(250, 204, 21, 0.35)',
-        boxShadow: '0 0 45px rgba(2, 132, 199, 0.45)'
+        maxWidth: '440px',
+        padding: '2rem 1.75rem',
+        borderRadius: 'var(--radius-md)',
+        background: 'var(--bg-card)',
+        border: '1px solid var(--border-subtle)',
+        boxShadow: 'var(--shadow-md)'
       }}>
         {/* Dual Logos & Title */}
-        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1rem', marginBottom: '1.2rem' }}>
+        <div style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
             {/* Church Seal */}
             <div style={{
-              position: 'relative',
-              width: '84px',
-              height: '84px',
+              width: '58px',
+              height: '58px',
               borderRadius: '50%',
-              padding: '3px',
-              background: 'linear-gradient(135deg, #facc15 0%, #0284c7 100%)',
-              boxShadow: '0 0 25px rgba(250, 204, 21, 0.45)',
-              display: 'inline-block'
+              border: '2px solid var(--color-primary)',
+              overflow: 'hidden',
+              background: 'var(--bg-secondary)',
+              flexShrink: 0
             }}>
               <img
                 src={churchLogo}
                 alt="شعار الكنيسة"
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  borderRadius: '50%',
-                  objectFit: 'cover'
-                }}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
               />
             </div>
 
             {/* Sunday School Service Logo */}
             <div style={{
-              position: 'relative',
-              width: '84px',
-              height: '84px',
+              width: '58px',
+              height: '58px',
               borderRadius: '50%',
-              padding: '3px',
-              background: 'linear-gradient(135deg, #38bdf8 0%, #facc15 100%)',
-              boxShadow: '0 0 25px rgba(56, 189, 248, 0.45)',
-              display: 'inline-block'
+              border: '2px solid var(--color-gold)',
+              overflow: 'hidden',
+              background: 'var(--bg-secondary)',
+              flexShrink: 0
             }}>
               <img
                 src={serviceLogo}
                 alt="شعار مدارس الأحد"
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  borderRadius: '50%',
-                  objectFit: 'cover'
-                }}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
               />
             </div>
           </div>
 
-          <h1 style={{ fontSize: '1.55rem', fontWeight: 900, color: 'var(--color-yellow-light)', marginBottom: '0.4rem', textShadow: '0 2px 10px rgba(250, 204, 21, 0.3)' }}>
+          <h1 style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '0.25rem' }}>
             منظومة خدمة مدارس الأحد
           </h1>
-          <p style={{ fontSize: '0.9rem', color: '#f8fafc', fontWeight: 700, lineHeight: 1.4, marginBottom: '0.2rem' }}>
-            كنيسة الشهيد العظيم مارجرجس الروماني والأنبا شنودة رئيس المتوحدين
+          <p style={{ fontSize: '0.85rem', color: 'var(--color-gold)', fontWeight: 600, margin: '0 0 0.15rem' }}>
+            كنيسة مارجرجس والأنبا شنودة
           </p>
-          <p style={{ fontSize: '0.8rem', color: '#93c5fd', fontWeight: 600 }}>
-            بعزبة شنوده - الكرور - أسوان
+          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>
+            عزبة شنوده - الكرور - أسوان
           </p>
-          <div style={{
-            margin: '0.85rem auto 0',
-            width: '100px',
-            height: '3px',
-            background: 'linear-gradient(90deg, transparent 0%, #facc15 50%, transparent 100%)',
-            borderRadius: '2px'
-          }} />
         </div>
 
         {error && (
           <div style={{
             padding: '0.75rem 1rem',
-            background: 'rgba(239, 68, 68, 0.15)',
-            border: '1px solid rgba(239, 68, 68, 0.4)',
+            background: 'rgba(239, 68, 68, 0.1)',
+            border: '1px solid rgba(239, 68, 68, 0.3)',
             borderRadius: 'var(--radius-sm)',
             color: '#fca5a5',
-            fontSize: '0.88rem',
+            fontSize: '0.85rem',
             display: 'flex',
             alignItems: 'center',
-            gap: '0.6rem',
-            marginBottom: '1.5rem'
+            gap: '0.5rem',
+            marginBottom: '1.25rem'
           }}>
-            <AlertCircle size={18} />
+            <AlertCircle size={16} style={{ flexShrink: 0 }} />
             <span>{error}</span>
           </div>
         )}
 
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div className="form-group" style={{ marginBottom: 0 }}>
             <label className="form-label">اسم المستخدم أو البريد الإلكتروني</label>
             <div style={{ position: 'relative' }}>
               <input
                 type="text"
                 className="form-input"
-                style={{ paddingRight: '2.5rem' }}
+                style={{ paddingRight: '2.4rem' }}
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="أدخل اسم المستخدم"
                 required
+                autoComplete="username"
               />
-              <User size={18} style={{
+              <User size={16} style={{
                 position: 'absolute',
-                right: '0.85rem',
+                right: '0.75rem',
                 top: '50%',
                 transform: 'translateY(-50%)',
-                color: 'var(--color-gold-main)'
+                color: 'var(--text-muted)'
               }} />
             </div>
           </div>
 
-          <div className="form-group" style={{ marginBottom: '1.75rem' }}>
+          <div className="form-group" style={{ marginBottom: 0 }}>
             <label className="form-label">كلمة المرور</label>
             <div style={{ position: 'relative' }}>
               <input
                 type="password"
                 className="form-input"
-                style={{ paddingRight: '2.5rem' }}
+                style={{ paddingRight: '2.4rem' }}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="أدخل كلمة المرور"
                 required
+                autoComplete="current-password"
               />
-              <Lock size={18} style={{
+              <Lock size={16} style={{
                 position: 'absolute',
-                right: '0.85rem',
+                right: '0.75rem',
                 top: '50%',
                 transform: 'translateY(-50%)',
-                color: 'var(--color-gold-main)'
+                color: 'var(--text-muted)'
               }} />
             </div>
           </div>
@@ -182,24 +165,34 @@ export const LoginPage = () => {
             type="submit"
             className="btn btn-primary"
             disabled={loading}
-            style={{ width: '100%', padding: '0.85rem', fontSize: '1.05rem', fontWeight: 800 }}
+            style={{
+              width: '100%',
+              padding: '0.75rem',
+              fontSize: '0.95rem',
+              fontWeight: 700,
+              justifyContent: 'center',
+              gap: '0.5rem',
+              marginTop: '0.5rem'
+            }}
           >
-            {loading ? 'جاري التحقق...' : 'تسجيل الدخول إلى النظام 🔑'}
-            {!loading && <ArrowLeft size={18} />}
+            <span>{loading ? 'جاري التحقق...' : 'تسجيل الدخول'}</span>
+            {!loading && <ArrowLeft size={16} />}
           </button>
         </form>
 
         <div style={{
-          marginTop: '2rem',
-          paddingTop: '1.25rem',
-          borderTop: '1px solid rgba(212, 175, 55, 0.15)',
+          marginTop: '1.75rem',
+          paddingTop: '1rem',
+          borderTop: '1px solid var(--border-subtle)',
           textAlign: 'center',
-          fontSize: '0.8rem',
-          color: 'var(--text-subtle)'
+          fontSize: '0.75rem',
+          color: 'var(--text-muted)'
         }}>
-          تسجيل الدخول مخصص للمخدومين والخدام المصرح لهم فقط
+          نظام الخدمة الداخلي المصرح به للخدام
         </div>
       </div>
     </div>
   );
 };
+
+export default LoginPage;

@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import QRCode from 'qrcode';
 import { membersApi } from '../api/members';
 import { apiClient } from '../api/client';
@@ -325,6 +326,7 @@ const CreatedMemberQRModal = ({ member, onClose }) => {
 // ——— No more hardcoded STAGE_OPTIONS — classes come from API ———
 
 export const MemberManagement = () => {
+  const navigate = useNavigate();
   const { hasPermission } = useAuth();
 
   // Data States
@@ -346,28 +348,9 @@ export const MemberManagement = () => {
   const [page, setPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
 
-  // Modal States
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [editingMember, setEditingMember] = useState(null);
-  const [viewingMember, setViewingMember] = useState(null);
+  // Modal States (Compact dialogs only)
   const [statusModalMember, setStatusModalMember] = useState(null);
   const [createdMember, setCreatedMember] = useState(null);
-
-  // Form State
-  const [formData, setFormData] = useState({
-    full_name: '',
-    gender: 'ذكر',
-    date_of_birth: '',
-    class_id: '',       // بدل stage — الفصل من ClassGroup
-    group_name: '',
-    phone: '',
-    whatsapp_phone: '',
-    father_of_confession: '',
-    address: '',
-    notes: '',
-    status: 'Active'
-  });
-  const [modalError, setModalError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   // جلب الفصول الديناميكية من API مرة واحدة عند التحميل
@@ -376,10 +359,6 @@ export const MemberManagement = () => {
       .then(res => {
         const data = res?.data?.data?.items || res?.data?.items || [];
         setClasses(data);
-        // اضبط القيمة الافتراضية للفورم لأول فصل
-        if (data.length > 0) {
-          setFormData(prev => ({ ...prev, class_id: prev.class_id || data[0].class_id }));
-        }
       })
       .catch(() => setClasses([]));
   }, []);
@@ -418,143 +397,14 @@ export const MemberManagement = () => {
     fetchData();
   }, [fetchData]);
 
-  // Open Create Modal
+  // Navigate to Create Member Page
   const handleOpenCreate = () => {
-    setEditingMember(null);
-    setFormData({
-      full_name: '',
-      gender: 'ذكر',
-      date_of_birth: '',
-      class_id: classes.length > 0 ? classes[0].class_id : '',
-      group_name: '',
-      phone: '',
-      secondary_phone: '',
-      member_phone: '',
-      whatsapp_phone: '',
-      father_of_confession: '',
-      address: '',
-      notes: '',
-      status: 'Active'
-    });
-    setModalError('');
-    setShowAddModal(true);
+    navigate('/members/new');
   };
 
-  // Open Edit Modal
+  // Navigate to Edit Member Page
   const handleOpenEdit = (member) => {
-    setEditingMember(member);
-    // نجيب الفصل النشط الحالي للطفل من ClassGroupMember (class_id مش موجودة على member مباشرة)
-    setFormData({
-      full_name: member.full_name || '',
-      gender: member.gender || 'ذكر',
-      date_of_birth: member.date_of_birth || '',
-      class_id: member.active_class_id || (classes.length > 0 ? classes[0].class_id : ''),
-      group_name: member.group_name || '',
-      phone: member.phone || '',
-      secondary_phone: member.secondary_phone || '',
-      member_phone: member.member_phone || '',
-      whatsapp_phone: member.whatsapp_phone || '',
-      father_of_confession: member.father_of_confession || '',
-      address: member.address || '',
-      notes: member.notes || '',
-      status: member.status || 'Active'
-    });
-    setModalError('');
-    setShowAddModal(true);
-  };
-
-  // Submit Add / Edit Form
-  const handleSubmitForm = async (e) => {
-    e.preventDefault();
-    setModalError('');
-
-    // 1. Full name validation (at least 3 words, no numbers)
-    if (!isValidFullName(formData.full_name)) {
-      setModalError('اسم الطفل المخدوم يجب أن يكون ثلاثياً أو رباعياً على الأقل بدون أرقام (مثال: مارك فادي نبيل)');
-      return;
-    }
-
-    // 2. Primary Egyptian phone validation
-    if (!isValidEgyptianMobile(formData.phone)) {
-      setModalError('رقم تليفون ولي الأمر الرئيسي يجب أن يكون رقم محمول مصري صالح مكون من 11 رقم يبدأ بـ (010 أو 011 أو 012 أو 015)');
-      return;
-    }
-
-    // 3. Optional secondary parent phone validation
-    if (formData.secondary_phone && !isValidEgyptianMobile(formData.secondary_phone)) {
-      setModalError('الرقم الآخر لولي الأمر غير صالح. يرجى إدخال رقم محمول مصري مكون من 11 رقم يبدأ بـ (010 أو 011 أو 012 أو 015)');
-      return;
-    }
-
-    // 4. Optional child's own phone validation
-    if (formData.member_phone && !isValidEgyptianMobile(formData.member_phone)) {
-      setModalError('رقم الطفل المخدوم غير صالح. يرجى إدخال رقم محمول مصري مكون من 11 رقم يبدأ بـ (010 أو 011 أو 012 أو 015)');
-      return;
-    }
-
-    // التحقق من اختيار الفصل
-    if (!formData.class_id) {
-      setModalError('يرجى اختيار الفصل الخدمي أولاً');
-      return;
-    }
-
-    setSubmitting(true);
-
-    const selectedClass = classes.find(c => c.class_id === formData.class_id);
-    const resolvedStage = selectedClass?.stage || selectedClass?.name || 'عام';
-
-    const payload = {
-      ...formData,
-      stage: resolvedStage,
-      full_name: formData.full_name.trim(),
-      date_of_birth: formData.date_of_birth ? formData.date_of_birth : null,
-      group_name: formData.group_name?.trim() || null,
-      father_of_confession: formData.father_of_confession?.trim() || null,
-      address: formData.address?.trim() || null,
-      notes: formData.notes?.trim() || null,
-      phone: normalizePhone(formData.phone),
-      secondary_phone: formData.secondary_phone ? normalizePhone(formData.secondary_phone) : null,
-      member_phone: formData.member_phone ? normalizePhone(formData.member_phone) : null,
-      whatsapp_phone: formData.whatsapp_phone ? normalizePhone(formData.whatsapp_phone) : (formData.member_phone ? normalizePhone(formData.member_phone) : normalizePhone(formData.phone))
-    };
-
-    try {
-      if (editingMember) {
-        await membersApi.updateMember(editingMember.member_id, payload);
-        setShowAddModal(false);
-        fetchData();
-      } else {
-        const res = await membersApi.createMember(payload);
-        setShowAddModal(false);
-        fetchData();
-        const createdData = res?.data || res;
-        if (createdData && (createdData.member_id || createdData.id)) {
-          // إضافة الطفل للفصل المختار عبر ClassGroupMember (إذا لم يكن السيرفر قد أضافه تلقائياً)
-          if (formData.class_id) {
-            try {
-              await apiClient.post(`/classes/${formData.class_id}/members`, {
-                member_id: createdData.member_id || createdData.id
-              });
-            } catch (classErr) {
-              // العضوية قد تكون نشطة بالفعل عبر السيرفر الذري
-              console.log('Class membership synchronized');
-            }
-          }
-          setCreatedMember(createdData);
-        }
-      }
-    } catch (err) {
-      const detail = err.response?.data?.detail;
-      const errorMsg = typeof detail === 'string'
-        ? detail
-        : (Array.isArray(detail)
-            ? detail.map(d => (d.loc ? `${d.loc.slice(-1)}: ` : '') + (d.msg || d.message)).join(' | ')
-            : err.response?.data?.message)
-          || 'فشلت عملية حفظ المخدوم ببيانات السيرفر. يرجى مراجعة البيانات والمحاولة مجدداً.';
-      setModalError(errorMsg);
-    } finally {
-      setSubmitting(false);
-    }
+    navigate(`/members/${member.member_id}/edit`);
   };
 
   // Change Status
@@ -903,7 +753,7 @@ export const MemberManagement = () => {
                         </button>
 
                         <button
-                          onClick={() => setViewingMember(member)}
+                          onClick={() => navigate(`/members/${member.member_id}`)}
                           className="btn btn-secondary"
                           style={{ padding: '0.35rem 0.6rem', fontSize: '0.8rem' }}
                           title="عرض الملف الكامل"
@@ -922,35 +772,37 @@ export const MemberManagement = () => {
                             }}
                             className="btn btn-secondary"
                             style={{ padding: '0.35rem 0.6rem', fontSize: '0.8rem', color: '#34d399' }}
-                            title="إلغاء الأرشفة وإعادة التفعيل"
+                            title="إلغاء الأرشفة"
                           >
                             <Archive size={15} />
                           </button>
                         )}
 
+                        {/* Status Change Button */}
                         {hasPermission('members:write') && !member.is_archived && (
-                          <>
-                            <button
-                              onClick={() => handleOpenEdit(member)}
-                              className="btn btn-secondary"
-                              style={{ padding: '0.35rem 0.6rem', fontSize: '0.8rem' }}
-                              title="تعديل البيانات والصورة"
-                            >
-                              <Edit size={15} />
-                            </button>
-                            <button
-                              onClick={() => setStatusModalMember(member)}
-                              className="btn btn-secondary"
-                              style={{ padding: '0.35rem 0.6rem', fontSize: '0.8rem', color: '#fb923c' }}
-                              title="تغيير الحالة والأرشفة"
-                            >
-                              <ShieldAlert size={15} />
-                            </button>
-                          </>
+                          <button
+                            onClick={() => setStatusModalMember(member)}
+                            className="btn btn-secondary"
+                            style={{ padding: '0.35rem 0.6rem', fontSize: '0.8rem', color: '#fb923c' }}
+                            title="تغيير الحالة / أرشفة"
+                          >
+                            <ShieldAlert size={15} />
+                          </button>
+                        )}
+
+                        {/* Edit Button */}
+                        {hasPermission('members:write') && (
+                          <button
+                            onClick={() => handleOpenEdit(member)}
+                            className="btn btn-secondary"
+                            style={{ padding: '0.35rem 0.6rem', fontSize: '0.8rem' }}
+                            title="تعديل البيانات"
+                          >
+                            <Edit size={15} />
+                          </button>
                         )}
                       </div>
                     </td>
-
                   </tr>
                 ))
               )}
@@ -959,363 +811,34 @@ export const MemberManagement = () => {
         </div>
       </div>
 
-      {/* 5. Add / Edit Member Modal */}
-      {showAddModal && (
-        <div className="modal-overlay">
-          <div className="modal-card" style={{ maxWidth: '680px' }}>
-            <div className="modal-header">
-              <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>
-                {editingMember ? `تعديل بيانات الطفل (${editingMember.member_id})` : 'تسجيل طفل مخدوم جديد'}
-              </h2>
-              <button onClick={() => setShowAddModal(false)} className="btn-secondary" style={{ padding: '0.3rem', borderRadius: '50%' }}>
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="modal-body">
-              {modalError && (
-                <div style={{ padding: '0.75rem', background: 'var(--danger-glow)', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: '8px', color: '#fca5a5', fontSize: '0.85rem' }}>
-                  {modalError}
-                </div>
-              )}
-
-              <form id="memberForm" onSubmit={handleSubmitForm} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                
-                {/* Photo Upload Section for Existing Member */}
-                {editingMember && (
-                  <div style={{
-                    padding: '0.75rem 1rem',
-                    borderRadius: '10px',
-                    background: 'rgba(56, 189, 248, 0.08)',
-                    border: '1px solid rgba(56, 189, 248, 0.2)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '1rem'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <div style={{
-                        width: '48px', height: '48px', borderRadius: '10px', background: '#334155',
-                        border: '1px solid #38bdf8', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center'
-                      }}>
-                        {formData.photo_url ? (
-                          <img src={getPhotoUrl(formData.photo_url)} alt="صورة المخدوم" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        ) : (
-                          <Camera size={24} style={{ color: '#38bdf8' }} />
-                        )}
-                      </div>
-                      <div>
-                        <div style={{ fontSize: '0.9rem', fontWeight: '700', color: '#fff' }}>صورة المخدوم الحالية</div>
-                        <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>صورة شخصية واضحة للتعرف البصري</div>
-                      </div>
-                    </div>
-
-                    <label className="btn btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.82rem', cursor: 'pointer', gap: '6px' }}>
-                      <span>تغيير الصورة 🖼️</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        style={{ display: 'none' }}
-                        onChange={async (e) => {
-                          const file = e.target.files?.[0];
-                          if (!file) return;
-                          try {
-                            const res = await membersApi.uploadPhoto(editingMember.member_id, file);
-                            if (res && res.data) {
-                              setFormData((prev) => ({ ...prev, photo_url: res.data.photo_url }));
-                              alert('تم رفع صورة الطفل بنجاح 🖼️');
-                              fetchData();
-                            }
-                          } catch (err) {
-                            alert(err.response?.data?.message || 'فشل رفع الصورة');
-                          }
-                        }}
-                      />
-                    </label>
-                  </div>
-                )}
-
-                {/* 1. Personal & Class Information */}
-                <div className="form-section-title">
-                  <UserPlus size={18} color="#facc15" />
-                  <span>البيانات الأساسية والفصل الخدمي</span>
-                </div>
-
-                <div className="form-row-2-1">
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">الاسم الكامل للمخدوم (الاسم واسم الأب على الأقل)*</label>
-                    <input
-                      type="text" className="form-input" value={formData.full_name}
-                      onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-                      placeholder="مثال: كيرلس فادي عاطف" required
-                    />
-                  </div>
-
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">النوع (الجنس)*</label>
-                    <select className="form-input" value={formData.gender} onChange={(e) => setFormData({ ...formData, gender: e.target.value })}>
-                      <option value="ذكر">ذكر 👦</option>
-                      <option value="أنثى">أنثى 👧</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="form-row-2">
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">الفصل الخدمي (فصل التربية الكنسية)*</label>
-                    <select
-                      className="form-input"
-                      value={formData.class_id}
-                      onChange={(e) => setFormData({ ...formData, class_id: e.target.value })}
-                      required
-                    >
-                      <option value="">— اختر الفصل الخدمي —</option>
-                      {classes.map((cls) => (
-                        <option key={cls.class_id} value={cls.class_id}>
-                          {cls.name} ({cls.group_type === 'Standard' ? 'أساسي' : cls.group_type})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">اسم الأسرة أو المجموعة (اختياري)</label>
-                    <input
-                      type="text" className="form-input" value={formData.group_name}
-                      onChange={(e) => setFormData({ ...formData, group_name: e.target.value })}
-                      placeholder="مثال: أسرة القديس مارمرقس"
-                    />
-                  </div>
-                </div>
-
-                <div className="form-row-2">
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">تاريخ الميلاد (اختياري)</label>
-                    <input
-                      type="date" className="form-input" value={formData.date_of_birth}
-                      onChange={(e) => setFormData({ ...formData, date_of_birth: e.target.value })}
-                    />
-                  </div>
-
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">اسم أب الاعتراف (اختياري)</label>
-                    <input
-                      type="text" className="form-input" value={formData.father_of_confession}
-                      onChange={(e) => setFormData({ ...formData, father_of_confession: e.target.value })}
-                      placeholder="مثال: أبونا بولا"
-                    />
-                  </div>
-                </div>
-
-                {/* 2. Contact Phone Numbers */}
-                <div className="form-section-title" style={{ marginTop: '0.9rem' }}>
-                  <Phone size={18} color="#38bdf8" />
-                  <span>أرقام الهواتف والتواصل</span>
-                </div>
-
-                <div className="form-row-3">
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">تليفون ولي الأمر الرئيسي*</label>
-                    <input
-                      type="tel" className="form-input" value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      placeholder="012XXXXXXXX" required
-                    />
-                  </div>
-
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">رقم آخر لولي الأمر (اختياري)</label>
-                    <input
-                      type="tel" className="form-input" value={formData.secondary_phone}
-                      onChange={(e) => setFormData({ ...formData, secondary_phone: e.target.value })}
-                      placeholder="010XXXXXXXX"
-                    />
-                  </div>
-
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">رقم الطفل نفسه (اختياري)</label>
-                    <input
-                      type="tel" className="form-input" value={formData.member_phone}
-                      onChange={(e) => setFormData({ ...formData, member_phone: e.target.value })}
-                      placeholder="015XXXXXXXX"
-                    />
-                  </div>
-                </div>
-
-                {/* 3. Address & Additional Notes */}
-                <div className="form-section-title" style={{ marginTop: '0.9rem' }}>
-                  <MapPin size={18} color="#34d399" />
-                  <span>بيانات السكن والرعاية</span>
-                </div>
-
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label className="form-label">عنوان السكن (اختياري)</label>
-                  <input
-                    type="text" className="form-input" value={formData.address}
-                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                    placeholder="عزبة شنوده - الكرور - الشارع..."
-                  />
-                </div>
-
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label className="form-label">ملاحظات خدمة ورعاية خاصة</label>
-                  <textarea
-                    className="form-input" rows={2} value={formData.notes}
-                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                    placeholder="أي ملاحظات خاصة بالتلميذ أو الظروف الصحية..."
-                  />
-                </div>
-              </form>
-            </div>
-
-            <div className="modal-footer">
-              <button type="button" onClick={() => setShowAddModal(false)} className="btn btn-secondary" disabled={submitting}>إلغاء</button>
-              <button type="submit" form="memberForm" className="btn btn-primary" disabled={submitting}>
-                {submitting ? 'جاري الحفظ...' : editingMember ? 'تعديل البيانات' : 'حفظ وتسجيل المخدوم 💾'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 6. View Member Profile Modal */}
-      {viewingMember && (
+      {/* 5. Pagination */}
+      {totalItems > 20 && (
         <div style={{
-          position: 'fixed',
-          top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(15, 23, 42, 0.82)',
-          backdropFilter: 'blur(8px)',
           display: 'flex',
-          alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 1000,
-          padding: '1rem'
+          alignItems: 'center',
+          gap: '1rem',
+          padding: '0.75rem 0'
         }}>
-          <div className="glass-card animate-fade-in" style={{
-            width: '100%',
-            maxWidth: '550px',
-            background: '#1e293b',
-            boxShadow: 'var(--shadow-glow)'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <div style={{
-                  width: '56px', height: '56px', borderRadius: '50%', background: '#334155', border: '2px solid #38bdf8', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
-                }}>
-                  {viewingMember.photo_url ? (
-                    <img src={getPhotoUrl(viewingMember.photo_url)} alt={viewingMember.full_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  ) : (
-                    <span style={{ fontSize: '1.2rem', color: '#38bdf8', fontWeight: 'bold' }}>{viewingMember.full_name.charAt(0)}</span>
-                  )}
-                </div>
-                <div>
-                  <span style={{
-                    fontFamily: 'monospace',
-                    fontSize: '0.95rem',
-                    fontWeight: 800,
-                    color: '#38bdf8',
-                    background: 'rgba(56, 189, 248, 0.15)',
-                    padding: '0.25rem 0.65rem',
-                    borderRadius: '8px',
-                    border: '1px solid rgba(56, 189, 248, 0.3)'
-                  }}>
-                    {viewingMember.member_id}
-                  </span>
-                  <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--text-main)', marginTop: '0.3rem' }}>
-                    {viewingMember.full_name}
-                  </h2>
-                </div>
-              </div>
-              <button onClick={() => setViewingMember(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
-                <X size={22} />
-              </button>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', fontSize: '0.92rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.5rem' }}>
-                <span style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <Sparkles size={16} /> المرحلة والدراسة:
-                </span>
-                <span style={{ fontWeight: 700 }}>{viewingMember.stage} {viewingMember.group_name && `(${viewingMember.group_name})`}</span>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.5rem' }}>
-                <span style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <Phone size={16} /> تليفون ولي الأمر:
-                </span>
-                <span style={{ fontWeight: 700, dir: 'ltr' }}>{viewingMember.phone}</span>
-              </div>
-
-              {viewingMember.whatsapp_phone && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.5rem' }}>
-                  <span style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <MessageSquare size={16} /> الواتساب:
-                  </span>
-                  <span style={{ fontWeight: 700, color: '#34d399', dir: 'ltr' }}>{viewingMember.whatsapp_phone}</span>
-                </div>
-              )}
-
-              {viewingMember.date_of_birth && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.5rem' }}>
-                  <span style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <Calendar size={16} /> تاريخ الميلاد:
-                  </span>
-                  <span style={{ fontWeight: 700 }}>{viewingMember.date_of_birth}</span>
-                </div>
-              )}
-
-              {viewingMember.father_of_confession && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.5rem' }}>
-                  <span style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <Heart size={16} /> أب الاعتراف:
-                  </span>
-                  <span style={{ fontWeight: 700 }}>{viewingMember.father_of_confession}</span>
-                </div>
-              )}
-
-              {viewingMember.address && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.5rem' }}>
-                  <span style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <MapPin size={16} /> العنوان:
-                  </span>
-                  <span style={{ fontWeight: 600 }}>{viewingMember.address}</span>
-                </div>
-              )}
-
-              {viewingMember.notes && (
-                <div style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.5rem' }}>
-                  <span style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.3rem' }}>
-                    <FileText size={16} /> ملاحظات:
-                  </span>
-                  <p style={{ background: 'rgba(0,0,0,0.2)', padding: '0.5rem', borderRadius: '6px', fontSize: '0.85rem' }}>
-                    {viewingMember.notes}
-                  </p>
-                </div>
-              )}
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '0.3rem' }}>
-                <span style={{ color: 'var(--text-muted)' }}>حالة الحساب:</span>
-                <div>{getStatusBadge(viewingMember.status)}</div>
-              </div>
-            </div>
-
-            <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <button 
-                onClick={() => {
-                  setCreatedMember(viewingMember);
-                  setViewingMember(null);
-                }} 
-                className="btn btn-primary"
-                style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-              >
-                <QrCode size={16} />
-                <span>عرض بطاقة الـ QR 🎴</span>
-              </button>
-              <button onClick={() => setViewingMember(null)} className="btn btn-secondary">
-                إغلاق
-              </button>
-            </div>
-          </div>
+          <button
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            disabled={page <= 1}
+            className="btn btn-secondary"
+            style={{ padding: '0.45rem 1rem', fontSize: '0.85rem' }}
+          >
+            السابق
+          </button>
+          <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+            صفحة {page} من {Math.ceil(totalItems / 20)}
+          </span>
+          <button
+            onClick={() => setPage(p => p + 1)}
+            disabled={page >= Math.ceil(totalItems / 20)}
+            className="btn btn-secondary"
+            style={{ padding: '0.45rem 1rem', fontSize: '0.85rem' }}
+          >
+            التالي
+          </button>
         </div>
       )}
 

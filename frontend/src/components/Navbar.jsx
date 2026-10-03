@@ -23,7 +23,7 @@ export const Navbar = ({ onToggleMobileSidebar }) => {
 
   useEffect(() => {
     fetchUnread();
-    const interval = setInterval(fetchUnread, 30000); // Auto poll unread count every 30s
+    const interval = setInterval(fetchUnread, 30000);
     return () => clearInterval(interval);
   }, [fetchUnread]);
 
@@ -38,12 +38,8 @@ export const Navbar = ({ onToggleMobileSidebar }) => {
   return (
     <>
       <header
-        className="glass-card navbar-header"
+        className="navbar-header"
         style={{
-          borderRadius: 0,
-          borderTop: 'none',
-          borderLeft: 'none',
-          borderRight: 'none',
           padding: '0.65rem 1.25rem',
           display: 'flex',
           alignItems: 'center',
@@ -51,12 +47,12 @@ export const Navbar = ({ onToggleMobileSidebar }) => {
           position: 'sticky',
           top: 0,
           zIndex: 100,
-          background: 'rgba(7, 23, 44, 0.94)',
-          borderBottom: '1px solid rgba(250, 204, 21, 0.35)',
-          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)'
+          background: 'var(--bg-card)',
+          borderBottom: '1px solid var(--border-subtle)',
+          boxShadow: 'var(--shadow-sm)'
         }}
       >
-        {/* Mobile Sidebar Toggle & Church Branding & Dual Logos */}
+        {/* Mobile Hamburger & Branding */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <button
             onClick={onToggleMobileSidebar}
@@ -64,159 +60,162 @@ export const Navbar = ({ onToggleMobileSidebar }) => {
             style={{
               padding: '0.45rem',
               borderRadius: 'var(--radius-sm)',
-              color: 'var(--color-yellow-light)',
-              borderColor: 'rgba(250, 204, 21, 0.3)'
+              color: 'var(--color-primary-light)'
             }}
             title="القائمة"
+            aria-label="القائمة الرئيسية"
           >
-            <Menu size={22} />
+            <Menu size={20} />
           </button>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            {/* Logos: Church Seal & Sunday School Service */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+            {/* Logos */}
             <div style={{ display: 'flex', alignItems: 'center', position: 'relative' }}>
               <div style={{
-                position: 'relative',
-                width: '46px',
-                height: '46px',
+                width: '38px',
+                height: '38px',
                 borderRadius: '50%',
-                padding: '2px',
-                background: 'linear-gradient(135deg, #facc15 0%, #0284c7 100%)',
-                boxShadow: '0 0 14px rgba(250, 204, 21, 0.45)',
+                border: '2px solid var(--color-primary)',
+                overflow: 'hidden',
                 flexShrink: 0,
-                zIndex: 2
+                zIndex: 2,
+                background: 'var(--bg-secondary)'
               }}>
                 <img
                   src={churchLogo}
                   alt="شعار الكنيسة"
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    borderRadius: '50%',
-                    objectFit: 'cover'
-                  }}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 />
               </div>
 
               <div style={{
-                position: 'relative',
-                width: '40px',
-                height: '40px',
+                width: '32px',
+                height: '32px',
                 borderRadius: '50%',
-                padding: '2px',
-                background: 'linear-gradient(135deg, #38bdf8 0%, #facc15 100%)',
-                boxShadow: '0 0 10px rgba(56, 189, 248, 0.4)',
-                marginRight: '-12px',
+                border: '1.5px solid var(--color-gold)',
+                overflow: 'hidden',
+                marginRight: '-10px',
                 flexShrink: 0,
-                zIndex: 1
+                zIndex: 1,
+                background: 'var(--bg-secondary)'
               }}>
                 <img
                   src={serviceLogo}
                   alt="شعار الخدمة"
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    borderRadius: '50%',
-                    objectFit: 'cover'
-                  }}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 />
               </div>
             </div>
 
             <div>
-              <h2 style={{ fontSize: '1rem', fontWeight: 900, color: 'var(--color-yellow-light)', margin: 0, lineHeight: 1.25, textShadow: '0 2px 10px rgba(250, 204, 21, 0.3)' }}>
-                كنيسة الشهيد العظيم مارجرجس الروماني والأنبا شنودة رئيس المتوحدين
+              <h2 style={{
+                fontSize: '0.95rem',
+                fontWeight: 700,
+                color: 'var(--text-main)',
+                margin: 0,
+                lineHeight: 1.2
+              }}>
+                كنيسة مارجرجس والأنبا شنودة
               </h2>
-              <p className="navbar-subtitle" style={{ fontSize: '0.73rem', color: '#93c5fd', margin: 0, fontWeight: 700 }}>
-                عزبة شنوده - الكرور - أسوان | خدمة مدارس الأحد
+              <p className="navbar-subtitle" style={{
+                fontSize: '0.72rem',
+                color: 'var(--text-muted)',
+                margin: 0,
+                fontWeight: 500
+              }}>
+                الكرور - أسوان | خدمة مدارس الأحد
               </p>
             </div>
           </div>
         </div>
 
-        {/* Logged in Servant User Info & Actions */}
+        {/* User Info & Actions */}
         {user && (
-          <div className="navbar-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-            
+          <div className="navbar-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             {/* Communication Hub Notification Button */}
             <button
               onClick={() => setIsHubOpen(true)}
               className="btn btn-secondary"
               style={{
                 position: 'relative',
-                padding: '0.45rem 0.75rem',
-                gap: '0.35rem',
-                color: 'var(--color-gold-light)',
-                borderColor: 'rgba(212, 175, 55, 0.4)',
-                fontSize: '0.82rem'
+                padding: '0.4rem 0.75rem',
+                fontSize: '0.82rem',
+                gap: '0.35rem'
               }}
-              title="مركز التواصل والمهام الداخلي"
+              title="الرسائل والمهام"
             >
-              <MessageSquare size={17} />
-              <span className="navbar-text-hide-mobile">الرسائل والمهام</span>
+              <MessageSquare size={16} />
+              <span className="navbar-text-hide-mobile">الرسائل</span>
               {unreadCount > 0 && (
                 <span style={{
                   position: 'absolute',
-                  top: '-5px',
-                  right: '-5px',
-                  background: '#ef4444',
+                  top: '-4px',
+                  right: '-4px',
+                  background: 'var(--color-danger)',
                   color: '#fff',
-                  fontSize: '0.68rem',
-                  fontWeight: 900,
-                  width: '18px',
-                  height: '18px',
-                  borderRadius: '50%',
+                  fontSize: '0.65rem',
+                  fontWeight: 700,
+                  minWidth: '16px',
+                  height: '16px',
+                  borderRadius: '8px',
+                  padding: '0 4px',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: '0 0 10px rgba(239, 68, 68, 0.8)'
+                  justifyContent: 'center'
                 }}>
                   {unreadCount}
                 </span>
               )}
             </button>
 
+            {/* Servant Profile Indicator */}
             <div className="navbar-user-card" style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '0.6rem',
-              padding: '0.35rem 0.75rem',
-              background: 'rgba(59, 0, 11, 0.4)',
+              gap: '0.5rem',
+              padding: '0.35rem 0.65rem',
+              background: 'var(--bg-secondary)',
               borderRadius: 'var(--radius-sm)',
-              border: '1px solid rgba(212, 175, 55, 0.25)'
+              border: '1px solid var(--border-subtle)'
             }}>
               <div style={{
-                width: '32px',
-                height: '32px',
+                width: '28px',
+                height: '28px',
                 borderRadius: '50%',
-                background: 'rgba(212, 175, 55, 0.2)',
+                background: 'rgba(212, 175, 55, 0.15)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: 'var(--color-gold-light)',
+                color: 'var(--color-gold)',
                 flexShrink: 0
               }}>
-                <User size={18} />
+                <User size={16} />
               </div>
               <div className="navbar-user-info">
-                <div style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-main)', lineHeight: 1.2 }}>
                   {user.full_name}
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '1px' }}>
-                  <span className={`badge ${getRoleBadgeClass(user.role)}`} style={{ fontSize: '0.7rem', padding: '0.15rem 0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginTop: '1px' }}>
+                  <span className={`badge ${getRoleBadgeClass(user.role)}`} style={{ fontSize: '0.68rem', padding: '0.1rem 0.4rem' }}>
                     {user.role}
                   </span>
                 </div>
               </div>
             </div>
 
+            {/* Logout Button */}
             <button
               onClick={logout}
               className="btn btn-secondary"
-              style={{ padding: '0.45rem 0.75rem', fontSize: '0.82rem', color: '#f87171', borderColor: 'rgba(248, 113, 113, 0.3)' }}
+              style={{
+                padding: '0.4rem 0.65rem',
+                fontSize: '0.82rem',
+                color: 'var(--color-danger)',
+                borderColor: 'rgba(239, 68, 68, 0.25)'
+              }}
               title="تسجيل الخروج"
             >
-              <LogOut size={16} />
+              <LogOut size={15} />
               <span className="navbar-text-hide-mobile">خروج</span>
             </button>
           </div>

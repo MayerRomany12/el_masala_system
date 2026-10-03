@@ -12,14 +12,12 @@ import {
   Gift,
   Calendar,
   Sparkles,
-  QrCode,
   CreditCard,
   CheckCircle2,
   Cake,
   Award,
-  Settings,
-  ArrowRight,
-  CalendarCheck
+  CalendarCheck,
+  FolderKanban
 } from 'lucide-react';
 import churchLogo from '../assets/church_logo.png';
 import serviceLogo from '../assets/service_logo.png';
@@ -41,17 +39,21 @@ export const DashboardOverview = () => {
     const fetchMetrics = async () => {
       try {
         const [membersRes, sessionsRes, followupsRes, birthdaysRes] = await Promise.allSettled([
-          membersApi.getAll({ limit: 1 }),
+          membersApi.getStats ? membersApi.getStats() : membersApi.getMembers({ limit: 1 }),
           attendanceApi.listSessions({ limit: 1 }),
           followupApi.getStats(),
           birthdaysApi.getUpcoming({ days: 30 })
         ]);
 
+        const totalM = membersRes.status === 'fulfilled'
+          ? (membersRes.value?.data?.total || membersRes.value?.total || membersRes.value?.data?.items?.length || 0)
+          : 0;
+
         setMetrics({
-          totalMembers: membersRes.status === 'fulfilled' ? (membersRes.value.total || 0) : 0,
-          activeSessions: sessionsRes.status === 'fulfilled' ? (sessionsRes.value.data?.length || 0) : 0,
-          pendingFollowups: followupsRes.status === 'fulfilled' ? (followupsRes.value.data?.total_open || 0) : 0,
-          upcomingBirthdays: birthdaysRes.status === 'fulfilled' ? (birthdaysRes.value.data?.length || 0) : 0
+          totalMembers: totalM,
+          activeSessions: sessionsRes.status === 'fulfilled' ? (sessionsRes.value?.data?.length || 0) : 0,
+          pendingFollowups: followupsRes.status === 'fulfilled' ? (followupsRes.value?.data?.total_open || 0) : 0,
+          upcomingBirthdays: birthdaysRes.status === 'fulfilled' ? (birthdaysRes.value?.data?.length || 0) : 0
         });
       } catch (err) {
         console.error("Failed to load dashboard overview data", err);
@@ -65,37 +67,45 @@ export const DashboardOverview = () => {
 
   const stats = [
     {
-      title: 'إجمالي المخدومين المسجلين',
+      title: 'إجمالي المخدومين',
       value: metrics.totalMembers,
-      icon: <Users size={24} color="#38bdf8" />,
+      icon: <Users size={22} />,
+      iconColor: 'var(--color-primary-light)',
+      bgColor: 'rgba(56, 189, 248, 0.12)',
       link: '/members',
       desc: 'سجلات المخدومين بكافة الفصول'
     },
     {
-      title: 'جلسات الحضور النشطة',
+      title: 'جلسات الحضور',
       value: metrics.activeSessions,
-      icon: <CalendarCheck size={24} color="#34d399" />,
+      icon: <CalendarCheck size={22} />,
+      iconColor: 'var(--color-success)',
+      bgColor: 'rgba(52, 211, 153, 0.12)',
       link: '/attendance',
       desc: 'الجلسات المسجلة حديثاً'
     },
     {
       title: 'مهام افتقاد مفتوحة',
       value: metrics.pendingFollowups,
-      icon: <HeartHandshake size={24} color="#facc15" />,
+      icon: <HeartHandshake size={22} />,
+      iconColor: 'var(--color-gold)',
+      bgColor: 'rgba(212, 175, 55, 0.12)',
       link: '/followup',
-      desc: 'حالات غياب تحتاج متابعة ورعاية'
+      desc: 'حالات تحتاج متابعة وافتقاد'
     },
     {
-      title: 'أعياد ميلاد قادمة (30 يوم)',
+      title: 'أعياد ميلاد قادمة',
       value: metrics.upcomingBirthdays,
-      icon: <Gift size={24} color="#f472b6" />,
+      icon: <Gift size={22} />,
+      iconColor: '#f472b6',
+      bgColor: 'rgba(244, 114, 182, 0.12)',
       link: '/birthdays',
-      desc: 'فرص مباركة وتكريم المخدومين'
+      desc: 'خلال 30 يوماً القادمة'
     }
   ];
 
   return (
-    <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', paddingBottom: '2.5rem' }}>
       
       {/* Welcome Church Header Banner */}
       <div className="glass-card" style={{
@@ -103,87 +113,76 @@ export const DashboardOverview = () => {
         alignItems: 'center',
         justifyContent: 'space-between',
         flexWrap: 'wrap',
-        gap: '1.5rem',
-        background: 'linear-gradient(135deg, rgba(8, 28, 54, 0.9) 0%, rgba(4, 15, 30, 0.95) 100%)',
-        border: '1px solid rgba(250, 204, 21, 0.3)',
-        boxShadow: '0 10px 30px rgba(2, 132, 199, 0.3)'
+        gap: '1.25rem',
+        padding: '1.5rem'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
           {/* Dual Logos */}
-          <div style={{ display: 'flex', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', position: 'relative' }}>
             <div style={{
-              position: 'relative',
-              width: '74px',
-              height: '74px',
+              width: '56px',
+              height: '56px',
               borderRadius: '50%',
-              padding: '3px',
-              background: 'linear-gradient(135deg, #facc15 0%, #0284c7 100%)',
-              boxShadow: '0 0 20px rgba(250, 204, 21, 0.45)',
-              zIndex: 2
+              border: '2px solid var(--color-primary)',
+              overflow: 'hidden',
+              zIndex: 2,
+              background: 'var(--bg-secondary)',
+              flexShrink: 0
             }}>
               <img
                 src={churchLogo}
                 alt="شعار الكنيسة"
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  borderRadius: '50%',
-                  objectFit: 'cover'
-                }}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
               />
             </div>
+
             <div style={{
-              position: 'relative',
-              width: '64px',
-              height: '64px',
+              width: '46px',
+              height: '46px',
               borderRadius: '50%',
-              padding: '2px',
-              background: 'linear-gradient(135deg, #38bdf8 0%, #facc15 100%)',
-              boxShadow: '0 0 15px rgba(56, 189, 248, 0.4)',
-              marginRight: '-18px',
-              zIndex: 1
+              border: '1.5px solid var(--color-gold)',
+              overflow: 'hidden',
+              marginRight: '-14px',
+              zIndex: 1,
+              background: 'var(--bg-secondary)',
+              flexShrink: 0
             }}>
               <img
                 src={serviceLogo}
                 alt="شعار الخدمة"
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  borderRadius: '50%',
-                  objectFit: 'cover'
-                }}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
               />
             </div>
           </div>
 
           <div>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-yellow-light)', fontSize: '0.88rem', fontWeight: 800, marginBottom: '0.3rem' }}>
-              <Sparkles size={18} />
-              <span>مرحباً بك في منظومة خدمة مدارس الأحد</span>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', color: 'var(--color-gold)', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.2rem' }}>
+              <Sparkles size={16} />
+              <span>منظومة خدمة مدارس الأحد</span>
             </div>
-            <h1 style={{ fontSize: '1.65rem', fontWeight: 900, color: 'var(--text-main)', marginBottom: '0.3rem' }}>
-              أهلاً بك، {user?.full_name} 👋
+            <h1 style={{ fontSize: '1.45rem', fontWeight: 800, color: 'var(--text-main)', margin: '0 0 0.25rem' }}>
+              أهلاً بك، {user?.full_name}
             </h1>
-            <p style={{ color: '#93c5fd', fontSize: '0.9rem', maxWidth: '680px', margin: 0, fontWeight: 600 }}>
-              كنيسة الشهيد العظيم مارجرجس الروماني والأنبا شنودة رئيس المتوحدين — عزبة شنوده بالكرور (أسوان).
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0, fontWeight: 500 }}>
+              كنيسة مارجرجس والأنبا شنودة — عزبة شنوده بالكرور (أسوان)
             </p>
           </div>
         </div>
 
         <div style={{
-          background: 'rgba(6, 20, 38, 0.85)',
-          border: '1px solid rgba(250, 204, 21, 0.3)',
-          borderRadius: 'var(--radius-md)',
-          padding: '1rem 1.25rem',
+          background: 'var(--bg-secondary)',
+          border: '1px solid var(--border-subtle)',
+          borderRadius: 'var(--radius-sm)',
+          padding: '0.75rem 1.25rem',
           textAlign: 'center'
         }}>
-          <div style={{ fontSize: '0.78rem', color: 'var(--color-gold-light)', marginBottom: '0.2rem', fontWeight: 700 }}>صيغة معرف الطفل المعتمد</div>
-          <div style={{ fontSize: '1.3rem', fontWeight: 900, color: '#38bdf8', letterSpacing: '1px', fontFamily: 'monospace' }}>
-            K-XXXXXX
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.15rem', fontWeight: 600 }}>معرف المخدوم الدائم</div>
+          <div style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--color-primary-light)', letterSpacing: '1px', fontFamily: 'monospace' }}>
+            MEM-XXXXXX
           </div>
-          <div style={{ fontSize: '0.75rem', color: '#34d399', display: 'flex', alignItems: 'center', gap: '0.3rem', justifyContent: 'center', marginTop: '0.25rem', fontWeight: 700 }}>
-            <CheckCircle2 size={14} />
-            <span>Member ID ثابت ودائم</span>
+          <div style={{ fontSize: '0.72rem', color: 'var(--color-success)', display: 'flex', alignItems: 'center', gap: '0.3rem', justifyContent: 'center', marginTop: '0.2rem', fontWeight: 600 }}>
+            <CheckCircle2 size={13} />
+            <span>كود مشفر ثابت</span>
           </div>
         </div>
       </div>
@@ -194,16 +193,16 @@ export const DashboardOverview = () => {
           <div
             key={idx}
             className="glass-card stat-card"
-            onClick={stat.onClick}
-            style={{ cursor: 'pointer', transition: 'transform 0.2s ease, border-color 0.2s ease' }}
+            onClick={() => navigate(stat.link)}
+            style={{ cursor: 'pointer' }}
           >
-            <div className="stat-icon-box" style={{ background: stat.bgColor }}>
+            <div className="stat-icon-box" style={{ background: stat.bgColor, color: stat.iconColor }}>
               {stat.icon}
             </div>
             <div>
               <div className="stat-value">{loading ? '...' : stat.value}</div>
-              <div style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-main)' }}>{stat.title}</div>
-              <div className="stat-label">{stat.label}</div>
+              <div style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-main)' }}>{stat.title}</div>
+              <div className="stat-label" style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>{stat.desc}</div>
             </div>
           </div>
         ))}
@@ -211,46 +210,58 @@ export const DashboardOverview = () => {
 
       {/* Quick Action Tiles */}
       <div>
-        <h2 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '1rem', color: 'var(--color-gold-light)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <Sparkles size={20} style={{ color: '#d4af37' }} />
-          <span>وصول سريع لأقسام الخدمة الرئيسية</span>
+        <h2 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.85rem', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Sparkles size={18} style={{ color: 'var(--color-gold)' }} />
+          <span>الوصول السريع للخدمات</span>
         </h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
-          
-          <div className="glass-card" onClick={() => navigate('/attendance')} style={{ cursor: 'pointer', textAlign: 'center', padding: '1.5rem' }}>
-            <UserCheck color="#34d399" size={34} style={{ marginBottom: '0.75rem' }} />
-            <h3 style={{ fontSize: '1.05rem', fontWeight: 800, marginBottom: '0.25rem', color: 'var(--text-main)' }}>تسجيل حضور الجلسات</h3>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>المسح المصرح M5 وقارئ البطاقات</p>
+        
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+          <div className="glass-card" onClick={() => navigate('/attendance')} style={{ cursor: 'pointer', textAlign: 'center', padding: '1.25rem' }}>
+            <div style={{ width: '44px', height: '44px', margin: '0 auto 0.75rem', borderRadius: 'var(--radius-sm)', background: 'rgba(52, 211, 153, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-success)' }}>
+              <UserCheck size={24} />
+            </div>
+            <h3 style={{ fontSize: '0.98rem', fontWeight: 700, margin: '0 0 0.25rem', color: 'var(--text-main)' }}>تسجيل الحضور</h3>
+            <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0 }}>مسح باركود الـ QR والبطاقات</p>
           </div>
 
-          <div className="glass-card" onClick={() => navigate('/members')} style={{ cursor: 'pointer', textAlign: 'center', padding: '1.5rem' }}>
-            <Users color="#38bdf8" size={34} style={{ marginBottom: '0.75rem' }} />
-            <h3 style={{ fontSize: '1.05rem', fontWeight: 800, marginBottom: '0.25rem', color: 'var(--text-main)' }}>إدارة الأطفال والمخدومين</h3>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>إضافة وتعديل بيانات الأطفال K-ID</p>
+          <div className="glass-card" onClick={() => navigate('/members')} style={{ cursor: 'pointer', textAlign: 'center', padding: '1.25rem' }}>
+            <div style={{ width: '44px', height: '44px', margin: '0 auto 0.75rem', borderRadius: 'var(--radius-sm)', background: 'rgba(56, 189, 248, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-primary-light)' }}>
+              <Users size={24} />
+            </div>
+            <h3 style={{ fontSize: '0.98rem', fontWeight: 700, margin: '0 0 0.25rem', color: 'var(--text-main)' }}>قائمة المخدومين</h3>
+            <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0 }}>إضافة وتعديل بيانات الأطفال</p>
           </div>
 
-          <div className="glass-card" onClick={() => navigate('/cards')} style={{ cursor: 'pointer', textAlign: 'center', padding: '1.5rem' }}>
-            <CreditCard color="#fbbf24" size={34} style={{ marginBottom: '0.75rem' }} />
-            <h3 style={{ fontSize: '1.05rem', fontWeight: 800, marginBottom: '0.25rem', color: 'var(--text-main)' }}>طباعة البطاقات والـ QR</h3>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>قالب 1.585:1 بمقاسات الكنيسة الرسمية</p>
+          <div className="glass-card" onClick={() => navigate('/classes')} style={{ cursor: 'pointer', textAlign: 'center', padding: '1.25rem' }}>
+            <div style={{ width: '44px', height: '44px', margin: '0 auto 0.75rem', borderRadius: 'var(--radius-sm)', background: 'rgba(212, 175, 55, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-gold)' }}>
+              <FolderKanban size={24} />
+            </div>
+            <h3 style={{ fontSize: '0.98rem', fontWeight: 700, margin: '0 0 0.25rem', color: 'var(--text-main)' }}>الفصول والمجموعات</h3>
+            <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0 }}>توزيع الفصول والخدام المشرفين</p>
           </div>
 
-          <div className="glass-card" onClick={() => navigate('/followup')} style={{ cursor: 'pointer', textAlign: 'center', padding: '1.5rem' }}>
-            <HeartHandshake color="#f87171" size={34} style={{ marginBottom: '0.75rem' }} />
-            <h3 style={{ fontSize: '1.05rem', fontWeight: 800, marginBottom: '0.25rem', color: 'var(--text-main)' }}>متابعة الافتقاد والغياب</h3>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>كاشف الغائبين وتوثيق المكالمات M6</p>
+          <div className="glass-card" onClick={() => navigate('/cards')} style={{ cursor: 'pointer', textAlign: 'center', padding: '1.25rem' }}>
+            <div style={{ width: '44px', height: '44px', margin: '0 auto 0.75rem', borderRadius: 'var(--radius-sm)', background: 'rgba(245, 158, 11, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f59e0b' }}>
+              <CreditCard size={24} />
+            </div>
+            <h3 style={{ fontSize: '0.98rem', fontWeight: 700, margin: '0 0 0.25rem', color: 'var(--text-main)' }}>طباعة البطاقات</h3>
+            <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0 }}>تصدير وطباعة بطاقات الـ QR</p>
           </div>
 
-          <div className="glass-card" onClick={() => navigate('/rewards')} style={{ cursor: 'pointer', textAlign: 'center', padding: '1.5rem' }}>
-            <Award color="#fbbf24" size={34} style={{ marginBottom: '0.75rem' }} />
-            <h3 style={{ fontSize: '1.05rem', fontWeight: 800, marginBottom: '0.25rem', color: 'var(--text-main)' }}>المكافآت والخصومات</h3>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>نقاط الحضور وحاسبة خصم الرحلات M7</p>
+          <div className="glass-card" onClick={() => navigate('/followup')} style={{ cursor: 'pointer', textAlign: 'center', padding: '1.25rem' }}>
+            <div style={{ width: '44px', height: '44px', margin: '0 auto 0.75rem', borderRadius: 'var(--radius-sm)', background: 'rgba(239, 68, 68, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-danger)' }}>
+              <HeartHandshake size={24} />
+            </div>
+            <h3 style={{ fontSize: '0.98rem', fontWeight: 700, margin: '0 0 0.25rem', color: 'var(--text-main)' }}>متابعة الافتقاد</h3>
+            <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0 }}>متابعة الغياب والاتصالات</p>
           </div>
 
-          <div className="glass-card" onClick={() => navigate('/birthdays')} style={{ cursor: 'pointer', textAlign: 'center', padding: '1.5rem' }}>
-            <Cake color="#f43f5e" size={34} style={{ marginBottom: '0.75rem' }} />
-            <h3 style={{ fontSize: '1.05rem', fontWeight: 800, marginBottom: '0.25rem', color: 'var(--text-main)' }}>أعياد الميلاد والهدايا</h3>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>تهنئة الأطفال وتتبع تسليم الهدايا M8</p>
+          <div className="glass-card" onClick={() => navigate('/birthdays')} style={{ cursor: 'pointer', textAlign: 'center', padding: '1.25rem' }}>
+            <div style={{ width: '44px', height: '44px', margin: '0 auto 0.75rem', borderRadius: 'var(--radius-sm)', background: 'rgba(244, 63, 94, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f43f5e' }}>
+              <Cake size={24} />
+            </div>
+            <h3 style={{ fontSize: '0.98rem', fontWeight: 700, margin: '0 0 0.25rem', color: 'var(--text-main)' }}>أعياد الميلاد</h3>
+            <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0 }}>متابعة الهدايا والتهاني</p>
           </div>
         </div>
       </div>

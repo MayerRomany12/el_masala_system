@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import { membersApi } from '../api/members';
 import { cardsApi } from '../api/cards';
+import { apiClient } from '../api/client';
 import { MemberCard } from '../components/MemberCard';
 import { QRScanner } from '../components/QRScanner';
 import {
@@ -10,6 +12,7 @@ import {
   Printer,
   QrCode,
   Eye,
+  User,
   X,
   Sparkles,
   AlertCircle,
@@ -34,16 +37,19 @@ const STAGE_OPTIONS = [
 ];
 
 export const CardManagement = () => {
+  const navigate = useNavigate();
   // Page mode: 'list' or 'scan'
   const [mode, setMode] = useState('list');
 
   // Members list states
   const [members, setMembers] = useState([]);
+  const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedClassId, setSelectedClassId] = useState('');
   const [selectedStage, setSelectedStage] = useState('');
   const [page, setPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
@@ -53,13 +59,23 @@ export const CardManagement = () => {
   const [cardLoading, setCardLoading] = useState(false);
   const [activeSide, setActiveSide] = useState('front'); // 'front' or 'back'
 
+  useEffect(() => {
+    apiClient.get('/classes/?status=Active&limit=50')
+      .then(res => {
+        const data = res?.data?.data?.items || res?.data?.items || [];
+        setClasses(data);
+      })
+      .catch(() => setClasses([]));
+  }, []);
+
   const fetchMembers = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
       const res = await membersApi.getMembers({
-        search: searchTerm,
-        stage: selectedStage,
+        search: searchTerm || undefined,
+        class_id: selectedClassId || undefined,
+        stage: selectedStage || undefined,
         status: 'Active', // Default to active members for card issuance
         page,
         limit: 20
@@ -73,7 +89,7 @@ export const CardManagement = () => {
     } finally {
       setLoading(false);
     }
-  }, [searchTerm, selectedStage, page]);
+  }, [searchTerm, selectedClassId, selectedStage, page]);
 
   useEffect(() => {
     fetchMembers();
@@ -148,14 +164,28 @@ export const CardManagement = () => {
           />
         </div>
 
+        {/* Dynamic Class Filter */}
+        <div style={{ flex: '0 1 200px' }}>
+          <select
+            className="form-input"
+            value={selectedClassId}
+            onChange={(e) => { setSelectedClassId(e.target.value); setPage(1); }}
+          >
+            <option value="">كل الفصول الخدمية</option>
+            {classes.map((cls) => (
+              <option key={cls.class_id} value={cls.class_id}>{cls.name}</option>
+            ))}
+          </select>
+        </div>
+
         {/* Stage Filter */}
-        <div style={{ flex: '0 1 220px' }}>
+        <div style={{ flex: '0 1 180px' }}>
           <select
             className="form-input"
             value={selectedStage}
             onChange={(e) => { setSelectedStage(e.target.value); setPage(1); }}
           >
-            <option value="">كل المراحل الخدمية</option>
+            <option value="">كل المراحل</option>
             {STAGE_OPTIONS.map((stg) => (
               <option key={stg} value={stg}>{stg}</option>
             ))}
@@ -236,14 +266,25 @@ export const CardManagement = () => {
                       )}
                     </td>
                     <td>
-                      <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                         <button
                           onClick={() => handleOpenCard(member)}
                           className="btn btn-secondary"
-                          style={{ padding: '0.35rem 0.75rem', fontSize: '0.82rem', gap: '0.4rem' }}
+                          style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', gap: '0.35rem' }}
+                          title="معاينة وطباعة بطاقة العضوية"
                         >
-                          <Eye size={15} />
-                          <span>معاينة البطاقة</span>
+                          <Eye size={14} />
+                          <span>معاينة</span>
+                        </button>
+
+                        <button
+                          onClick={() => navigate(`/members/${member.member_id}`)}
+                          className="btn btn-secondary"
+                          style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', gap: '0.35rem' }}
+                          title="عرض الملف الكامل للمخدوم"
+                        >
+                          <User size={14} />
+                          <span>الملف</span>
                         </button>
                       </div>
                     </td>
@@ -254,6 +295,31 @@ export const CardManagement = () => {
           </table>
         </div>
       </div>
+
+      {/* Pagination */}
+      {totalItems > 20 && (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1rem', padding: '0.5rem 0' }}>
+          <button
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            disabled={page <= 1}
+            className="btn btn-secondary"
+            style={{ padding: '0.45rem 1rem', fontSize: '0.85rem' }}
+          >
+            السابق
+          </button>
+          <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+            صفحة {page} من {Math.ceil(totalItems / 20)}
+          </span>
+          <button
+            onClick={() => setPage(p => p + 1)}
+            disabled={page >= Math.ceil(totalItems / 20)}
+            className="btn btn-secondary"
+            style={{ padding: '0.45rem 1rem', fontSize: '0.85rem' }}
+          >
+            التالي
+          </button>
+        </div>
+      )}
 
       {/* 4. Interactive Card Preview Modal */}
       {selectedMemberCard && (

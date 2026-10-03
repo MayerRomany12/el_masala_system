@@ -8,6 +8,8 @@ import { LoginPage } from './pages/LoginPage';
 import { DashboardOverview } from './pages/DashboardOverview';
 import { UserManagement } from './pages/UserManagement';
 import { MemberManagement } from './pages/MemberManagement';
+import { MemberFormPage } from './pages/MemberFormPage';
+import { MemberProfilePage } from './pages/MemberProfilePage';
 import { CardManagement } from './pages/CardManagement';
 import { EventManagement } from './pages/EventManagement';
 import { AttendanceManagement } from './pages/AttendanceManagement';
@@ -19,6 +21,8 @@ import { ReportManagement } from './pages/ReportManagement';
 import { QRScanner } from './components/QRScanner';
 
 import { ClassManagement } from './pages/ClassManagement';
+import { ClassFormPage } from './pages/ClassFormPage';
+import { ClassDetailsPage } from './pages/ClassDetailsPage';
 import { SummerActivityManagement } from './pages/SummerActivityManagement';
 
 const ProtectedLayout = () => {
@@ -32,12 +36,12 @@ const ProtectedLayout = () => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'var(--bg-gradient)',
+        background: 'var(--bg-main)',
         color: 'var(--text-main)',
-        fontSize: '1.2rem',
+        fontSize: '1.1rem',
         fontWeight: 700
       }}>
-        جاري تهيئة منظومة الخدمة الكنسية...
+        جاري تهيئة منظومة الخدمة...
       </div>
     );
   }
@@ -55,8 +59,18 @@ const ProtectedLayout = () => {
           <Routes>
             <Route path="/" element={<DashboardOverview />} />
             <Route path="/users" element={<UserManagement />} />
+            
+            {/* Members Routes */}
             <Route path="/members" element={<MemberManagement />} />
+            <Route path="/members/new" element={<MemberFormPage />} />
+            <Route path="/members/:id/edit" element={<MemberFormPage />} />
+            <Route path="/members/:id" element={<MemberProfilePage />} />
+
+            {/* Classes Routes */}
             <Route path="/classes" element={<ClassManagement />} />
+            <Route path="/classes/new" element={<ClassFormPage />} />
+            <Route path="/classes/:id" element={<ClassDetailsPage />} />
+
             <Route path="/summer-activities" element={<SummerActivityManagement />} />
             <Route path="/cards" element={<CardManagement />} />
             <Route path="/scan" element={<QRScanner />} />

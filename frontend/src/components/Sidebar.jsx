@@ -10,7 +10,6 @@ import {
   QrCode,
   UserCheck,
   HeartHandshake,
-  Gift,
   Award,
   FileBarChart,
   UserCog,
@@ -19,89 +18,49 @@ import {
   X
 } from 'lucide-react';
 
+const navGroups = [
+  {
+    label: 'القائمة',
+    items: [
+      { title: 'الرئيسية', path: '/', icon: <LayoutDashboard size={18} />, permission: null }
+    ]
+  },
+  {
+    label: 'الأعضاء',
+    items: [
+      { title: 'المخدومين', path: '/members', icon: <Users size={18} />, permission: 'members:read' },
+      { title: 'البطاقات و QR', path: '/cards', icon: <CreditCard size={18} />, permission: 'members:read' },
+      { title: 'أعياد الميلاد', path: '/birthdays', icon: <Cake size={18} />, permission: 'birthdays:read' }
+    ]
+  },
+  {
+    label: 'الخدمة',
+    items: [
+      { title: 'الفصول والمجموعات', path: '/classes', icon: <FolderKanban size={18} />, permission: 'classes:manage' },
+      { title: 'النشاط الصيفي', path: '/summer-activities', icon: <Calendar size={18} />, permission: 'classes:manage' },
+      { title: 'الأنشطة والرحلات', path: '/events', icon: <QrCode size={18} />, permission: 'events:read' }
+    ]
+  },
+  {
+    label: 'الحضور والمتابعة',
+    items: [
+      { title: 'تسجيل الحضور', path: '/attendance', icon: <UserCheck size={18} />, permission: 'attendance:scan' },
+      { title: 'الافتقاد والغياب', path: '/followup', icon: <HeartHandshake size={18} />, permission: 'followup:read' },
+      { title: 'المكافآت', path: '/rewards', icon: <Award size={18} />, permission: 'rewards:manage' }
+    ]
+  },
+  {
+    label: 'النظام',
+    items: [
+      { title: 'المستخدمين', path: '/users', icon: <UserCog size={18} />, permission: 'users:read' },
+      { title: 'الإعدادات', path: '/settings', icon: <Settings size={18} />, permission: 'settings:write' },
+      { title: 'التقارير', path: '/reports', icon: <FileBarChart size={18} />, permission: 'reports:export' }
+    ]
+  }
+];
+
 export const Sidebar = ({ mobileOpen, setMobileOpen }) => {
   const { hasPermission } = useAuth();
-
-  const navItems = [
-    {
-      title: 'الرئيسية والملخص',
-      path: '/',
-      icon: <LayoutDashboard size={19} />,
-      permission: null
-    },
-    {
-      title: 'الأعضاء والأطفال',
-      path: '/members',
-      icon: <Users size={19} />,
-      permission: 'members:read'
-    },
-    {
-      title: 'إدارة الفصول والمجموعات',
-      path: '/classes',
-      icon: <FolderKanban size={19} />,
-      permission: 'classes:manage'
-    },
-    {
-      title: 'قطاع النشاط الصيفي',
-      path: '/summer-activities',
-      icon: <Calendar size={19} />,
-      permission: 'classes:manage'
-    },
-    {
-      title: 'بطاقات العضوية و QR',
-      path: '/cards',
-      icon: <CreditCard size={19} />,
-      permission: 'members:read'
-    },
-    {
-      title: 'الأنشطة والرحلات',
-      path: '/events',
-      icon: <QrCode size={19} />,
-      permission: 'events:read'
-    },
-    {
-      title: 'تسجيل الحضور (جهاز)',
-      path: '/attendance',
-      icon: <UserCheck size={19} />,
-      permission: 'attendance:scan'
-    },
-    {
-      title: 'متابعة الافتقاد والغياب',
-      path: '/followup',
-      icon: <HeartHandshake size={19} />,
-      permission: 'followup:read'
-    },
-    {
-      title: 'المكافآت والخصومات',
-      path: '/rewards',
-      icon: <Award size={19} />,
-      permission: 'rewards:manage'
-    },
-    {
-      title: 'أعياد الميلاد والهدايا',
-      path: '/birthdays',
-      icon: <Cake size={19} />,
-      permission: 'birthdays:read'
-    },
-    {
-      title: 'إدارة المستخدمين',
-      path: '/users',
-      icon: <UserCog size={19} />,
-      permission: 'users:read'
-    },
-    {
-      title: 'إعدادات النظام',
-      path: '/settings',
-      icon: <Settings size={19} />,
-      permission: 'settings:write'
-    },
-    {
-      title: 'التقارير والإحصائيات',
-      path: '/reports',
-      icon: <FileBarChart size={19} />,
-      permission: 'reports:export'
-    }
-  ];
 
   const handleNavClick = () => {
     if (setMobileOpen) {
@@ -111,7 +70,7 @@ export const Sidebar = ({ mobileOpen, setMobileOpen }) => {
 
   return (
     <>
-      {/* Mobile Drawer Overlay Backdrop */}
+      {/* Mobile Backdrop */}
       {mobileOpen && (
         <div
           className="sidebar-backdrop"
@@ -120,57 +79,62 @@ export const Sidebar = ({ mobileOpen, setMobileOpen }) => {
       )}
 
       <aside className={`app-sidebar ${mobileOpen ? 'mobile-open' : ''}`}>
+        {/* Mobile Close Button */}
         <div style={{
-          fontSize: '0.82rem',
-          fontWeight: 800,
-          color: 'var(--color-gold-light)',
-          padding: '0 0.5rem 0.75rem 0',
-          borderBottom: '1px solid rgba(212, 175, 55, 0.15)',
-          marginBottom: '0.5rem',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          letterSpacing: '0.03em'
+          padding: '0 0.5rem 0.5rem',
+          borderBottom: '1px solid var(--surface-border)',
+          marginBottom: '0.5rem'
         }}>
-          <span>قائمة الخدمات والأنشطة</span>
+          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)' }}>
+            نظام المسلة
+          </span>
           <button
             onClick={() => setMobileOpen && setMobileOpen(false)}
             className="btn btn-secondary sidebar-close-btn"
             style={{ padding: '0.25rem', border: 'none', background: 'transparent', color: 'var(--text-muted)' }}
           >
-            <X size={20} />
+            <X size={18} />
           </button>
         </div>
 
-        <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-          {navItems.map((item) => {
-            if (item.permission && !hasPermission(item.permission)) {
-              return null;
-            }
+        <nav style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+          {navGroups.map((group) => {
+            const visibleItems = group.items.filter(
+              item => !item.permission || hasPermission(item.permission)
+            );
+            if (visibleItems.length === 0) return null;
+
             return (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                onClick={handleNavClick}
-                className={({ isActive }) => `btn ${isActive ? 'btn-primary' : 'btn-secondary'}`}
-                style={({ isActive }) => ({
-                  justifyContent: 'flex-start',
-                  width: '100%',
-                  padding: '0.72rem 1rem',
-                  fontSize: '0.88rem',
-                  borderRadius: 'var(--radius-sm)',
-                  border: isActive ? '1px solid rgba(250, 204, 21, 0.45)' : '1px solid transparent',
-                  borderRight: isActive ? '4px solid #facc15' : '1px solid transparent',
-                  background: isActive ? 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)' : 'transparent',
-                  color: isActive ? '#ffffff' : 'var(--text-muted)',
-                  boxShadow: isActive ? '0 4px 15px rgba(2, 132, 199, 0.5)' : 'none',
-                  fontWeight: isActive ? 800 : 600,
-                  transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
-                })}
-              >
-                {item.icon}
-                <span>{item.title}</span>
-              </NavLink>
+              <div key={group.label}>
+                <div className="sidebar-group-title">{group.label}</div>
+                {visibleItems.map((item) => (
+                  <NavLink
+                    key={item.path}
+                    to={item.path}
+                    onClick={handleNavClick}
+                    end={item.path === '/'}
+                    className={({ isActive }) => `btn ${isActive ? 'btn-primary' : 'btn-secondary'}`}
+                    style={({ isActive }) => ({
+                      justifyContent: 'flex-start',
+                      width: '100%',
+                      padding: '0.55rem 0.85rem',
+                      fontSize: '0.84rem',
+                      borderRadius: 'var(--radius-sm)',
+                      border: isActive ? '1px solid rgba(59, 158, 222, 0.3)' : '1px solid transparent',
+                      background: isActive ? 'var(--color-blue-main)' : 'transparent',
+                      color: isActive ? '#ffffff' : 'var(--text-muted)',
+                      fontWeight: isActive ? 700 : 500,
+                      marginBottom: '2px'
+                    })}
+                  >
+                    {item.icon}
+                    <span>{item.title}</span>
+                  </NavLink>
+                ))}
+              </div>
             );
           })}
         </nav>
