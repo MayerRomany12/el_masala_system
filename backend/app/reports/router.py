@@ -4,7 +4,7 @@ from datetime import date
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.auth.dependencies import get_current_user, require_permission
+from app.auth.dependencies import get_current_user, require_permission, get_servant_class_ids
 from app.reports.service import ReportsService
 from app.shared.response import success_response
 
@@ -14,14 +14,83 @@ router = APIRouter(prefix="/reports", tags=["Analytics, Reports & Data Export En
 @router.get("/attendance", response_model=dict)
 async def get_attendance_report(
     stage: Optional[str] = Query(None),
+    class_id: Optional[str] = Query(None),
     from_date: Optional[date] = Query(None),
     to_date: Optional[date] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user=Depends(require_permission("reports:export"))
 ):
+    allowed_class_ids = await get_servant_class_ids(current_user, db)
     service = ReportsService(db)
-    items = await service.get_attendance_report(stage=stage, from_date=from_date, to_date=to_date)
+    items = await service.get_attendance_report(
+        stage=stage,
+        class_id=class_id,
+        allowed_class_ids=allowed_class_ids,
+        from_date=from_date,
+        to_date=to_date
+    )
     return success_response(data={"items": items, "total": len(items)}, message="تم حساب تقرير الحضور والانتظام بنجاح")
+
+
+@router.get("/who-attended", response_model=dict)
+async def get_who_attended_report(
+    session_id: Optional[str] = Query(None),
+    class_id: Optional[str] = Query(None),
+    stage: Optional[str] = Query(None),
+    from_date: Optional[date] = Query(None),
+    to_date: Optional[date] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_permission("reports:export"))
+):
+    allowed_class_ids = await get_servant_class_ids(current_user, db)
+    service = ReportsService(db)
+    items = await service.get_who_attended_report(
+        session_id=session_id,
+        class_id=class_id,
+        stage=stage,
+        from_date=from_date,
+        to_date=to_date,
+        allowed_class_ids=allowed_class_ids
+    )
+    return success_response(data={"items": items, "total": len(items)}, message="تم إعداد كشف الحاضرين بنجاح")
+
+
+@router.get("/who-absent", response_model=dict)
+async def get_who_absent_report(
+    session_id: Optional[str] = Query(None),
+    class_id: Optional[str] = Query(None),
+    stage: Optional[str] = Query(None),
+    from_date: Optional[date] = Query(None),
+    to_date: Optional[date] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_permission("reports:export"))
+):
+    allowed_class_ids = await get_servant_class_ids(current_user, db)
+    service = ReportsService(db)
+    items = await service.get_who_was_absent_report(
+        session_id=session_id,
+        class_id=class_id,
+        stage=stage,
+        from_date=from_date,
+        to_date=to_date,
+        allowed_class_ids=allowed_class_ids
+    )
+    return success_response(data={"items": items, "total": len(items)}, message="تم إعداد كشف الغائبين بنجاح")
+
+
+@router.get("/member/{member_id}/print-profile")
+async def get_member_profile_print(
+    member_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_permission("reports:export"))
+):
+    service = ReportsService(db)
+    html_content = await service.generate_member_profile_report(member_id)
+    return Response(
+        content=html_content,
+        media_type="text/html; charset=utf-8",
+        headers={"Content-Disposition": f"inline; filename=member_profile_{member_id}.html"}
+    )
 
 
 @router.get("/financials", response_model=dict)
@@ -85,19 +154,25 @@ async def get_birthday_report(
 
 @router.get("/export/excel")
 async def export_excel(
-    report_type: str = Query("attendance", description="نوع التقرير: attendance, financials, members, followup, birthdays"),
+    report_type: str = Query("attendance", description="نوع التقرير: attendance, who_attended, who_absent, financials, members, followup, birthdays"),
     stage: Optional[str] = Query(None),
+    class_id: Optional[str] = Query(None),
+    session_id: Optional[str] = Query(None),
     event_type: Optional[str] = Query(None),
     from_date: Optional[date] = Query(None),
     to_date: Optional[date] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user=Depends(require_permission("reports:export"))
 ):
+    allowed_class_ids = await get_servant_class_ids(current_user, db)
     service = ReportsService(db)
     content, media_type, filename = await service.export_report(
         report_type=report_type,
         export_format="excel",
         stage=stage,
+        class_id=class_id,
+        session_id=session_id,
+        allowed_class_ids=allowed_class_ids,
         event_type=event_type,
         from_date=from_date,
         to_date=to_date
@@ -111,19 +186,25 @@ async def export_excel(
 
 @router.get("/export/csv")
 async def export_csv(
-    report_type: str = Query("attendance", description="نوع التقرير: attendance, financials, members, followup, birthdays"),
+    report_type: str = Query("attendance", description="نوع التقرير: attendance, who_attended, who_absent, financials, members, followup, birthdays"),
     stage: Optional[str] = Query(None),
+    class_id: Optional[str] = Query(None),
+    session_id: Optional[str] = Query(None),
     event_type: Optional[str] = Query(None),
     from_date: Optional[date] = Query(None),
     to_date: Optional[date] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user=Depends(require_permission("reports:export"))
 ):
+    allowed_class_ids = await get_servant_class_ids(current_user, db)
     service = ReportsService(db)
     content, media_type, filename = await service.export_report(
         report_type=report_type,
         export_format="csv",
         stage=stage,
+        class_id=class_id,
+        session_id=session_id,
+        allowed_class_ids=allowed_class_ids,
         event_type=event_type,
         from_date=from_date,
         to_date=to_date
@@ -137,19 +218,25 @@ async def export_csv(
 
 @router.get("/export/pdf")
 async def export_pdf(
-    report_type: str = Query("attendance", description="نوع التقرير: attendance, financials, members, followup, birthdays"),
+    report_type: str = Query("attendance", description="نوع التقرير: attendance, who_attended, who_absent, financials, members, followup, birthdays"),
     stage: Optional[str] = Query(None),
+    class_id: Optional[str] = Query(None),
+    session_id: Optional[str] = Query(None),
     event_type: Optional[str] = Query(None),
     from_date: Optional[date] = Query(None),
     to_date: Optional[date] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user=Depends(require_permission("reports:export"))
 ):
+    allowed_class_ids = await get_servant_class_ids(current_user, db)
     service = ReportsService(db)
     content, media_type, filename = await service.export_report(
         report_type=report_type,
         export_format="pdf",
         stage=stage,
+        class_id=class_id,
+        session_id=session_id,
+        allowed_class_ids=allowed_class_ids,
         event_type=event_type,
         from_date=from_date,
         to_date=to_date

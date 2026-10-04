@@ -14,6 +14,7 @@ ROLE_PERMISSIONS = {
     RoleEnum.SUPER_ADMIN: list(ALL_PERMISSIONS),
     RoleEnum.ADMIN: [
         "users:read",
+        "classes:read", "classes:manage",
         "members:read", "members:write", "members:archive",
         "cards:issue", "cards:revoke",
         "events:read", "events:write",
@@ -26,13 +27,37 @@ ROLE_PERMISSIONS = {
         "messages:send", "messages:manage"
     ],
     RoleEnum.SERVANT: [
-        "members:read",
+        "classes:read", "classes:manage",
+        "members:read", "members:write",
         "events:read",
         "attendance:session", "attendance:scan",
         "followup:read", "followup:write",
+        "birthdays:read",
+        "reports:read", "reports:export",
         "messages:send"
     ]
 }
+
+
+async def get_servant_class_ids(user: dict, db: AsyncSession) -> Optional[List[str]]:
+    """
+    Returns None if user is Super Admin (meaning unrestricted access to all classes).
+    Returns list of class_id strings for Admin / Servant based on active assignments.
+    """
+    role = user.get("role", RoleEnum.SERVANT)
+    if role in [RoleEnum.SUPER_ADMIN, "Super Admin"]:
+        return None  # Unrestricted
+
+    from app.models.class_group import ClassGroupServant
+    from sqlalchemy import select
+    res = await db.execute(
+        select(ClassGroupServant.class_id).where(
+            ClassGroupServant.servant_id == user.get("user_id"),
+            ClassGroupServant.is_active == True
+        )
+    )
+    return [str(row[0]) for row in res.all()]
+
 
 
 def get_permissions_for_role(role: str) -> List[str]:

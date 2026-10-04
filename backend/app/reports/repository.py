@@ -17,10 +17,21 @@ class ReportsRepository:
     async def get_attendance_report(
         self,
         stage: Optional[str] = None,
+        class_id: Optional[str] = None,
+        allowed_class_ids: Optional[List[str]] = None,
         from_date: Optional[date] = None,
         to_date: Optional[date] = None
     ) -> List[Dict[str, Any]]:
-        query = select(AttendanceSession).where(AttendanceSession.status != "Cancelled")
+        from app.models.class_group import ClassGroup
+        query = select(AttendanceSession, ClassGroup.name.label("class_name")).outerjoin(
+            ClassGroup, AttendanceSession.class_id == ClassGroup.class_id
+        ).where(AttendanceSession.status != "Cancelled")
+
+        if class_id:
+            query = query.where(AttendanceSession.class_id == class_id)
+        elif allowed_class_ids is not None:
+            query = query.where(AttendanceSession.class_id.in_(allowed_class_ids))
+
         if stage and stage != "ALL":
             stage_prefix = stage.split('-')[0].strip()
             query = query.where(
@@ -33,16 +44,23 @@ class ReportsRepository:
             query = query.where(AttendanceSession.session_date <= to_date)
 
         query = query.order_by(AttendanceSession.session_date.desc(), AttendanceSession.created_at.desc())
-        sessions = (await self.db.execute(query)).scalars().all()
+        sessions = (await self.db.execute(query)).all()
 
         results = []
-        for s in sessions:
-            # 1. Targeted Active Members (matching stage per M5 rules)
-            mem_q = select(func.count(Member.member_id)).where(Member.status == "Active")
-            if s.stage and s.stage != "ALL":
-                stg_pref = s.stage.split('-')[0].strip()
-                mem_q = mem_q.where(Member.stage.ilike(f"%{stg_pref}%"))
-            targeted_count = (await self.db.execute(mem_q)).scalar_one()
+        for s, class_name in sessions:
+            # 1. Targeted Active Members
+            if s.class_id:
+                from app.models.class_group import ClassGroupMember
+                target_q = select(func.count(ClassGroupMember.membership_id)).where(
+                    ClassGroupMember.class_id == s.class_id,
+                    ClassGroupMember.is_active == True
+                )
+            else:
+                target_q = select(func.count(Member.member_id)).where(Member.status == "Active")
+                if s.stage and s.stage != "ALL":
+                    stg_pref = s.stage.split('-')[0].strip()
+                    target_q = target_q.where(Member.stage.ilike(f"%{stg_pref}%"))
+            targeted_count = (await self.db.execute(target_q)).scalar_one()
 
             # 2. Present Valid Records only
             rec_q = select(func.count(AttendanceRecord.record_id)).where(
@@ -50,19 +68,161 @@ class ReportsRepository:
                 AttendanceRecord.status == "Valid"
             )
             present_count = (await self.db.execute(rec_q)).scalar_one()
-
             pct = round((present_count / targeted_count) * 100.0, 1) if targeted_count > 0 else 0.0
 
             results.append({
                 "session_id": s.session_id,
                 "session_date": str(s.session_date),
+                "class_id": s.class_id,
+                "class_name": class_name or "اجتماع عام",
                 "stage": s.stage,
                 "session_title": s.title or f"جلسة {s.stage}",
                 "targeted_members_count": targeted_count,
                 "present_count": present_count,
+                "absent_count": max(0, targeted_count - present_count),
                 "attendance_percentage": pct
             })
         return results
+
+    async def get_who_attended_report(
+        self,
+        session_id: Optional[str] = None,
+        class_id: Optional[str] = None,
+        stage: Optional[str] = None,
+        from_date: Optional[date] = None,
+        to_date: Optional[date] = None,
+        allowed_class_ids: Optional[List[str]] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        تقرير تفصيلي بأسماء المخدومين الحاضرين (مين حضر)
+        """
+        from app.models.class_group import ClassGroup
+        query = (
+            select(
+                AttendanceRecord,
+                Member,
+                AttendanceSession.session_date,
+                AttendanceSession.title.label("session_title"),
+                ClassGroup.name.label("class_name")
+            )
+            .join(Member, AttendanceRecord.member_id == Member.member_id)
+            .join(AttendanceSession, AttendanceRecord.session_id == AttendanceSession.session_id)
+            .outerjoin(ClassGroup, AttendanceSession.class_id == ClassGroup.class_id)
+            .where(AttendanceRecord.status == "Valid")
+        )
+
+        if session_id:
+            query = query.where(AttendanceRecord.session_id == session_id)
+        if class_id:
+            query = query.where(AttendanceSession.class_id == class_id)
+        elif allowed_class_ids is not None:
+            query = query.where(AttendanceSession.class_id.in_(allowed_class_ids))
+
+        if stage and stage != "ALL":
+            stage_prefix = stage.split('-')[0].strip()
+            query = query.where(or_(Member.stage.ilike(f"%{stage_prefix}%"), AttendanceSession.stage.ilike(f"%{stage_prefix}%")))
+        if from_date:
+            query = query.where(AttendanceSession.session_date >= from_date)
+        if to_date:
+            query = query.where(AttendanceSession.session_date <= to_date)
+
+        query = query.order_by(AttendanceSession.session_date.desc(), Member.full_name.asc())
+        rows = (await self.db.execute(query)).all()
+
+        results = []
+        for idx, (rec, mem, s_date, s_title, c_name) in enumerate(rows, 1):
+            results.append({
+                "index": idx,
+                "member_id": mem.member_id,
+                "full_name": mem.full_name,
+                "class_name": c_name or "اجتماع عام",
+                "stage": mem.stage,
+                "area": getattr(mem, "area", None) or "غير محدد",
+                "phone": mem.phone or "",
+                "session_date": str(s_date),
+                "session_title": s_title,
+                "method": rec.method,
+                "scanned_at": rec.scanned_at.strftime("%I:%M %p") if rec.scanned_at else ""
+            })
+        return results
+
+    async def get_who_was_absent_report(
+        self,
+        session_id: Optional[str] = None,
+        class_id: Optional[str] = None,
+        stage: Optional[str] = None,
+        from_date: Optional[date] = None,
+        to_date: Optional[date] = None,
+        allowed_class_ids: Optional[List[str]] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        تقرير تفصيلي بأسماء المخدومين الغائبين (مين غاب) لجلسة أو لفصل ومرحلة
+        """
+        from app.models.class_group import ClassGroup, ClassGroupMember
+
+        # First find matching sessions
+        s_query = select(AttendanceSession, ClassGroup.name.label("class_name")).outerjoin(
+            ClassGroup, AttendanceSession.class_id == ClassGroup.class_id
+        ).where(AttendanceSession.status.in_(["Open", "Completed"]))
+
+        if session_id:
+            s_query = s_query.where(AttendanceSession.session_id == session_id)
+        if class_id:
+            s_query = s_query.where(AttendanceSession.class_id == class_id)
+        elif allowed_class_ids is not None:
+            s_query = s_query.where(AttendanceSession.class_id.in_(allowed_class_ids))
+
+        if stage and stage != "ALL":
+            s_query = s_query.where(AttendanceSession.stage.ilike(f"%{stage.split('-')[0].strip()}%"))
+        if from_date:
+            s_query = s_query.where(AttendanceSession.session_date >= from_date)
+        if to_date:
+            s_query = s_query.where(AttendanceSession.session_date <= to_date)
+
+        s_query = s_query.order_by(AttendanceSession.session_date.desc()).limit(20)
+        sessions = (await self.db.execute(s_query)).all()
+
+        absent_records = []
+        idx = 1
+        for s, c_name in sessions:
+            # Get members that belong to this session
+            if s.class_id:
+                mem_q = select(Member).join(ClassGroupMember, Member.member_id == ClassGroupMember.member_id).where(
+                    ClassGroupMember.class_id == s.class_id,
+                    ClassGroupMember.is_active == True,
+                    Member.is_archived == False
+                )
+            else:
+                mem_q = select(Member).where(Member.is_archived == False, Member.status == "Active")
+                if s.stage and s.stage != "ALL":
+                    mem_q = mem_q.where(Member.stage.ilike(f"%{s.stage.split('-')[0].strip()}%"))
+
+            members = (await self.db.execute(mem_q.order_by(Member.full_name.asc()))).scalars().all()
+
+            # Find who attended
+            rec_q = select(AttendanceRecord.member_id).where(
+                AttendanceRecord.session_id == s.session_id,
+                AttendanceRecord.status == "Valid"
+            )
+            attended_mids = set((await self.db.execute(rec_q)).scalars().all())
+
+            for m in members:
+                if m.member_id not in attended_mids:
+                    absent_records.append({
+                        "index": idx,
+                        "member_id": m.member_id,
+                        "full_name": m.full_name,
+                        "class_name": c_name or "اجتماع عام",
+                        "stage": m.stage,
+                        "area": getattr(m, "area", None) or "غير محدد",
+                        "phone": m.phone or "",
+                        "whatsapp_phone": getattr(m, "whatsapp_phone", None) or m.phone or "",
+                        "session_date": str(s.session_date),
+                        "session_title": s.title
+                    })
+                    idx += 1
+
+        return absent_records
 
     async def get_financial_report(
         self,

@@ -25,6 +25,23 @@ export const reportsApi = {
     return response.data;
   },
 
+  // GET /reports/who-attended — Attended list
+  getWhoAttendedReport: async (params = {}) => {
+    const response = await apiClient.get('/reports/who-attended', { params });
+    return response.data;
+  },
+
+  // GET /reports/who-absent — Absent list
+  getWhoAbsentReport: async (params = {}) => {
+    const response = await apiClient.get('/reports/who-absent', { params });
+    return response.data;
+  },
+
+  // GET /reports/member/{id}/print-profile — Print member profile URL
+  getMemberProfilePrintUrl: (memberId) => {
+    return `${apiClient.defaults.baseURL || '/api/v1'}/reports/member/${memberId}/print-profile`;
+  },
+
   // GET /reports/export/{format} — Authenticated Blob Download
   downloadExport: async (reportType, format, params = {}) => {
     const response = await apiClient.get(`/reports/export/${format}`, {

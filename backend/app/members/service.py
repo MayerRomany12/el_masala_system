@@ -36,7 +36,7 @@ class MemberService:
         member_dict = data.model_dump()
 
         # Sanitize optional fields: convert empty string or whitespace to None
-        for key in ["date_of_birth", "group_name", "father_of_confession", "address", "notes", "secondary_phone", "member_phone", "whatsapp_phone", "photo_url"]:
+        for key in ["date_of_birth", "group_name", "father_of_confession", "address", "notes", "secondary_phone", "member_phone", "whatsapp_phone", "email", "area", "photo_url"]:
             if key in member_dict and member_dict[key] is not None:
                 if isinstance(member_dict[key], str) and not member_dict[key].strip():
                     member_dict[key] = None
@@ -114,7 +114,9 @@ class MemberService:
         search: Optional[str] = None,
         stage: Optional[str] = None,
         class_id: Optional[str] = None,
+        area: Optional[str] = None,
         status: Optional[str] = None,
+        allowed_class_ids: Optional[List[str]] = None,
         page: int = 1,
         limit: int = 50,
     ) -> Dict[str, Any]:
@@ -123,9 +125,19 @@ class MemberService:
         skip = (page - 1) * limit
 
         items, total = await self.repository.get_members(
-            search=search, stage=stage, class_id=class_id, status=status, skip=skip, limit=limit
+            search=search, stage=stage, class_id=class_id, area=area, status=status,
+            allowed_class_ids=allowed_class_ids, skip=skip, limit=limit
         )
         return {"total": total, "page": page, "limit": limit, "items": items}
+
+    async def get_member_attendance_history(self, member_id: str) -> Dict[str, Any]:
+        existing = await self.repository.get_by_member_id(member_id)
+        if not existing:
+            raise NotFoundException(f"المخدوم برقم العضوية {member_id} غير موجود")
+        return await self.repository.get_member_attendance_history(member_id)
+
+    async def get_distinct_areas(self) -> List[str]:
+        return await self.repository.get_distinct_areas()
 
     async def update_member(self, member_id: str, data: MemberUpdate) -> Dict[str, Any]:
         existing = await self.repository.get_by_member_id(member_id)
@@ -137,7 +149,7 @@ class MemberService:
             return existing
 
         # Sanitize empty string fields to None
-        for key in ["date_of_birth", "group_name", "father_of_confession", "address", "notes", "secondary_phone", "member_phone", "whatsapp_phone", "photo_url"]:
+        for key in ["date_of_birth", "group_name", "father_of_confession", "address", "notes", "secondary_phone", "member_phone", "whatsapp_phone", "email", "area", "photo_url"]:
             if key in update_fields and update_fields[key] is not None:
                 if isinstance(update_fields[key], str) and not update_fields[key].strip():
                     update_fields[key] = None

@@ -47,5 +47,11 @@ export const followupApi = {
   escalateTask: async (id) => {
     const response = await apiClient.patch(`/followup/tasks/${id}/escalate`);
     return response.data;
+  },
+
+  // GET /followup/tasks/by-area — Grouped tasks by residential area for targeted visits
+  getTasksByArea: async (params = {}) => {
+    const response = await apiClient.get('/followup/tasks/by-area', { params });
+    return response.data;
   }
 };

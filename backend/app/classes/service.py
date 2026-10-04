@@ -31,6 +31,7 @@ class ClassService:
         stage: Optional[str] = None,
         status: Optional[str] = None,
         is_active: Optional[bool] = None,
+        allowed_class_ids: Optional[List[str]] = None,
         limit: int = 100
     ) -> List[Dict[str, Any]]:
         return await self.repo.list_classes(
@@ -39,6 +40,7 @@ class ClassService:
             stage=stage,
             status=status,
             is_active=is_active,
+            allowed_class_ids=allowed_class_ids,
             limit=limit
         )
 

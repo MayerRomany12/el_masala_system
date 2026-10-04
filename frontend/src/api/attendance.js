@@ -64,5 +64,21 @@ export const attendanceApi = {
   cancelRecord: async (recordId, cancellationReason) => {
     const response = await apiClient.patch(`/attendance/records/${recordId}/cancel`, { cancellation_reason: cancellationReason });
     return response.data;
+  },
+
+  // GET /attendance/sessions/{id}/sheet — Numbered class attendance sheet
+  getSessionSheet: async (sessionId, search = '') => {
+    const response = await apiClient.get(`/attendance/sessions/${sessionId}/sheet`, {
+      params: { search: search || undefined }
+    });
+    return response.data;
+  },
+
+  // POST /attendance/sessions/{id}/toggle — Instant 1-click present/absent toggle
+  toggleMemberAttendance: async (sessionId, memberId) => {
+    const response = await apiClient.post(`/attendance/sessions/${sessionId}/toggle`, {
+      member_id: memberId
+    });
+    return response.data;
   }
 };

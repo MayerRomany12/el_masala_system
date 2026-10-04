@@ -3,7 +3,9 @@ import { Html5Qrcode } from 'html5-qrcode';
 import { apiClient } from '../api/client';
 import { attendanceApi } from '../api/attendance';
 import { membersApi } from '../api/members';
-import { eventsApi } from '../api/events';
+import { getPhotoUrl } from '../utils/photo';
+import { getWaUrl } from '../utils/phone';
+import { WhatsAppButton } from '../components/WhatsAppButton';
 import {
   UserCheck,
   QrCode,
@@ -26,58 +28,63 @@ import {
   CheckCircle2,
   Clock,
   ShieldCheck,
-  Award,
-  GraduationCap,
+  Printer,
+  FileSpreadsheet,
+  Download,
+  Filter,
+  Phone,
+  MessageSquare,
   Layers,
-  Zap
+  ChevronDown
 } from 'lucide-react';
 
-const STAGE_OPTIONS = [
-  'ALL',
-  'حضانة (KG1 & KG2)',
-  'ابتدائي - الصف الأول',
-  'ابتدائي - الصف الثاني',
-  'ابتدائي - الصف الثالث',
-  'ابتدائي - الصف الرابع',
-  'ابتدائي - الصف الخامس',
-  'ابتدائي - الصف السادس',
-  'إعدادي - الصف الأول',
-  'إعدادي - الصف الثاني',
-  'إعدادي - الصف الثالث',
-  'ثانوي',
-  'جامعة وخريجين'
-];
-
 export const AttendanceManagement = () => {
-  // Sessions states
+  // Classes & Sessions states
+  const [classesList, setClassesList] = useState([]);
+  const [selectedClassId, setSelectedClassId] = useState('');
   const [sessions, setSessions] = useState([]);
   const [selectedSession, setSelectedSession] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Classes list for class-first session creation
-  const [classesList, setClassesList] = useState([]);
+  // Numbered Class Attendance Sheet states
+  const [sheetItems, setSheetItems] = useState([]);
+  const [sheetStats, setSheetStats] = useState({
+    total_members: 0,
+    present_count: 0,
+    absent_count: 0,
+    attendance_rate: 0
+  });
+  const [sheetLoading, setSheetLoading] = useState(false);
+  const [sheetSearch, setSheetSearch] = useState('');
+  const [filterTab, setFilterTab] = useState('ALL'); // 'ALL' | 'PRESENT' | 'ABSENT'
+  const [togglingMemberId, setTogglingMemberId] = useState(null);
 
-  // Live Records states
-  const [records, setRecords] = useState([]);
-  const [recLoading, setRecLoading] = useState(false);
-  const [recSearch, setRecSearch] = useState('');
-
-  // Scanner & Motor Input States
+  // QR Camera Modal & Scanner State
+  const [isScannerModalOpen, setIsScannerModalOpen] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
-  const [manualInput, setManualInput] = useState('');
-  const [scanFeedback, setScanFeedback] = useState(null); // { type: 'success'|'warning'|'error', message: '' }
-  const [scanSubmitting, setScanSubmitting] = useState(false);
+  const [scanFeedback, setScanFeedback] = useState(null);
+  const [recentScanResult, setRecentScanResult] = useState(null);
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
 
-  // Scanner Lock & Cooldown Engine (Eliminates Jitter & Continuous Rapid Re-triggers)
+  const scannerContainerId = 'qr-attendance-viewfinder';
+  const html5QrcodeRef = useRef(null);
   const isScanLockedRef = useRef(false);
   const lastScannedTokenRef = useRef('');
   const cooldownIntervalRef = useRef(null);
   const cooldownTimeoutRef = useRef(null);
-  const [cooldownSeconds, setCooldownSeconds] = useState(0);
-  const [recentScanResult, setRecentScanResult] = useState(null);
 
-  // Web Audio API Audio Synthesizer (Instant acoustic feedback)
+  // New Session Modal
+  const [isSessionModalOpen, setIsSessionModalOpen] = useState(false);
+  const [sessionFormData, setSessionFormData] = useState({
+    class_id: '',
+    title: '',
+    session_date: new Date().toISOString().split('T')[0],
+    recurrence: 'Weekly'
+  });
+  const [sessionFormLoading, setSessionFormLoading] = useState(false);
+
+  // Audio Synthesizer (Instant acoustic feedback)
   const playFeedbackSound = useCallback((type) => {
     try {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
@@ -89,25 +96,22 @@ export const AttendanceManagement = () => {
       gain.connect(ctx.destination);
 
       if (type === 'success') {
-        // High bright pleasant two-tone chime
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
-        osc.frequency.setValueAtTime(880, ctx.currentTime + 0.12); // A5
+        osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+        osc.frequency.setValueAtTime(880, ctx.currentTime + 0.12);
         gain.gain.setValueAtTime(0.28, ctx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.42);
         osc.start(ctx.currentTime);
         osc.stop(ctx.currentTime + 0.42);
       } else if (type === 'warning') {
-        // Warm medium double warble
         osc.type = 'triangle';
-        osc.frequency.setValueAtTime(493.88, ctx.currentTime); // B4
-        osc.frequency.setValueAtTime(415.30, ctx.currentTime + 0.14); // G#4
+        osc.frequency.setValueAtTime(493.88, ctx.currentTime);
+        osc.frequency.setValueAtTime(415.30, ctx.currentTime + 0.14);
         gain.gain.setValueAtTime(0.32, ctx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
         osc.start(ctx.currentTime);
         osc.stop(ctx.currentTime + 0.45);
       } else if (type === 'error') {
-        // Low buzz tone
         osc.type = 'sawtooth';
         osc.frequency.setValueAtTime(220, ctx.currentTime);
         osc.frequency.setValueAtTime(155, ctx.currentTime + 0.14);
@@ -117,117 +121,42 @@ export const AttendanceManagement = () => {
         osc.stop(ctx.currentTime + 0.45);
       }
     } catch (e) {
-      // Audio playback fails silently if browser blocks autoplay
+      // Audio fails silently if blocked
     }
   }, []);
 
-  // New Session Modal
-  const [isSessionModalOpen, setIsSessionModalOpen] = useState(false);
-  const [sessionFormData, setSessionFormData] = useState({
-    class_id: '',
-    title: '',
-    session_date: new Date().toISOString().split('T')[0],
-    stage: 'ALL',
-    recurrence: 'Weekly',
-    event_id: ''
-  });
-  const [sessionFormLoading, setSessionFormLoading] = useState(false);
-
-  // Device Modal
-  const [isDeviceModalOpen, setIsDeviceModalOpen] = useState(false);
-  const [devices, setDevices] = useState([]);
-  const [deviceName, setDeviceName] = useState('تابلت خدمة الكنيسة');
-  const [activeDeviceToken, setActiveDeviceToken] = useState(() => localStorage.getItem('almasalla_device_token') || '');
-
-  // Cancel Attendance Modal
-  const [cancellingRecord, setCancellingRecord] = useState(null);
-  const [cancelReason, setCancelReason] = useState('');
-  const [cancelLoading, setCancelLoading] = useState(false);
-
-  const html5QrcodeRef = useRef(null);
-  const scannerContainerId = 'attendance-qr-reader';
-
-  // Fetch Classes for Class-first session creation
+  // 1. Fetch Assigned Classes
   const fetchClasses = useCallback(async () => {
     try {
-      const res = await apiClient.get('/classes', { params: { limit: 100 } });
-      setClassesList(res.data?.data?.items || []);
-    } catch (err) {
-      console.error('Failed to load classes for attendance', err);
-    }
-  }, []);
-
-  const formatArabicDate = (dateStr) => {
-    if (!dateStr) return '';
-    try {
-      const [y, m, d] = dateStr.split('-');
-      const dt = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
-      return dt.toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-    } catch {
-      return dateStr;
-    }
-  };
-
-  const buildDynamicTitle = (classId, dateStr) => {
-    const dateText = formatArabicDate(dateStr);
-    if (classId && classId !== 'GENERAL') {
-      const cls = classesList.find(c => c.class_id === classId);
-      if (cls) {
-        return `حضور ${cls.name} - ${dateText}`;
+      const res = await apiClient.get('/classes/?status=Active&limit=100');
+      const items = res?.data?.data?.items || res?.data?.items || [];
+      setClassesList(items);
+      if (items.length > 0 && !selectedClassId) {
+        setSelectedClassId(items[0].class_id);
       }
+    } catch (err) {
+      console.error('Failed to load classes', err);
     }
-    return `حضور اجتماع مدارس الأحد - ${dateText}`;
-  };
+  }, [selectedClassId]);
 
-  const openNewSessionModal = () => {
-    const today = new Date().toISOString().split('T')[0];
-    const initialClassId = classesList.length > 0 ? classesList[0].class_id : '';
-    const initialStage = classesList.length > 0 ? (classesList[0].stage || 'عام') : 'ALL';
-    const initialTitle = buildDynamicTitle(initialClassId, today);
-    setSessionFormData({
-      class_id: initialClassId,
-      session_date: today,
-      title: initialTitle,
-      stage: initialStage,
-      recurrence: 'Weekly',
-      event_id: ''
-    });
-    setIsSessionModalOpen(true);
-  };
-
-  const handleClassChange = (e) => {
-    const selectedId = e.target.value;
-    const cls = classesList.find(c => c.class_id === selectedId);
-    const newStage = cls ? (cls.stage || 'عام') : 'ALL';
-    const newTitle = buildDynamicTitle(selectedId, sessionFormData.session_date);
-    setSessionFormData(prev => ({
-      ...prev,
-      class_id: selectedId,
-      stage: newStage,
-      title: newTitle
-    }));
-  };
-
-  const handleDateChange = (e) => {
-    const newDate = e.target.value;
-    const newTitle = buildDynamicTitle(sessionFormData.class_id, newDate);
-    setSessionFormData(prev => ({
-      ...prev,
-      session_date: newDate,
-      title: newTitle
-    }));
-  };
-
-  // Fetch Open & Recent Sessions
-  const fetchSessions = useCallback(async () => {
+  // 2. Fetch Sessions for the selected class
+  const fetchSessions = useCallback(async (classId) => {
     setLoading(true);
     setError('');
     try {
-      const res = await attendanceApi.getSessions({ limit: 30 });
+      const params = { limit: 30 };
+      if (classId) {
+        params.class_id = classId;
+      }
+      const res = await attendanceApi.getSessions(params);
       if (res.success) {
-        setSessions(res.data.items);
-        if (res.data.items.length > 0 && !selectedSession) {
-          setSelectedSession(res.data.items[0]);
+        const items = res.data.items || [];
+        setSessions(items);
+        if (items.length > 0) {
+          setSelectedSession(items[0]);
+        } else {
+          setSelectedSession(null);
+          setSheetItems([]);
         }
       }
     } catch (err) {
@@ -235,150 +164,106 @@ export const AttendanceManagement = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedSession]);
+  }, []);
 
   useEffect(() => {
-    fetchSessions();
     fetchClasses();
-  }, [fetchSessions, fetchClasses]);
+  }, [fetchClasses]);
 
-  // Fetch Session Live Attendance Records
-  const fetchRecords = useCallback(async (sessionId, search = '') => {
+  useEffect(() => {
+    if (selectedClassId) {
+      fetchSessions(selectedClassId);
+    }
+  }, [selectedClassId, fetchSessions]);
+
+  // 3. Fetch Numbered Sheet for the selected session
+  const fetchSessionSheet = useCallback(async (sessionId, search = '') => {
     if (!sessionId) return;
-    setRecLoading(true);
+    setSheetLoading(true);
     try {
-      const res = await attendanceApi.getSessionRecords(sessionId, { status: 'Valid', search });
+      const res = await attendanceApi.getSessionSheet(sessionId, search);
       if (res.success) {
-        setRecords(res.data);
+        setSheetItems(res.data.items || []);
+        if (res.data.stats) {
+          setSheetStats(res.data.stats);
+        }
       }
     } catch (err) {
-      // Ignore transient fetch error
+      console.error('Error fetching session sheet:', err);
     } finally {
-      setRecLoading(false);
+      setSheetLoading(false);
     }
   }, []);
 
   useEffect(() => {
     if (selectedSession) {
-      fetchRecords(selectedSession.session_id);
+      fetchSessionSheet(selectedSession.session_id, sheetSearch);
     }
-  }, [selectedSession, fetchRecords]);
+  }, [selectedSession, sheetSearch, fetchSessionSheet]);
 
-  // Concise Error Classification & Actionable Guidance
-  const formatAttendanceError = useCallback((err) => {
-    const status = err.response?.status;
-    const raw = (err.response?.data?.detail || err.response?.data?.message || err.message || '').toString();
+  // 4. Toggle Attendance for Member (Instant 1-Click Action)
+  const handleToggleAttendance = async (memberId) => {
+    if (!selectedSession || togglingMemberId) return;
 
-    // 1. Already Registered
-    if (raw.includes('مسجل حضوره بالفعل') || raw.includes('بالفعل')) {
-      const timeMatch = raw.match(/الساعة\s*([0-9:AMP]+|\d+:\d+\s*[صم])/i);
-      const timeStr = timeMatch ? `(${timeMatch[0]})` : '';
-      return {
-        status: 'warning',
-        title: 'الطفل مسجل حضوره بالفعل ⚠️',
-        message: `تم قيد حضور هذا الطفل مسبقاً في هذه الجلسة ${timeStr}`,
-        actionTip: 'لا داعي لإعادة المسح، تم حفظ الحضور'
-      };
-    }
+    // Optimistic UI update
+    setTogglingMemberId(memberId);
+    const target = sheetItems.find(m => m.member_id === memberId);
+    const newAttended = !target?.attended;
 
-    // 2. Member Not Found / Invalid Token
-    if (
-      status === 404 ||
-      raw.includes('تعذر العثور') ||
-      raw.includes('غير موجود') ||
-      raw.includes('غير مسجل') ||
-      raw.includes('Not Found')
-    ) {
-      return {
-        status: 'error',
-        title: 'كارت غير مسجل ❌',
-        message: 'رمز الـ QR غير مسجل في قاعدة بيانات الكنيسة',
-        actionTip: 'تأكد من كارت الطفل أو ابحث عنه يدويًا بالاسم'
-      };
-    }
-
-    // 3. Inactive Member Account
-    if (raw.includes('غير نشط') || raw.includes('Inactive') || raw.includes('Archived')) {
-      return {
-        status: 'warning',
-        title: 'حساب الطفل معطل ⚠️',
-        message: 'ملف المخدوم غير نشط في النظام حالياً',
-        actionTip: 'راجع أمين الخدمة لإعادة تفعيل حساب الطفل'
-      };
-    }
-
-    // 4. Closed Session
-    if (raw.includes('مغلقة') || raw.includes('closed') || raw.includes('Void')) {
-      return {
-        status: 'warning',
-        title: 'الجلسة مغلقة حالياً 🔒',
-        message: 'لا يمكن تسجيل الحضور وجلسة الفصل مغلقة',
-        actionTip: 'اضغط على زر (إعادة فتح الجلسة) بالأعلى أولاً'
-      };
-    }
-
-    // 5. Unauthorized Servant
-    if (status === 403 || raw.includes('غير مصرح') || raw.includes('Unauthorized') || raw.includes('Forbidden')) {
-      return {
-        status: 'warning',
-        title: 'غير مصرح لك بهذا الفصل ✋',
-        message: 'هذه الجلسة مخصصة لخدام آخرين مشرفين على الفصل',
-        actionTip: 'راجع أمين الخدمة لإضافتك لقائمة خدام الفصل'
-      };
-    }
-
-    // 6. Network Connection Issue
-    if (!err.response || err.code === 'ECONNABORTED' || raw.includes('Network Error')) {
-      return {
-        status: 'error',
-        title: 'انقطع الاتصال بالسيرفر 📡',
-        message: 'تعذر الوصول لخادم الكنيسة عبر الشبكة',
-        actionTip: 'تحقق من اتصال الواي فاي أو شبكة الإنترنت'
-      };
-    }
-
-    // 7. Generic Fallback
-    return {
-      status: 'error',
-      title: 'تعذر قيد الحضور ❌',
-      message: raw.length > 55 ? raw.substring(0, 52) + '...' : (raw || 'لم نتمكن من قراءة بيانات البطاقة'),
-      actionTip: 'أعد تمرير الكارت أو سجل اسم الطفل يدويًا'
-    };
-  }, []);
-
-  // Cooldown Manager (Gives the servant 3 seconds of calm to review child attendance)
-  const startCooldown = useCallback((seconds = 3) => {
-    if (cooldownIntervalRef.current) clearInterval(cooldownIntervalRef.current);
-    if (cooldownTimeoutRef.current) clearTimeout(cooldownTimeoutRef.current);
-
-    setCooldownSeconds(seconds);
-    let remaining = seconds;
-
-    cooldownIntervalRef.current = setInterval(() => {
-      remaining -= 1;
-      if (remaining <= 0) {
-        clearInterval(cooldownIntervalRef.current);
-        setCooldownSeconds(0);
-        // Release lock for the next child
-        isScanLockedRef.current = false;
-        setTimeout(() => {
-          lastScannedTokenRef.current = '';
-        }, 300);
-      } else {
-        setCooldownSeconds(remaining);
+    setSheetItems(prev => prev.map(m => {
+      if (m.member_id === memberId) {
+        return {
+          ...m,
+          attended: newAttended,
+          scanned_at: newAttended ? new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : null,
+          method: newAttended ? 'يدوي' : null
+        };
       }
-    }, 1000);
-  }, []);
+      return m;
+    }));
 
-  const handleDismissCooldownNow = useCallback(() => {
-    if (cooldownIntervalRef.current) clearInterval(cooldownIntervalRef.current);
-    if (cooldownTimeoutRef.current) clearTimeout(cooldownTimeoutRef.current);
-    setCooldownSeconds(0);
-    isScanLockedRef.current = false;
-    lastScannedTokenRef.current = '';
-  }, []);
+    setSheetStats(prev => {
+      const diff = newAttended ? 1 : -1;
+      const newPresent = Math.max(0, prev.present_count + diff);
+      const newAbsent = Math.max(0, prev.absent_count - diff);
+      const total = prev.total_members || (newPresent + newAbsent) || 1;
+      return {
+        ...prev,
+        present_count: newPresent,
+        absent_count: newAbsent,
+        attendance_rate: Math.round((newPresent / total) * 1000) / 10
+      };
+    });
 
-  // Start Camera QR Scanner Mode (Instant-Scan Hardware-Accelerated Motor)
+    playFeedbackSound(newAttended ? 'success' : 'warning');
+
+    try {
+      await attendanceApi.toggleMemberAttendance(selectedSession.session_id, memberId);
+    } catch (err) {
+      // Revert if server fails
+      alert(err.response?.data?.message || 'تعذر تسجيل حالة الحضور');
+      fetchSessionSheet(selectedSession.session_id, sheetSearch);
+    } finally {
+      setTogglingMemberId(null);
+    }
+  };
+
+  // 5. Toggle Session Open/Closed
+  const handleToggleSessionStatus = async () => {
+    if (!selectedSession) return;
+    const newStatus = selectedSession.status === 'Open' ? 'Closed' : 'Open';
+    try {
+      const res = await attendanceApi.updateSessionStatus(selectedSession.session_id, newStatus);
+      if (res.success) {
+        setSelectedSession(res.data);
+        setSessions(prev => prev.map(s => s.session_id === res.data.session_id ? res.data : s));
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || 'فشل تغيير حالة الجلسة');
+    }
+  };
+
+  // 6. Camera QR Scanning
   const startCamera = async () => {
     setScanFeedback(null);
     setRecentScanResult(null);
@@ -388,9 +273,7 @@ export const AttendanceManagement = () => {
     try {
       if (!html5QrcodeRef.current) {
         html5QrcodeRef.current = new Html5Qrcode(scannerContainerId, {
-          experimentalFeatures: {
-            useBarCodeDetectorIfSupported: true
-          },
+          experimentalFeatures: { useBarCodeDetectorIfSupported: true },
           verbose: false
         });
       }
@@ -398,922 +281,779 @@ export const AttendanceManagement = () => {
       await html5QrcodeRef.current.start(
         { facingMode: 'environment' },
         {
-          fps: 25, // High frame rate: checks 25 frames per second for instantaneous detection
-          qrbox: (viewfinderWidth, viewfinderHeight) => {
-            // Generous scanning area so card is caught immediately anywhere in frame
-            const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-            const edgeSize = Math.floor(minEdge * 0.85);
-            return { width: edgeSize, height: edgeSize };
+          fps: 20,
+          qrbox: (w, h) => {
+            const minEdge = Math.min(w, h);
+            const edge = Math.floor(minEdge * 0.8);
+            return { width: edge, height: edge };
           },
-          aspectRatio: 1.0,
-          experimentalFeatures: {
-            useBarCodeDetectorIfSupported: true // Native GPU / C++ barcode detector in mobile browsers
-          }
+          aspectRatio: 1.0
         },
-        (decodedText) => {
-          // 1. SYNCHRONOUS LOCK: If in cooldown or processing, drop frame completely (eliminates jitter)
+        async (decodedText) => {
           if (isScanLockedRef.current) return;
-          if (!decodedText || !decodedText.trim()) return;
+          const token = decodedText?.trim();
+          if (!token || lastScannedTokenRef.current === token) return;
 
-          const token = decodedText.trim();
-          // Prevent re-triggering if exact same token is still in front of lens
-          if (lastScannedTokenRef.current === token) return;
-
-          // Engage lock immediately
           isScanLockedRef.current = true;
           lastScannedTokenRef.current = token;
 
-          handleProcessAttendance(token, 'QR');
+          try {
+            const res = await attendanceApi.scanAttendance({
+              session_id: selectedSession.session_id,
+              qr_token: token,
+              method: 'QR'
+            });
+
+            playFeedbackSound('success');
+            setRecentScanResult({
+              status: 'success',
+              title: 'تم تسجيل الحضور بنجاح ✓',
+              name: res.data?.member_name || token
+            });
+
+            // Refresh sheet
+            fetchSessionSheet(selectedSession.session_id, sheetSearch);
+
+            // Cooldown 2 seconds
+            setCooldownSeconds(2);
+            cooldownIntervalRef.current = setInterval(() => {
+              setCooldownSeconds(c => {
+                if (c <= 1) {
+                  clearInterval(cooldownIntervalRef.current);
+                  isScanLockedRef.current = false;
+                  lastScannedTokenRef.current = '';
+                  return 0;
+                }
+                return c - 1;
+              });
+            }, 1000);
+
+          } catch (scanErr) {
+            playFeedbackSound('warning');
+            const msg = scanErr.response?.data?.detail || scanErr.response?.data?.message || 'كارت غير صالح';
+            setRecentScanResult({
+              status: 'warning',
+              title: 'تنبيه مسح الكارت',
+              name: msg
+            });
+            setTimeout(() => {
+              isScanLockedRef.current = false;
+              lastScannedTokenRef.current = '';
+            }, 1500);
+          }
         },
         () => {}
       );
       setCameraActive(true);
     } catch (err) {
-      setRecentScanResult({
-        status: 'error',
-        title: 'تعذر تشغيل الكاميرا 📷',
-        message: 'يرجى منح المتصفح إذن الوصول للكاميرا',
-        actionTip: 'يمكنك استخدام الإدخال اليدوي السريع أدناه'
-      });
+      alert('تعذر فتح الكاميرا، يرجى التأكد من صلاحية المتصفح.');
       setCameraActive(false);
     }
   };
 
   const stopCamera = async () => {
     if (cooldownIntervalRef.current) clearInterval(cooldownIntervalRef.current);
-    if (cooldownTimeoutRef.current) clearTimeout(cooldownTimeoutRef.current);
-    isScanLockedRef.current = false;
-    lastScannedTokenRef.current = '';
-    setCooldownSeconds(0);
-
     if (html5QrcodeRef.current && cameraActive) {
       try {
         await html5QrcodeRef.current.stop();
-      } catch (e) {}
-      setCameraActive(false);
-    }
-  };
-
-  useEffect(() => {
-    return () => {
-      stopCamera();
-    };
-  }, [cameraActive]);
-
-  // UNIFIED ATTENDANCE MOTOR CALL WITH ACOUSTIC & VISUAL FEEDBACK
-  const handleProcessAttendance = async (tokenOrId, method = 'QR') => {
-    if (!selectedSession || !tokenOrId || !tokenOrId.trim()) {
-      isScanLockedRef.current = false;
-      return;
-    }
-
-    setScanSubmitting(true);
-
-    try {
-      const res = await attendanceApi.scanAttendance(
-        {
-          session_id: selectedSession.session_id,
-          token_or_id: tokenOrId.trim(),
-          method
-        },
-        activeDeviceToken
-      );
-
-      if (res.success) {
-        // 🟢 Case 1: نجح وتمام الطفل اتسجل
-        playFeedbackSound('success');
-        const childName = res.data?.member_name || 'الطفل';
-        setRecentScanResult({
-          status: 'success',
-          title: 'تم تسجيل الحضور بنجاح 🟢',
-          memberName: childName,
-          message: `تم قيد حضور ${childName} واحتساب النقاط`,
-          actionTip: 'تم تحديث رصيد الطفل وإضافته لكشف الحاضرين',
-          points: 10,
-          time: new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })
-        });
-        setManualInput('');
-
-        // Refresh records & session metrics in background
-        fetchRecords(selectedSession.session_id);
-        attendanceApi.getSessionById(selectedSession.session_id).then((sRes) => {
-          if (sRes.success) setSelectedSession(sRes.data);
-        });
+        await html5QrcodeRef.current.clear();
+      } catch (e) {
+        // ignore
       }
-    } catch (err) {
-      // Concise error classification per user request
-      const formatted = formatAttendanceError(err);
-      playFeedbackSound(formatted.status);
-      setRecentScanResult({
-        ...formatted,
-        time: new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })
-      });
-    } finally {
-      setScanSubmitting(false);
-      // Start 3-second calm cooldown so servant has plenty of time to take note
-      startCooldown(3);
     }
+    setCameraActive(false);
+    setIsScannerModalOpen(false);
   };
 
-  const handleManualSubmit = (e) => {
-    e.preventDefault();
-    if (isScanLockedRef.current) return;
-    isScanLockedRef.current = true;
-    handleProcessAttendance(manualInput, 'Manual');
-  };
-
-  // Open / Close Session
-  const handleToggleSessionStatus = async () => {
+  // 7. Print Official Attendance Sheet
+  const handlePrintSheet = async () => {
     if (!selectedSession) return;
-    const newStatus = selectedSession.status === 'Open' ? 'Closed' : 'Open';
-    try {
-      const res = await attendanceApi.updateSessionStatus(selectedSession.session_id, newStatus);
-      if (res.success) {
-        setSelectedSession(res.data);
-        fetchSessions();
-      }
-    } catch (err) {
-      alert(err.response?.data?.message || 'تعذر تغيير حالة الجلسة');
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('يرجى السماح بالنوافذ المنبثقة لطباعة الكشف');
+      return;
     }
+
+    const currentCls = classesList.find(c => c.class_id === selectedClassId);
+    const className = currentCls?.name || selectedSession.class_name || selectedSession.stage || 'الفصل الخدمي';
+
+    const rowsHtml = sheetItems.map((m) => `
+      <tr style="background: ${m.attended ? '#ffffff' : '#fff5f5'};">
+        <td style="text-align: center; font-weight: bold; border: 1px solid #cbd5e1; padding: 6px;">${m.index}</td>
+        <td style="border: 1px solid #cbd5e1; padding: 6px; font-weight: bold;">${m.full_name}</td>
+        <td style="border: 1px solid #cbd5e1; padding: 6px; text-align: center; color: #475569;">${m.area || '—'}</td>
+        <td style="border: 1px solid #cbd5e1; padding: 6px; text-align: center; font-family: monospace;" dir="ltr">${m.phone || '—'}</td>
+        <td style="text-align: center; border: 1px solid #cbd5e1; padding: 6px; font-weight: bold; color: ${m.attended ? '#15803d' : '#b91c1c'};">
+          ${m.attended ? 'حاضر ✓' : 'غائب ✗'}
+        </td>
+        <td style="border: 1px solid #cbd5e1; padding: 6px; text-align: center; font-size: 11px; color: #64748b;">
+          ${m.scanned_at || (m.attended ? 'تم التسجيل' : '—')}
+        </td>
+        <td style="border: 1px solid #cbd5e1; padding: 6px; text-align: center; width: 120px;"></td>
+      </tr>
+    `).join('');
+
+    const html = `
+      <!DOCTYPE html>
+      <html dir="rtl" lang="ar">
+      <head>
+        <meta charset="utf-8" />
+        <title>كشف حضور وغياب - ${className} - ${selectedSession.session_date}</title>
+        <style>
+          @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap');
+          body { font-family: 'Cairo', sans-serif; padding: 25px; color: #0f172a; }
+          .header { text-align: center; border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 15px; }
+          .church { font-size: 17px; font-weight: 800; }
+          .title { font-size: 20px; font-weight: 900; color: #1e3a8a; margin: 4px 0; }
+          .meta { font-size: 13px; color: #475569; display: flex; justify-content: space-around; margin-top: 8px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 12px; }
+          th { background: #f1f5f9; border: 1px solid #94a3b8; padding: 8px 6px; font-weight: 800; }
+          .stats-bar { display: flex; justify-content: space-between; background: #f8fafc; border: 1px solid #cbd5e1; padding: 8px 15px; border-radius: 6px; margin-top: 15px; font-weight: 700; font-size: 13px; }
+          .signatures { display: flex; justify-content: space-between; margin-top: 40px; font-size: 13px; font-weight: bold; }
+          @media print {
+            body { padding: 0; }
+            button { display: none; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="church">كنيسة الشهيد العظيم مارجرجس والأنبا شنودة بالكرور</div>
+          <div class="title">كشف حضور وغياب: ${className}</div>
+          <div class="meta">
+            <div><strong>تاريخ الجلسة:</strong> ${selectedSession.session_date}</div>
+            <div><strong>عنوان اللقاء:</strong> ${selectedSession.title}</div>
+            <div><strong>تاريخ الطباعة:</strong> ${new Date().toLocaleDateString('ar-EG')}</div>
+          </div>
+        </div>
+
+        <div class="stats-bar">
+          <div>إجمالي الفصل: ${sheetStats.total_members} مخدوم</div>
+          <div style="color: #15803d;">عدد الحاضرين: ${sheetStats.present_count}</div>
+          <div style="color: #b91c1c;">عدد الغائبين: ${sheetStats.absent_count}</div>
+          <div>نسبة الحضور: ${sheetStats.attendance_rate}%</div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 35px;">م</th>
+              <th>اسم المخدوم</th>
+              <th style="width: 110px;">المنطقة</th>
+              <th style="width: 105px;">الهاتف</th>
+              <th style="width: 75px;">الحالة</th>
+              <th style="width: 80px;">وقت الحضور</th>
+              <th>ملاحظات وافتقاد الخادم</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+          </tbody>
+        </table>
+
+        <div class="signatures">
+          <div>توقيع خادم الفصل: .........................</div>
+          <div>توقيع أمين المرحلة: .........................</div>
+          <div>توقيع كاهن الكنيسة: .........................</div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
+    setTimeout(() => {
+      printWindow.focus();
+      printWindow.print();
+    }, 600);
   };
 
-  // Create Session submit
-  const handleCreateSessionSubmit = async (e) => {
+  // 8. Create New Session for the Class
+  const handleCreateSession = async (e) => {
     e.preventDefault();
-    if (!sessionFormData.title.trim()) {
-      alert('يرجى كتابة اسم/عنوان الجلسة');
+    if (!sessionFormData.class_id) {
+      alert('يرجى اختيار الفصل');
       return;
     }
-    if (!sessionFormData.session_date) {
-      alert('يرجى تحديد تاريخ الجلسة');
-      return;
-    }
+
     setSessionFormLoading(true);
     try {
-      const payload = {
-        class_id: (sessionFormData.class_id && sessionFormData.class_id !== 'GENERAL') ? sessionFormData.class_id : null,
+      const selectedCls = classesList.find(c => c.class_id === sessionFormData.class_id);
+      const stage = selectedCls?.stage || selectedCls?.name || 'عام';
+      const title = sessionFormData.title || `جلسة ${selectedCls?.name || ''} - ${sessionFormData.session_date}`;
+
+      const res = await attendanceApi.createSession({
+        class_id: sessionFormData.class_id,
+        stage: stage,
+        title: title,
         session_date: sessionFormData.session_date,
-        title: sessionFormData.title.trim(),
-        stage: sessionFormData.stage || 'ALL',
-        recurrence: sessionFormData.recurrence || 'Weekly',
-        event_id: sessionFormData.event_id || null
-      };
-      const res = await attendanceApi.createSession(payload);
+        recurrence: sessionFormData.recurrence || 'Weekly'
+      });
+
       if (res.success) {
         setIsSessionModalOpen(false);
-        setSelectedSession(res.data);
-        await fetchSessions();
+        await fetchSessions(sessionFormData.class_id);
       }
     } catch (err) {
-      const detail = err.response?.data?.detail;
-      let msg = 'تعذر إنشاء جلسة جديدة، يرجى التأكد من البيانات المدخلة';
-      if (typeof detail === 'string') {
-        msg = detail;
-      } else if (Array.isArray(detail)) {
-        msg = detail.map(d => `${d.loc ? d.loc.join('.') : ''}: ${d.msg || d.message}`).join('\n');
-      } else if (err.response?.data?.message) {
-        msg = err.response.data.message;
-      }
-      alert(`❌ تعذر فتح الجلسة:\n${msg}`);
+      alert(err.response?.data?.message || 'تعذر إنشاء الجلسة');
     } finally {
       setSessionFormLoading(false);
     }
   };
 
-  // Register device submit
-  const handleRegisterDeviceSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      const res = await attendanceApi.registerDevice({ device_name: deviceName });
-      if (res.success) {
-        const token = res.data.device_token;
-        localStorage.setItem('almasalla_device_token', token);
-        setActiveDeviceToken(token);
-        alert(`تم اعتماد هذا الجهاز بنجاح باسم "${res.data.device_name}"`);
-        setIsDeviceModalOpen(false);
-      }
-    } catch (err) {
-      alert(err.response?.data?.message || 'فشل اعتماد الجهاز');
-    }
-  };
-
-  // Cancel Attendance submit
-  const handleCancelAttendanceSubmit = async (e) => {
-    e.preventDefault();
-    if (!cancellingRecord || !cancelReason.trim()) return;
-    setCancelLoading(true);
-    try {
-      await attendanceApi.cancelRecord(cancellingRecord.record_id, cancelReason.trim());
-      setCancellingRecord(null);
-      setCancelReason('');
-      fetchRecords(selectedSession.session_id);
-      const sRes = await attendanceApi.getSessionById(selectedSession.session_id);
-      if (sRes.success) setSelectedSession(sRes.data);
-    } catch (err) {
-      alert(err.response?.data?.message || 'تعذر تصحيح إدخال الحضور');
-    } finally {
-      setCancelLoading(false);
-    }
-  };
+  // Filter items based on tab
+  const filteredItems = sheetItems.filter(item => {
+    if (filterTab === 'PRESENT') return item.attended;
+    if (filterTab === 'ABSENT') return !item.attended;
+    return true;
+  });
 
   return (
-    <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+    <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', paddingBottom: '3rem' }}>
       
-      {/* 1. Header & Controls */}
+      {/* 1. Header Toolbar */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h1 style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <UserCheck size={28} style={{ color: '#34d399' }} />
-            <span>نظام تسجيل الحضور المصرح به</span>
+          <h1 style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--text-main)', margin: '0 0 0.25rem', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <UserCheck size={28} style={{ color: '#38bdf8' }} />
+            <span>كشف حضور وغياب الفصول</span>
           </h1>
-          <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)' }}>
-            تسجيل الحضور الفعلي بالربط الثلاثي المحكم (جلسة مفتوحة + خادم مصرح له + جهاز معتمد)
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>
+            كشف مرقم بأسماء مخدومي الفصل، المنطقة السكنية، والتليفون مع رصد فوري للغياب والحضور بضغطة واحدة
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <button onClick={openNewSessionModal} className="btn btn-primary" style={{ gap: '0.4rem' }}>
-            <Plus size={18} />
-            <span>فتح جلسة جديدة</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => {
+              setSessionFormData({
+                class_id: selectedClassId || (classesList[0]?.class_id || ''),
+                title: '',
+                session_date: new Date().toISOString().split('T')[0],
+                recurrence: 'Weekly'
+              });
+              setIsSessionModalOpen(true);
+            }}
+            className="btn btn-primary"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.88rem', fontWeight: 700 }}
+          >
+            <Plus size={16} />
+            <span>جلسة جديدة للفصل</span>
           </button>
 
-          <button onClick={() => setIsDeviceModalOpen(true)} className="btn btn-secondary" style={{ gap: '0.4rem' }}>
-            <Smartphone size={18} style={{ color: activeDeviceToken ? '#34d399' : 'var(--text-muted)' }} />
-            <span>{activeDeviceToken ? 'الجهاز معتمد 🟢' : 'اعتماد جهاز'}</span>
+          <button
+            onClick={() => {
+              setIsScannerModalOpen(true);
+              setTimeout(() => startCamera(), 300);
+            }}
+            className="btn btn-secondary"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.88rem', color: '#38bdf8', borderColor: 'rgba(56, 189, 248, 0.3)' }}
+          >
+            <Camera size={16} />
+            <span>مسح كروت QR (اختياري)</span>
+          </button>
+
+          <button
+            onClick={handlePrintSheet}
+            disabled={!selectedSession || sheetItems.length === 0}
+            className="btn btn-secondary"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.88rem', color: '#f59e0b', borderColor: 'rgba(245, 158, 11, 0.3)' }}
+          >
+            <Printer size={16} />
+            <span>طباعة الكشف (PDF)</span>
           </button>
         </div>
       </div>
 
-      {/* 2. Active Session Selector & Metrics Dashboard */}
-      <div className="glass-card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-        
-        {/* Session Selector bar */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '1rem' }}>
+      {/* 2. Class & Session Selector Bar */}
+      <div className="glass-card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem', alignItems: 'center' }}>
           
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1, minWidth: '280px' }}>
-            <Calendar size={22} style={{ color: '#38bdf8' }} />
-            <div style={{ flex: 1 }}>
-              <label className="form-label" style={{ fontSize: '0.78rem', marginBottom: '2px' }}>الجلسة المستهدفة حالياً:</label>
-              <select
-                className="form-input"
-                style={{ fontWeight: 700, color: 'var(--text-main)' }}
-                value={selectedSession?.session_id || ''}
-                onChange={(e) => {
-                  const found = sessions.find(s => s.session_id === e.target.value);
-                  setSelectedSession(found);
-                }}
-              >
-                {sessions.map((s) => (
-                  <option key={s.session_id} value={s.session_id}>
-                    {s.title} ({s.session_date}) {s.class_name ? `— [فصل: ${s.class_name}]` : ''} — [{s.status === 'Open' ? 'مفتوحة 🟢' : 'مغلقة 🔴'}]
-                  </option>
-                ))}
-              </select>
-            </div>
+          {/* Class Selector */}
+          <div>
+            <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--color-gold)' }}>
+              <Layers size={15} />
+              <span>الفصل الخدمي المستهدف:</span>
+            </label>
+            <select
+              className="form-input"
+              style={{ fontWeight: 700 }}
+              value={selectedClassId}
+              onChange={(e) => setSelectedClassId(e.target.value)}
+            >
+              {classesList.map((cls) => (
+                <option key={cls.class_id} value={cls.class_id}>
+                  {cls.name} ({cls.stage || 'عام'})
+                </option>
+              ))}
+            </select>
           </div>
 
-          {selectedSession && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-              
-              {/* Recurrence Change Selector */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'rgba(255,255,255,0.05)', padding: '0.2rem 0.6rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)' }}>
-                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>التكرار:</span>
-                <select
-                  className="form-input"
-                  style={{ padding: '0.2rem 0.4rem', fontSize: '0.78rem', width: 'auto', background: 'none', border: 'none', color: '#fbbf24', fontWeight: 800 }}
-                  value={selectedSession.recurrence || 'Weekly'}
-                  onChange={async (e) => {
-                    const newRec = e.target.value;
-                    try {
-                      const res = await attendanceApi.updateSessionRecurrence(selectedSession.session_id, newRec);
-                      if (res.success) {
-                        setSelectedSession(res.data);
-                        fetchSessions();
-                      }
-                    } catch (err) {
-                      alert(err.response?.data?.message || 'تعذر تغيير تكرار الجلسة');
-                    }
-                  }}
-                >
-                  <option value="Weekly">أسبوعية 📅</option>
-                  <option value="Daily">يومية / مؤتمر ☀️</option>
-                  <option value="Monthly">شهريّة 🗓️</option>
-                  <option value="OneTime">مرة واحدة فقط (عدم التكرار) 🛑</option>
-                </select>
-              </div>
+          {/* Session Selector */}
+          <div>
+            <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#38bdf8' }}>
+              <Calendar size={15} />
+              <span>جلسة الحضور:</span>
+            </label>
+            <select
+              className="form-input"
+              style={{ fontWeight: 700 }}
+              value={selectedSession?.session_id || ''}
+              onChange={(e) => {
+                const found = sessions.find(s => s.session_id === e.target.value);
+                setSelectedSession(found);
+              }}
+            >
+              {sessions.length === 0 ? (
+                <option value="">لا توجد جلسات مفتوحة لهذا الفصل</option>
+              ) : (
+                sessions.map((s) => (
+                  <option key={s.session_id} value={s.session_id}>
+                    {s.title} ({s.session_date}) — [{s.status === 'Open' ? 'مفتوحة للتسجيل 🟢' : 'مغلقة 🔒'}]
+                  </option>
+                ))
+              )}
+            </select>
+          </div>
 
-              <span
-                className="badge"
-                style={{
-                  padding: '0.4rem 0.8rem',
-                  fontSize: '0.85rem',
-                  background: selectedSession.status === 'Open' ? 'rgba(52, 211, 153, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                  color: selectedSession.status === 'Open' ? '#34d399' : '#f87171',
-                  border: `1px solid ${selectedSession.status === 'Open' ? '#34d39940' : '#f8717140'}`
-                }}
-              >
-                {selectedSession.status === 'Open' ? 'جلسة مفتوحة للتسجيل 🔓' : 'جلسة مغلقة 🔒'}
+          {/* Session Status Toggle */}
+          {selectedSession && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '1.2rem' }}>
+              <span className={`badge ${selectedSession.status === 'Open' ? 'badge-success' : 'badge-danger'}`} style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}>
+                {selectedSession.status === 'Open' ? 'الجلسة مفتوحة للتسجيل 🔓' : 'الجلسة مغلقة 🔒'}
               </span>
 
               <button
+                type="button"
                 onClick={handleToggleSessionStatus}
                 className="btn btn-secondary"
-                style={{ padding: '0.4rem 0.75rem', fontSize: '0.82rem', gap: '4px' }}
+                style={{ fontSize: '0.82rem', padding: '0.4rem 0.75rem', gap: '4px' }}
               >
-                {selectedSession.status === 'Open' ? <Lock size={15} /> : <Unlock size={15} />}
-                <span>{selectedSession.status === 'Open' ? 'إغلاق الجلسة' : 'إعادة فتح الجلسة'}</span>
+                {selectedSession.status === 'Open' ? <Lock size={14} /> : <Unlock size={14} />}
+                <span>{selectedSession.status === 'Open' ? 'إغلاق' : 'فتح'}</span>
               </button>
             </div>
           )}
         </div>
 
-        {/* Selected Session Metrics Progress Bar */}
+        {/* Selected Session KPI Summary */}
         {selectedSession && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.25rem', alignItems: 'center' }}>
-            
-            <div>
-              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block' }}>الأطفال الحاضرون الآن</span>
-              <strong style={{ fontSize: '1.5rem', fontWeight: 900, color: '#34d399' }}>
-                {selectedSession.present_count} طفل
-              </strong>
-            </div>
-
-            <div>
-              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block' }}>المستهدفون النشطون بالمرحلة ({selectedSession.stage})</span>
-              <strong style={{ fontSize: '1.5rem', fontWeight: 900, color: '#f8fafc' }}>
-                {selectedSession.targeted_count} طفل
-              </strong>
-            </div>
-
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', marginBottom: '4px' }}>
-                <span style={{ color: 'var(--text-muted)' }}>نسبة الحضور الحقيقية</span>
-                <strong style={{ color: '#38bdf8' }}>{selectedSession.attendance_percentage}%</strong>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+            gap: '1rem',
+            paddingTop: '0.75rem',
+            borderTop: '1px solid var(--border-subtle)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(56, 189, 248, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#38bdf8' }}>
+                <Users size={20} />
               </div>
-              <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden' }}>
-                <div style={{ width: `${Math.min(100, selectedSession.attendance_percentage)}%`, height: '100%', background: 'linear-gradient(90deg, #38bdf8 0%, #34d399 100%)' }} />
+              <div>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>إجمالي مخدومي الفصل</span>
+                <strong style={{ fontSize: '1.25rem', fontWeight: 800 }}>{sheetStats.total_members} مخدوم</strong>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(34, 197, 94, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#22c55e' }}>
+                <CheckCircle size={20} />
+              </div>
+              <div>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>الحاضرون اليوم</span>
+                <strong style={{ fontSize: '1.25rem', fontWeight: 800, color: '#22c55e' }}>{sheetStats.present_count} طفل</strong>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(239, 68, 68, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ef4444' }}>
+                <XCircle size={20} />
+              </div>
+              <div>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>الغائبون اليوم</span>
+                <strong style={{ fontSize: '1.25rem', fontWeight: 800, color: '#ef4444' }}>{sheetStats.absent_count} طفل</strong>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(245, 158, 11, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f59e0b', fontWeight: 900, fontSize: '0.85rem' }}>
+                {sheetStats.attendance_rate}%
+              </div>
+              <div style={{ flex: 1 }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>نسبة الحضور</span>
+                <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden', marginTop: '4px' }}>
+                  <div style={{ width: `${Math.min(100, sheetStats.attendance_rate)}%`, height: '100%', background: 'linear-gradient(90deg, #38bdf8 0%, #22c55e 100%)' }} />
+                </div>
               </div>
             </div>
           </div>
         )}
       </div>
 
-      {/* 3. Fast Scanner & Unified Motor Section */}
-      {selectedSession && selectedSession.status === 'Open' ? (
-        <div className="glass-card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.25rem', background: 'linear-gradient(145deg, #1e293b 0%, #0f172a 100%)' }}>
+      {/* 3. Numbered Class Attendance Sheet */}
+      <div className="glass-card" style={{ padding: '1.25rem' }}>
+        
+        {/* Controls: Search & Tabs */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
           
-          <div style={{ textAlign: 'center' }}>
-            <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
-              <QrCode size={24} style={{ color: '#38bdf8' }} />
-              <span>وضع القارئ السريع الموحد (Fast Scanner Mode)</span>
-            </h3>
-            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-              امسح بطاقة الـ QR دون انقطاع — النظام يمنحك مهلة هادئة لملاحظة الطفل دون أي اهتزاز أو تكرار عشوائي
-            </p>
-          </div>
-
-          {/* Prominent High-Visibility Result Card */}
-          {recentScanResult && (
-            <div
-              className="animate-fade-in"
+          {/* Tabs: All / Present / Absent */}
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <button
+              onClick={() => setFilterTab('ALL')}
+              className={`btn ${filterTab === 'ALL' ? 'btn-primary' : 'btn-secondary'}`}
+              style={{ fontSize: '0.84rem', padding: '0.4rem 0.9rem' }}
+            >
+              <span>الكل ({sheetStats.total_members})</span>
+            </button>
+            <button
+              onClick={() => setFilterTab('PRESENT')}
+              className={`btn ${filterTab === 'PRESENT' ? 'btn-primary' : 'btn-secondary'}`}
               style={{
-                width: '100%',
-                maxWidth: '520px',
-                padding: '1.2rem 1.4rem',
-                borderRadius: '16px',
-                textAlign: 'center',
-                background:
-                  recentScanResult.status === 'success'
-                    ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(5, 150, 105, 0.15) 100%)'
-                    : recentScanResult.status === 'warning'
-                    ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.25) 0%, rgba(217, 119, 6, 0.15) 100%)'
-                    : 'linear-gradient(135deg, rgba(239, 68, 68, 0.25) 0%, rgba(185, 28, 28, 0.15) 100%)',
-                border: `2px solid ${
-                  recentScanResult.status === 'success'
-                    ? '#34d399'
-                    : recentScanResult.status === 'warning'
-                    ? '#fbbf24'
-                    : '#f87171'
-                }`,
-                boxShadow: `0 8px 24px ${
-                  recentScanResult.status === 'success'
-                    ? 'rgba(52, 211, 153, 0.25)'
-                    : recentScanResult.status === 'warning'
-                    ? 'rgba(251, 191, 36, 0.25)'
-                    : 'rgba(248, 113, 113, 0.25)'
-                }`
+                fontSize: '0.84rem',
+                padding: '0.4rem 0.9rem',
+                background: filterTab === 'PRESENT' ? 'rgba(34, 197, 94, 0.25)' : undefined,
+                borderColor: filterTab === 'PRESENT' ? '#22c55e' : undefined,
+                color: filterTab === 'PRESENT' ? '#86efac' : undefined
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
-                {recentScanResult.status === 'success' && <CheckCircle2 size={26} style={{ color: '#34d399' }} />}
-                {recentScanResult.status === 'warning' && <AlertTriangle size={26} style={{ color: '#fbbf24' }} />}
-                {recentScanResult.status === 'error' && <XCircle size={26} style={{ color: '#f87171' }} />}
-                <span
-                  style={{
-                    fontWeight: 900,
-                    fontSize: '1.1rem',
-                    color:
-                      recentScanResult.status === 'success'
-                        ? '#6ee7b7'
-                        : recentScanResult.status === 'warning'
-                        ? '#fde047'
-                        : '#fca5a5'
-                  }}
-                >
-                  {recentScanResult.title}
-                </span>
-              </div>
+              <span>الحاضرين فقط ({sheetStats.present_count})</span>
+            </button>
+            <button
+              onClick={() => setFilterTab('ABSENT')}
+              className={`btn ${filterTab === 'ABSENT' ? 'btn-primary' : 'btn-secondary'}`}
+              style={{
+                fontSize: '0.84rem',
+                padding: '0.4rem 0.9rem',
+                background: filterTab === 'ABSENT' ? 'rgba(239, 68, 68, 0.25)' : undefined,
+                borderColor: filterTab === 'ABSENT' ? '#ef4444' : undefined,
+                color: filterTab === 'ABSENT' ? '#fca5a5' : undefined
+              }}
+            >
+              <span>الغائبين فقط ({sheetStats.absent_count})</span>
+            </button>
+          </div>
 
-              {recentScanResult.memberName && (
-                <div style={{ margin: '0.35rem 0' }}>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>اسم الطفل المسجل:</span>
-                  <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#f8fafc', letterSpacing: '0.5px' }}>
-                    {recentScanResult.memberName}
-                  </div>
-                </div>
-              )}
+          {/* Quick Search inside sheet */}
+          <div style={{ position: 'relative', width: '260px' }}>
+            <Search size={16} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+            <input
+              type="text"
+              className="form-input"
+              style={{ paddingRight: '2rem', fontSize: '0.84rem', paddingBlock: '0.4rem' }}
+              placeholder="بحث في كشف الفصل..."
+              value={sheetSearch}
+              onChange={(e) => setSheetSearch(e.target.value)}
+            />
+          </div>
+        </div>
 
-              <p style={{ fontSize: '0.9rem', color: '#cbd5e1', margin: '0.35rem 0' }}>
-                {recentScanResult.message}
-              </p>
-
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.6rem', marginTop: '0.6rem', flexWrap: 'wrap' }}>
-                {recentScanResult.points && (
-                  <span className="badge" style={{ background: 'rgba(52, 211, 153, 0.25)', color: '#6ee7b7', border: '1px solid #34d39940', fontSize: '0.82rem', padding: '0.3rem 0.7rem' }}>
-                    🌟 +10 نقاط حضور
-                  </span>
-                )}
-                {recentScanResult.time && (
-                  <span className="badge" style={{ background: 'rgba(255, 255, 255, 0.1)', color: '#e2e8f0', fontSize: '0.82rem', padding: '0.3rem 0.7rem' }}>
-                    🕒 {recentScanResult.time}
-                  </span>
-                )}
-              </div>
-
-              {recentScanResult.actionTip && (
-                <div style={{ marginTop: '0.6rem' }}>
-                  <span
+        {/* The Numbered Table */}
+        <div className="table-container">
+          <table className="custom-table">
+            <thead>
+              <tr>
+                <th style={{ width: '45px', textAlign: 'center' }}>م</th>
+                <th>اسم المخدوم</th>
+                <th>المنطقة السكنية</th>
+                <th>رقم التليفون والتواصل</th>
+                <th style={{ textAlign: 'center', width: '160px' }}>حالة الحضور</th>
+                <th style={{ textAlign: 'center', width: '120px' }}>وقت التسجيل</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sheetLoading ? (
+                <tr>
+                  <td colSpan={6} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                    جاري تحميل كشف الحضور والغياب...
+                  </td>
+                </tr>
+              ) : filteredItems.length === 0 ? (
+                <tr>
+                  <td colSpan={6} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                    لا يوجد مخدومين مسكنين بهذا الفصل أو يطابقون خيارات البحث.
+                  </td>
+                </tr>
+              ) : (
+                filteredItems.map((member) => (
+                  <tr
+                    key={member.member_id}
                     style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '5px',
-                      background: 'rgba(255, 255, 255, 0.08)',
-                      padding: '0.25rem 0.75rem',
-                      borderRadius: '20px',
-                      fontSize: '0.8rem',
-                      color: '#94a3b8'
+                      background: member.attended ? 'rgba(34, 197, 94, 0.05)' : 'rgba(239, 68, 68, 0.03)',
+                      transition: 'background 0.2s ease'
                     }}
                   >
-                    💡 {recentScanResult.actionTip}
-                  </span>
-                </div>
-              )}
+                    {/* 1. Serial Number */}
+                    <td style={{ textAlign: 'center', fontWeight: 800, color: 'var(--text-muted)' }}>
+                      {member.index}
+                    </td>
 
-              {/* Cooldown Timer Bar & Next Scan Button */}
-              {cooldownSeconds > 0 ? (
-                <div style={{ marginTop: '0.85rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', fontSize: '0.8rem', color: '#94a3b8' }}>
-                    <span>⏳ مهلة التحقق والاستيعاب:</span>
-                    <span style={{ fontWeight: 800, color: '#38bdf8' }}>جاهز للمسح التالي خلال {cooldownSeconds}ث</span>
-                  </div>
-                  <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.15)', borderRadius: '2px', overflow: 'hidden' }}>
-                    <div
-                      style={{
-                        width: `${(cooldownSeconds / 3) * 100}%`,
-                        height: '100%',
-                        background: '#38bdf8',
-                        transition: 'width 1s linear'
-                      }}
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleDismissCooldownNow}
-                    className="btn btn-secondary"
-                    style={{ padding: '0.35rem 0.9rem', fontSize: '0.8rem', gap: '0.4rem', marginTop: '0.25rem' }}
-                  >
-                    <Zap size={14} style={{ color: '#fde047' }} />
-                    <span>مسح الطفل التالي فوراً دون انتظار ⚡</span>
-                  </button>
-                </div>
-              ) : (
-                <div style={{ marginTop: '0.6rem', fontSize: '0.82rem', color: '#34d399', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}>
-                  <span>🟢 الكاميرا جاهزة الآن — مرر بطاقة الطفل القادم أمام العدسة</span>
-                </div>
-              )}
-            </div>
-          )}
+                    {/* 2. Member Info */}
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <div style={{
+                          width: '36px',
+                          height: '36px',
+                          borderRadius: '50%',
+                          background: 'var(--bg-secondary)',
+                          border: `2px solid ${member.attended ? '#22c55e' : '#64748b'}`,
+                          overflow: 'hidden',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0
+                        }}>
+                          {member.photo_url ? (
+                            <img src={getPhotoUrl(member.photo_url)} alt={member.full_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          ) : (
+                            <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#38bdf8' }}>
+                              {member.full_name.charAt(0)}
+                            </span>
+                          )}
+                        </div>
 
-          {/* Scanner / Camera View Container */}
-          <div style={{ width: '100%', maxWidth: '380px', position: 'relative' }}>
-            {/* Live Camera State Indicator */}
-            {cameraActive && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: '10px',
-                  right: '10px',
-                  zIndex: 10,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '0.3rem 0.7rem',
-                  borderRadius: '20px',
-                  fontSize: '0.74rem',
-                  fontWeight: 700,
-                  background: cooldownSeconds > 0 ? 'rgba(245, 158, 11, 0.9)' : 'rgba(16, 185, 129, 0.9)',
-                  color: '#ffffff',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-                  backdropFilter: 'blur(4px)'
-                }}
-              >
-                {cooldownSeconds > 0 ? (
-                  <>
-                    <Clock size={12} />
-                    <span>مهلة ({cooldownSeconds}ث)</span>
-                  </>
-                ) : (
-                  <>
-                    <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#ffffff', display: 'inline-block', animation: 'pulse 1.5s infinite' }} />
-                    <span>كاميرا نشطة</span>
-                  </>
-                )}
-              </div>
-            )}
+                        <div>
+                          <div style={{ fontWeight: 700, color: 'var(--text-main)', fontSize: '0.92rem' }}>
+                            {member.full_name}
+                          </div>
+                          <span style={{ fontFamily: 'monospace', fontSize: '0.75rem', color: '#38bdf8' }}>
+                            {member.member_id}
+                          </span>
+                        </div>
+                      </div>
+                    </td>
 
-            <div
-              id={scannerContainerId}
-              style={{
-                width: '100%',
-                minHeight: '240px',
-                borderRadius: '16px',
-                overflow: 'hidden',
-                background: '#0f172a',
-                border:
-                  recentScanResult?.status === 'success' && cooldownSeconds > 0
-                    ? '3px solid #34d399'
-                    : recentScanResult?.status === 'warning' && cooldownSeconds > 0
-                    ? '3px solid #fbbf24'
-                    : recentScanResult?.status === 'error' && cooldownSeconds > 0
-                    ? '3px solid #f87171'
-                    : '2px dashed rgba(56, 189, 248, 0.5)',
-                boxShadow:
-                  recentScanResult?.status === 'success' && cooldownSeconds > 0
-                    ? '0 0 25px rgba(52, 211, 153, 0.35)'
-                    : recentScanResult?.status === 'warning' && cooldownSeconds > 0
-                    ? '0 0 25px rgba(251, 191, 36, 0.35)'
-                    : recentScanResult?.status === 'error' && cooldownSeconds > 0
-                    ? '0 0 25px rgba(248, 113, 113, 0.35)'
-                    : 'none',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'border 0.3s ease, box-shadow 0.3s ease'
-              }}
-            />
+                    {/* 3. Area */}
+                    <td>
+                      {member.area ? (
+                        <span style={{
+                          fontSize: '0.78rem',
+                          fontWeight: 700,
+                          padding: '0.2rem 0.6rem',
+                          background: 'rgba(168, 85, 247, 0.12)',
+                          color: '#c084fc',
+                          borderRadius: '6px',
+                          border: '1px solid rgba(168, 85, 247, 0.3)'
+                        }}>
+                          {member.area}
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>—</span>
+                      )}
+                    </td>
 
-            {!cameraActive && (
-              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', background: '#0f172a', borderRadius: '16px', zIndex: 5 }}>
-                <Camera size={44} style={{ color: '#38bdf8', opacity: 0.8 }} />
-                <button onClick={startCamera} className="btn btn-primary">
-                  <Camera size={18} />
-                  <span>تشغيل كاميرا الـ QR المستمرة</span>
-                </button>
-              </div>
-            )}
-          </div>
+                    {/* 4. Phone & Contact */}
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        {member.phone ? (
+                          <a
+                            href={`tel:${member.phone}`}
+                            style={{ color: '#38bdf8', textDecoration: 'none', fontWeight: 700, fontFamily: 'monospace', fontSize: '0.84rem' }}
+                            dir="ltr"
+                          >
+                            {member.phone}
+                          </a>
+                        ) : (
+                          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>غير مسجل</span>
+                        )}
 
-          {/* Manual Input Motor */}
-          <form onSubmit={handleManualSubmit} style={{ display: 'flex', gap: '0.5rem', width: '100%', maxWidth: '420px' }}>
-            <input
-              type="text"
-              className="form-input"
-              placeholder="أو أدخل رمز العضوية K-XXXXXX أو ابحث يدويًا..."
-              value={manualInput}
-              onChange={(e) => setManualInput(e.target.value)}
-            />
-            <button type="submit" className="btn btn-secondary" disabled={scanSubmitting || !manualInput.trim()}>
-              <CheckCircle size={16} />
-              <span>تسجيل</span>
-            </button>
-          </form>
-        </div>
-      ) : (
-        <div className="glass-card" style={{ padding: '2rem', textAlign: 'center', color: '#f87171', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
-          🔒 هذه الجلسة مغلقة حالياً — يرجى فتح الجلسة أولاً لتفعيل وضع القارئ السريع وتسجيل الحضور.
-        </div>
-      )}
+                        {member.phone && (
+                          <WhatsAppButton
+                            phone={member.whatsapp_phone || member.phone}
+                            memberName={member.full_name}
+                            memberId={member.member_id}
+                            template="card"
+                            variant="icon"
+                          />
+                        )}
+                      </div>
+                    </td>
 
-      {/* 4. Live Attendance Feed Table */}
-      {selectedSession && (
-        <div className="glass-card" style={{ padding: '1.25rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Clock size={20} style={{ color: '#38bdf8' }} />
-              <span>كشف الحاضرين في الجلسة ({records.length} طفل)</span>
-            </h3>
+                    {/* 5. 1-Click Interactive Attendance Toggle Button */}
+                    <td style={{ textAlign: 'center' }}>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleAttendance(member.member_id)}
+                        disabled={togglingMemberId === member.member_id || selectedSession?.status === 'Closed'}
+                        className="btn"
+                        style={{
+                          width: '120px',
+                          padding: '0.45rem 0.6rem',
+                          fontSize: '0.86rem',
+                          fontWeight: 800,
+                          borderRadius: '8px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          cursor: selectedSession?.status === 'Closed' ? 'not-allowed' : 'pointer',
+                          background: member.attended ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                          borderColor: member.attended ? '#22c55e' : '#ef4444',
+                          color: member.attended ? '#86efac' : '#fca5a5',
+                          boxShadow: member.attended ? '0 0 10px rgba(34, 197, 94, 0.2)' : 'none',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        {member.attended ? (
+                          <>
+                            <CheckCircle2 size={16} />
+                            <span>حاضر ✓</span>
+                          </>
+                        ) : (
+                          <>
+                            <XCircle size={16} />
+                            <span>غائب ✗</span>
+                          </>
+                        )}
+                      </button>
+                    </td>
 
-            <input
-              type="text"
-              className="form-input"
-              style={{ width: '220px', padding: '0.35rem 0.75rem', fontSize: '0.82rem' }}
-              placeholder="تصفية في الحاضرين..."
-              value={recSearch}
-              onChange={(e) => {
-                setRecSearch(e.target.value);
-                fetchRecords(selectedSession.session_id, e.target.value);
-              }}
-            />
-          </div>
-
-          <div className="table-container">
-            <table className="custom-table">
-              <thead>
-                <tr>
-                  <th>وقت الحضور</th>
-                  <th>رمز العضوية</th>
-                  <th>اسم الطفل الحاضر</th>
-                  <th>المرحلة</th>
-                  <th>طريقة المسح</th>
-                  <th>الخادم المسجل</th>
-                  <th style={{ textAlign: 'center' }}>إلغاء / تصحيح</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recLoading ? (
-                  <tr>
-                    <td colSpan={7} style={{ textAlign: 'center', padding: '2rem' }}>جاري تحميل كشف الحاضرين...</td>
-                  </tr>
-                ) : records.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
-                      لم يتم تسجيل حضور أي طفل في هذه الجلسة حتى الآن.
+                    {/* 6. Scanned At / Method */}
+                    <td style={{ textAlign: 'center', fontSize: '0.78rem', color: member.attended ? '#34d399' : 'var(--text-muted)' }}>
+                      {member.attended ? (
+                        <div>
+                          <strong style={{ display: 'block', dir: 'ltr' }}>{member.scanned_at || 'حاضر'}</strong>
+                          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{member.method === 'QR' ? '📷 ماسح' : '✍️ يدوي'}</span>
+                        </div>
+                      ) : (
+                        '—'
+                      )}
                     </td>
                   </tr>
-                ) : (
-                  records.map((r) => {
-                    const timeStr = r.scanned_at ? new Date(r.scanned_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : '';
-
-                    return (
-                      <tr key={r.record_id}>
-                        <td style={{ fontWeight: 800, color: '#34d399', dir: 'ltr', textAlign: 'right' }}>
-                          {timeStr}
-                        </td>
-                        <td>
-                          <span style={{ fontFamily: 'monospace', fontWeight: 800, color: '#38bdf8' }}>
-                            {r.member_id}
-                          </span>
-                        </td>
-                        <td style={{ fontWeight: 700, color: 'var(--text-main)' }}>
-                          {r.member_name}
-                        </td>
-                        <td style={{ fontSize: '0.82rem' }}>{r.member_stage}</td>
-                        <td>
-                          <span className="badge" style={{ background: 'rgba(148, 163, 184, 0.12)', color: '#e2e8f0' }}>
-                            {r.method === 'QR' ? 'ماسح 📷' : 'يدوي ⌨️'}
-                          </span>
-                        </td>
-                        <td style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                          {r.scanned_by_name || 'الخادم المسجل'}
-                        </td>
-                        <td style={{ textAlign: 'center' }}>
-                          <button
-                            onClick={() => { setCancellingRecord(r); setCancelReason(''); }}
-                            className="btn btn-secondary"
-                            style={{ padding: '0.25rem 0.5rem', fontSize: '0.78rem', color: '#f87171' }}
-                            title="إلغاء وتصحيح الحضور"
-                          >
-                            <XCircle size={15} />
-                            <span>تصحيح</span>
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
-      )}
+      </div>
 
-      {/* 5. Create Session Modal */}
-      {isSessionModalOpen && (
-        <div className="modal-overlay" onClick={() => setIsSessionModalOpen(false)}>
-          <div className="modal-card" style={{ maxWidth: '560px' }} onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(250, 204, 21, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-gold-main)' }}>
-                  <UserCheck size={22} />
-                </div>
-                <div>
-                  <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-gold-light)', margin: 0 }}>
-                    فتح جلسة تسجيل حضور جديدة
-                  </h3>
-                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>
-                    اختر الفصل أولاً ثم التاريخ ثم حدد اسم الجلسة لبدء المسح المعتمد
-                  </p>
-                </div>
-              </div>
-              <button onClick={() => setIsSessionModalOpen(false)} className="btn-secondary" style={{ padding: '0.35rem', borderRadius: '50%' }}>
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="modal-body">
-              <form id="createSessionForm" onSubmit={handleCreateSessionSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
-                {/* الخطوة 1: اختيار الفصل أولاً */}
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label className="form-label" style={{ fontWeight: 800, color: 'var(--color-gold-light)', display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.92rem' }}>
-                    <GraduationCap size={18} style={{ color: 'var(--color-gold-main)' }} />
-                    <span>1️⃣ اختر الفصل أولاً *</span>
-                  </label>
-                  <select
-                    className="form-input"
-                    style={{ fontWeight: 700, borderColor: 'rgba(250, 204, 21, 0.4)', background: 'rgba(10, 25, 47, 0.7)' }}
-                    value={sessionFormData.class_id}
-                    onChange={handleClassChange}
-                    required
-                  >
-                    <option value="">— اختر الفصل المستهدف من القائمة —</option>
-                    <option value="GENERAL">🌟 جلسة عامة لكافة المراحل والفصول</option>
-                    {classesList.map((cls) => (
-                      <option key={cls.class_id} value={cls.class_id}>
-                        {cls.name} ({cls.stage || 'عام'}) — [الأطفال: {cls.active_members_count || 0} | الخدام: {cls.active_servants_count || 0}]
-                      </option>
-                    ))}
-                  </select>
-                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.25rem', display: 'block' }}>
-                    يتم تلقائياً حصر الأطفال وتفويض خدام هذا الفصل للتسجيل.
-                  </span>
-                </div>
-
-                {/* الخطوة 2: اختيار التاريخ */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label" style={{ fontWeight: 800, color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.92rem' }}>
-                      <Calendar size={18} />
-                      <span>2️⃣ تاريخ الجلسة *</span>
-                    </label>
-                    <input
-                      type="date"
-                      className="form-input"
-                      value={sessionFormData.session_date}
-                      onChange={handleDateChange}
-                      required
-                    />
-                  </div>
-
-                  {/* المرحلة المستهدفة */}
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label" style={{ fontWeight: 700, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.88rem' }}>
-                      <Layers size={16} />
-                      <span>المرحلة الدراسية</span>
-                    </label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      value={sessionFormData.stage}
-                      readOnly
-                      style={{ opacity: 0.85, background: 'rgba(255, 255, 255, 0.05)' }}
-                      title="يتم ضبط المرحلة تلقائياً حسب الفصل المختار"
-                    />
-                  </div>
-                </div>
-
-                {/* الخطوة 3: اسم/عنوان الجلسة المخصص */}
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label className="form-label" style={{ fontWeight: 800, color: '#34d399', display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.92rem' }}>
-                    <Sparkles size={18} />
-                    <span>3️⃣ اسم وعنوان الجلسة (مخصص ومحدد) *</span>
-                  </label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    value={sessionFormData.title}
-                    onChange={(e) => setSessionFormData({ ...sessionFormData, title: e.target.value })}
-                    placeholder="مثال: حضور فصل حضانة - درس داود والنبي"
-                    required
-                  />
-                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.25rem', display: 'block' }}>
-                    💡 تم إنشاء الاسم تلقائياً ويمكنك تخصيصه (مثل موضوع الدرس أو اسم الاحتفال) لتسهيل تمييز الجلسات ومتابعتها.
-                  </span>
-                </div>
-
-                {/* تصنيف وتكرار الجلسة */}
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label className="form-label" style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                    تصنيف وتكرار الجلسة الخدمية 🔄
-                  </label>
-                  <select
-                    className="form-input"
-                    value={sessionFormData.recurrence}
-                    onChange={(e) => setSessionFormData({ ...sessionFormData, recurrence: e.target.value })}
-                  >
-                    <option value="Weekly">جلسة أسبوعية منتظمة (Weekly) 📅</option>
-                    <option value="Daily">جلسة يومية / مؤتمر مكثف (Daily) ☀️</option>
-                    <option value="Monthly">جلسة شهريّة (Monthly) 🗓️</option>
-                    <option value="OneTime">مرة واحدة فقط - لن تتكرر (OneTime) 🛑</option>
-                  </select>
-                </div>
-              </form>
-            </div>
-
-            <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-              <button type="button" onClick={() => setIsSessionModalOpen(false)} className="btn btn-secondary">
-                إلغاء
-              </button>
-              <button type="submit" form="createSessionForm" className="btn btn-primary" disabled={sessionFormLoading}>
-                {sessionFormLoading ? (
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <RefreshCw size={16} className="pulse-gold" />
-                    جاري الفتح...
-                  </span>
-                ) : (
-                  'فتح الجلسة الآن 🔓'
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 6. Register Device Modal */}
-      {isDeviceModalOpen && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 23, 42, 0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
-          <div className="glass-card animate-fade-in" style={{ width: '100%', maxWidth: '440px', background: '#1e293b', boxShadow: 'var(--shadow-glow)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.75rem', marginBottom: '1.25rem' }}>
-              <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Smartphone size={22} style={{ color: '#34d399' }} />
-                <span>اعتماد هذا الجهاز للتسجيل</span>
+      {/* 4. Optional QR Scanner Modal */}
+      {isScannerModalOpen && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.85)',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '1rem',
+          backdropFilter: 'blur(4px)'
+        }}>
+          <div className="glass-card" style={{ width: '100%', maxWidth: '440px', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Camera size={20} />
+                <span>مسح كروت QR بالكاميرا</span>
               </h3>
-              <button onClick={() => setIsDeviceModalOpen(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
-                <X size={22} />
-              </button>
-            </div>
-
-            <form onSubmit={handleRegisterDeviceSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div className="form-group">
-                <label className="form-label">اسم جهاز الخدمة (مثال: تابلت الكنيسة 1) *</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={deviceName}
-                  onChange={(e) => setDeviceName(e.target.value)}
-                  placeholder="أدخل اسم الجهاز المصرح به"
-                  required
-                />
-              </div>
-
-              <div style={{ fontSize: '0.8rem', color: '#94a3b8', background: 'rgba(56, 189, 248, 0.1)', padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(56, 189, 248, 0.2)' }}>
-                ℹ️ سيتم توليد رمز أمان فريد (Device Token) وحفظه بالمتصفح لإتمام الربط الثلاثي المعتمد.
-              </div>
-
-              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
-                <button type="button" onClick={() => setIsDeviceModalOpen(false)} className="btn btn-secondary">إلغاء</button>
-                <button type="submit" className="btn btn-primary">تأكيد اعتماد الجهاز</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* 7. Cancel Record Modal */}
-      {cancellingRecord && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 23, 42, 0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '1rem' }}>
-          <div className="glass-card animate-fade-in" style={{ width: '100%', maxWidth: '420px', background: '#1e293b', boxShadow: 'var(--shadow-glow)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.75rem', marginBottom: '1rem' }}>
-              <h4 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)' }}>
-                تصحيح/إلغاء حضور: {cancellingRecord.member_name}
-              </h4>
-              <button onClick={() => setCancellingRecord(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+              <button onClick={stopCamera} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
                 <X size={20} />
               </button>
             </div>
 
-            <form onSubmit={handleCancelAttendanceSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div className="form-group">
-                <label className="form-label">سبب تصحيح/إلغاء تسجيل الحضور *</label>
-                <input
-                  type="text"
+            <div style={{ width: '100%', minHeight: '260px', borderRadius: '12px', overflow: 'hidden', background: '#0f172a', border: '2px dashed #38bdf8' }} id={scannerContainerId} />
+
+            {recentScanResult && (
+              <div style={{
+                padding: '0.6rem 0.8rem',
+                borderRadius: '8px',
+                textAlign: 'center',
+                background: recentScanResult.status === 'success' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(245, 158, 11, 0.2)',
+                color: recentScanResult.status === 'success' ? '#86efac' : '#fbbf24',
+                fontWeight: 700,
+                fontSize: '0.85rem'
+              }}>
+                {recentScanResult.title} - {recentScanResult.name}
+              </div>
+            )}
+
+            <button onClick={stopCamera} className="btn btn-secondary" style={{ width: '100%', justifyContent: 'center' }}>
+              إغلاق العارض والعودة للكشف
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 5. New Session Modal */}
+      {isSessionModalOpen && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.85)',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '1rem',
+          backdropFilter: 'blur(4px)'
+        }}>
+          <div className="glass-card" style={{ width: '100%', maxWidth: '480px', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                إنشاء جلسة حضور جديدة للفصل
+              </h3>
+              <button onClick={() => setIsSessionModalOpen(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateSession} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label className="form-label">الفصل المستهدف*</label>
+                <select
                   className="form-input"
-                  value={cancelReason}
-                  onChange={(e) => setCancelReason(e.target.value)}
-                  placeholder="مثال: تم مسح البطاقة بالخطأ لطلب مرحلة أخرى"
+                  value={sessionFormData.class_id}
+                  onChange={(e) => setSessionFormData({ ...sessionFormData, class_id: e.target.value })}
+                  required
+                >
+                  <option value="">— اختر الفصل —</option>
+                  {classesList.map(c => (
+                    <option key={c.class_id} value={c.class_id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="form-label">تاريخ الجلسة*</label>
+                <input
+                  type="date"
+                  className="form-input"
+                  value={sessionFormData.session_date}
+                  onChange={(e) => setSessionFormData({ ...sessionFormData, session_date: e.target.value })}
                   required
                 />
               </div>
 
-              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
-                <button type="button" onClick={() => setCancellingRecord(null)} className="btn btn-secondary">إلغاء</button>
-                <button type="submit" className="btn btn-primary" style={{ background: '#ef4444' }} disabled={cancelLoading}>
-                  {cancelLoading ? 'جاري الإلغاء...' : 'تأكيد الإلغاء والتصحيح'}
+              <div>
+                <label className="form-label">عنوان الجلسة (اختياري)</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="مثال: قداس الأحد والمدارس"
+                  value={sessionFormData.title}
+                  onChange={(e) => setSessionFormData({ ...sessionFormData, title: e.target.value })}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
+                <button type="button" onClick={() => setIsSessionModalOpen(false)} className="btn btn-secondary">
+                  إلغاء
+                </button>
+                <button type="submit" disabled={sessionFormLoading} className="btn btn-primary">
+                  {sessionFormLoading ? 'جاري الإنشاء...' : 'بدء الجلسة'}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
+
     </div>
   );
 };

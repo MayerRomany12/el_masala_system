@@ -49,13 +49,36 @@ class BirthdayRepository:
         self,
         period: str = "today",  # today, week, month, all
         stage: Optional[str] = None,
+        class_id: Optional[str] = None,
+        allowed_class_ids: Optional[List[str]] = None,
         gift_status: Optional[str] = None,  # Delivered, Pending
         month: Optional[int] = None
     ) -> List[Dict[str, Any]]:
+        from app.models.class_group import ClassGroupMember
         query = select(Member).where(
             Member.is_archived == False,
             Member.date_of_birth.isnot(None)
         )
+
+        if class_id:
+            query = query.where(
+                Member.member_id.in_(
+                    select(ClassGroupMember.member_id).where(
+                        ClassGroupMember.class_id == class_id,
+                        ClassGroupMember.is_active == True
+                    )
+                )
+            )
+        elif allowed_class_ids is not None:
+            query = query.where(
+                Member.member_id.in_(
+                    select(ClassGroupMember.member_id).where(
+                        ClassGroupMember.class_id.in_(allowed_class_ids),
+                        ClassGroupMember.is_active == True
+                    )
+                )
+            )
+
         if stage and stage != "ALL":
             stage_prefix = stage.split('-')[0].strip()
             query = query.where(Member.stage.ilike(f"%{stage_prefix}%"))

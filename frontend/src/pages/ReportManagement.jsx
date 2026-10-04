@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { reportsApi } from '../api/reports';
 import { apiClient } from '../api/client';
+import { getWaUrl } from '../utils/phone';
 import {
   FileBarChart,
   Download,
@@ -10,7 +11,13 @@ import {
   Filter,
   AlertCircle,
   Users,
-  Calendar
+  Calendar,
+  CheckCircle2,
+  XCircle,
+  MessageCircle,
+  Phone,
+  ExternalLink,
+  BookOpen
 } from 'lucide-react';
 
 const STAGE_OPTIONS = [
@@ -24,8 +31,12 @@ const STAGE_OPTIONS = [
 ];
 
 export const ReportManagement = () => {
-  // Active Report Tab: 'members', 'attendance', 'financials', 'followup', 'birthdays'
+  // Active Report Tab: 'members', 'who_attended', 'who_absent', 'attendance', 'financials', 'followup', 'birthdays'
   const [reportType, setReportType] = useState('members');
+
+  // Classes List
+  const [classesList, setClassesList] = useState([]);
+  const [selectedClassId, setSelectedClassId] = useState('');
 
   // Filters
   const [selectedStage, setSelectedStage] = useState('');
@@ -40,6 +51,16 @@ export const ReportManagement = () => {
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState('');
 
+  // Load Classes for Class-centric filtering
+  useEffect(() => {
+    apiClient.get('/classes/?status=Active&limit=100')
+      .then((res) => {
+        const items = res?.data?.data?.items || res?.data?.items || [];
+        setClassesList(items);
+      })
+      .catch(() => setClassesList([]));
+  }, []);
+
   // Fetch Report Data
   const fetchReportData = useCallback(async () => {
     setLoading(true);
@@ -48,6 +69,7 @@ export const ReportManagement = () => {
       if (reportType === 'members') {
         const res = await apiClient.get('/members', {
           params: {
+            class_id: selectedClassId || undefined,
             stage: selectedStage && selectedStage !== 'ALL' ? selectedStage : undefined,
             limit: 100
           }
@@ -56,8 +78,31 @@ export const ReportManagement = () => {
           setDataList(res.data.data.items || []);
           setSummaryData({ total_count: res.data.data.total });
         }
+      } else if (reportType === 'who_attended') {
+        const res = await reportsApi.getWhoAttendedReport({
+          class_id: selectedClassId || null,
+          stage: selectedStage && selectedStage !== 'ALL' ? selectedStage : null,
+          from_date: fromDate || null,
+          to_date: toDate || null
+        });
+        if (res.success) {
+          setDataList(res.data.items || []);
+          setSummaryData({ total_count: res.data.total || (res.data.items?.length || 0) });
+        }
+      } else if (reportType === 'who_absent') {
+        const res = await reportsApi.getWhoAbsentReport({
+          class_id: selectedClassId || null,
+          stage: selectedStage && selectedStage !== 'ALL' ? selectedStage : null,
+          from_date: fromDate || null,
+          to_date: toDate || null
+        });
+        if (res.success) {
+          setDataList(res.data.items || []);
+          setSummaryData({ total_count: res.data.total || (res.data.items?.length || 0) });
+        }
       } else if (reportType === 'attendance') {
         const res = await reportsApi.getAttendanceReport({
+          class_id: selectedClassId || null,
           stage: selectedStage && selectedStage !== 'ALL' ? selectedStage : null,
           from_date: fromDate || null,
           to_date: toDate || null
@@ -94,7 +139,7 @@ export const ReportManagement = () => {
     } finally {
       setLoading(false);
     }
-  }, [reportType, selectedStage, selectedEventType, fromDate, toDate]);
+  }, [reportType, selectedClassId, selectedStage, selectedEventType, fromDate, toDate]);
 
   useEffect(() => {
     fetchReportData();
@@ -105,6 +150,7 @@ export const ReportManagement = () => {
     try {
       setExporting(true);
       const params = {};
+      if (selectedClassId) params.class_id = selectedClassId;
       if (selectedStage && selectedStage !== 'ALL') params.stage = selectedStage;
       if (selectedEventType && selectedEventType !== 'ALL') params.event_type = selectedEventType;
       if (fromDate) params.from_date = fromDate;
@@ -216,15 +262,31 @@ export const ReportManagement = () => {
         <button
           onClick={() => setReportType('members')}
           className={`btn ${reportType === 'members' ? 'btn-primary' : 'btn-secondary'}`}
-          style={{ fontSize: '0.88rem' }}
+          style={{ fontSize: '0.88rem', whiteSpace: 'nowrap' }}
         >
           سجل المخدومين الشامل 📜
         </button>
 
         <button
+          onClick={() => setReportType('who_attended')}
+          className={`btn ${reportType === 'who_attended' ? 'btn-primary' : 'btn-secondary'}`}
+          style={{ fontSize: '0.88rem', whiteSpace: 'nowrap', color: reportType === 'who_attended' ? '#fff' : '#34d399' }}
+        >
+          كشف الحاضرين (مين حضر) ✅
+        </button>
+
+        <button
+          onClick={() => setReportType('who_absent')}
+          className={`btn ${reportType === 'who_absent' ? 'btn-primary' : 'btn-secondary'}`}
+          style={{ fontSize: '0.88rem', whiteSpace: 'nowrap', color: reportType === 'who_absent' ? '#fff' : '#f87171' }}
+        >
+          كشف الغائبين (مين غاب) ❌
+        </button>
+
+        <button
           onClick={() => setReportType('attendance')}
           className={`btn ${reportType === 'attendance' ? 'btn-primary' : 'btn-secondary'}`}
-          style={{ fontSize: '0.88rem' }}
+          style={{ fontSize: '0.88rem', whiteSpace: 'nowrap' }}
         >
           تقرير الحضور والانتظام 📊
         </button>
@@ -232,7 +294,7 @@ export const ReportManagement = () => {
         <button
           onClick={() => setReportType('financials')}
           className={`btn ${reportType === 'financials' ? 'btn-primary' : 'btn-secondary'}`}
-          style={{ fontSize: '0.88rem' }}
+          style={{ fontSize: '0.88rem', whiteSpace: 'nowrap' }}
         >
           التقرير المالي للرحلات والأنشطة 💳
         </button>
@@ -240,7 +302,7 @@ export const ReportManagement = () => {
         <button
           onClick={() => setReportType('followup')}
           className={`btn ${reportType === 'followup' ? 'btn-primary' : 'btn-secondary'}`}
-          style={{ fontSize: '0.88rem' }}
+          style={{ fontSize: '0.88rem', whiteSpace: 'nowrap' }}
         >
           تقرير متابعة الغياب والافتقاد 🤝
         </button>
@@ -248,7 +310,7 @@ export const ReportManagement = () => {
         <button
           onClick={() => setReportType('birthdays')}
           className={`btn ${reportType === 'birthdays' ? 'btn-primary' : 'btn-secondary'}`}
-          style={{ fontSize: '0.88rem' }}
+          style={{ fontSize: '0.88rem', whiteSpace: 'nowrap' }}
         >
           تقرير أعياد الميلاد وتوزيع الهدايا 🎁
         </button>
@@ -261,7 +323,23 @@ export const ReportManagement = () => {
           <span>تصفية التقرير:</span>
         </div>
 
-        {(reportType === 'members' || reportType === 'attendance') && (
+        {/* Class Filter */}
+        {(reportType === 'members' || reportType === 'who_attended' || reportType === 'who_absent' || reportType === 'attendance') && (
+          <div style={{ flex: '0 1 200px' }}>
+            <select
+              className="form-input"
+              value={selectedClassId}
+              onChange={(e) => setSelectedClassId(e.target.value)}
+            >
+              <option value="">جميع الفصول 🏫</option>
+              {classesList.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {(reportType === 'members' || reportType === 'who_attended' || reportType === 'who_absent' || reportType === 'attendance') && (
           <div style={{ flex: '0 1 200px' }}>
             <select
               className="form-input"
@@ -291,7 +369,7 @@ export const ReportManagement = () => {
           </div>
         )}
 
-        {(reportType === 'attendance' || reportType === 'financials') && (
+        {(reportType === 'attendance' || reportType === 'who_attended' || reportType === 'who_absent' || reportType === 'financials') && (
           <>
             <div style={{ flex: '0 1 160px' }}>
               <input
@@ -300,6 +378,7 @@ export const ReportManagement = () => {
                 value={fromDate}
                 onChange={(e) => setFromDate(e.target.value)}
                 placeholder="من تاريخ"
+                title="من تاريخ"
               />
             </div>
 
@@ -310,11 +389,60 @@ export const ReportManagement = () => {
                 value={toDate}
                 onChange={(e) => setToDate(e.target.value)}
                 placeholder="إلى تاريخ"
+                title="إلى تاريخ"
               />
             </div>
           </>
         )}
       </div>
+
+      {/* Summary Banner for Who Attended */}
+      {reportType === 'who_attended' && summaryData && (
+        <div className="glass-card animate-fade-in" style={{ padding: '1rem 1.5rem', background: 'rgba(52, 211, 153, 0.1)', border: '1px solid rgba(52, 211, 153, 0.3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <CheckCircle2 size={24} style={{ color: '#34d399' }} />
+            <div>
+              <strong style={{ fontSize: '1.2rem', color: '#34d399', display: 'block' }}>
+                كشف الحاضرين ({summaryData.total_count || dataList.length} مخدوم)
+              </strong>
+              <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                قائمة الأطفال الذين حضروا الجلسات من واقع الكشوفات المسجلة
+              </span>
+            </div>
+          </div>
+          <button
+            onClick={() => handleExport('pdf')}
+            className="btn btn-primary"
+            style={{ fontSize: '0.85rem' }}
+          >
+            <Printer size={16} /> طباعة كشف الحاضرين الرسمي (PDF)
+          </button>
+        </div>
+      )}
+
+      {/* Summary Banner for Who Absent */}
+      {reportType === 'who_absent' && summaryData && (
+        <div className="glass-card animate-fade-in" style={{ padding: '1rem 1.5rem', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <XCircle size={24} style={{ color: '#f87171' }} />
+            <div>
+              <strong style={{ fontSize: '1.2rem', color: '#f87171', display: 'block' }}>
+                كشف الغائبين المستهدفين للافتقاد ({summaryData.total_count || dataList.length} مخدوم)
+              </strong>
+              <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                قائمة الأطفال الغائبين لسرعة الافتقاد والتواصل المباشر مع أولياء الأمور
+              </span>
+            </div>
+          </div>
+          <button
+            onClick={() => handleExport('pdf')}
+            className="btn btn-secondary"
+            style={{ fontSize: '0.85rem', borderColor: 'rgba(239, 68, 68, 0.4)', color: '#fca5a5' }}
+          >
+            <Printer size={16} /> طباعة كشف الغياب للافتقاد (PDF)
+          </button>
+        </div>
+      )}
 
       {error && (
         <div className="alert alert-error">
@@ -421,6 +549,181 @@ export const ReportManagement = () => {
                         <span className="badge" style={{ background: row.status === 'Active' ? 'rgba(52, 211, 153, 0.18)' : 'rgba(239, 68, 68, 0.18)', color: row.status === 'Active' ? '#34d399' : '#f87171' }}>
                           {row.status === 'Active' ? 'نشط' : 'غير نشط'}
                         </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Who Attended Report Table */}
+        {reportType === 'who_attended' && (
+          <div className="table-container">
+            <table className="custom-table">
+              <thead>
+                <tr>
+                  <th style={{ width: '45px', textAlign: 'center' }}>م</th>
+                  <th>رمز المخدوم</th>
+                  <th>اسم المخدوم الكامل</th>
+                  <th>الفصل</th>
+                  <th>المرحلة</th>
+                  <th>المنطقة السكنية</th>
+                  <th>الهاتف</th>
+                  <th>تاريخ الجلسة</th>
+                  <th>طريقة التسجيل</th>
+                  <th style={{ textAlign: 'center' }}>إجراءات</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={10} style={{ textAlign: 'center', padding: '2rem' }}>جاري استخراج كشف الحاضرين...</td>
+                  </tr>
+                ) : dataList.length === 0 ? (
+                  <tr>
+                    <td colSpan={10} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>لا يوجد حضور مطابق للتصفية.</td>
+                  </tr>
+                ) : (
+                  dataList.map((row, idx) => (
+                    <tr key={`${row.member_id}-${row.session_date}-${idx}`}>
+                      <td style={{ textAlign: 'center', fontWeight: 800, color: 'var(--color-gold-light)' }}>
+                        {row.index || (idx + 1)}
+                      </td>
+                      <td>
+                        <span style={{ fontFamily: 'monospace', fontWeight: 800, color: '#38bdf8' }}>
+                          {row.member_id}
+                        </span>
+                      </td>
+                      <td style={{ fontWeight: 700, color: 'var(--text-main)' }}>{row.full_name}</td>
+                      <td>
+                        <span className="badge" style={{ background: 'rgba(212, 175, 55, 0.15)', color: 'var(--color-gold-light)', border: '1px solid rgba(212, 175, 55, 0.3)' }}>
+                          {row.class_name || '—'}
+                        </span>
+                      </td>
+                      <td>{row.stage || '—'}</td>
+                      <td>
+                        <span style={{ color: '#cbd5e1', fontSize: '0.85rem' }}>{row.area || '—'}</span>
+                      </td>
+                      <td>
+                        <span style={{ color: '#38bdf8', fontWeight: 600 }}>{row.phone || '—'}</span>
+                      </td>
+                      <td>{row.session_date || '—'}</td>
+                      <td>
+                        <span className="badge" style={{ background: row.method === 'qr' ? 'rgba(56, 189, 248, 0.15)' : 'rgba(52, 211, 153, 0.15)', color: row.method === 'qr' ? '#38bdf8' : '#34d399' }}>
+                          {row.method === 'qr' ? 'مسح QR 📱' : 'يدوي (الكشف) ✍️'}
+                        </span>
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        <button
+                          onClick={() => window.open(reportsApi.getMemberProfilePrintUrl(row.member_id), '_blank')}
+                          className="btn btn-secondary"
+                          style={{ fontSize: '0.78rem', padding: '0.25rem 0.5rem', gap: '0.25rem' }}
+                          title="طباعة استمارة المخدوم الشاملة"
+                        >
+                          <Printer size={13} /> استمارة
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Who Absent Report Table */}
+        {reportType === 'who_absent' && (
+          <div className="table-container">
+            <table className="custom-table">
+              <thead>
+                <tr>
+                  <th style={{ width: '45px', textAlign: 'center' }}>م</th>
+                  <th>رمز المخدوم</th>
+                  <th>اسم المخدوم الكامل</th>
+                  <th>الفصل</th>
+                  <th>المرحلة</th>
+                  <th>المنطقة السكنية</th>
+                  <th>الهاتف</th>
+                  <th>تاريخ جلسة الغياب</th>
+                  <th style={{ textAlign: 'center' }}>تواصل وافتقاد</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={9} style={{ textAlign: 'center', padding: '2rem' }}>جاري استخراج كشف الغائبين...</td>
+                  </tr>
+                ) : dataList.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} style={{ textAlign: 'center', padding: '2rem', color: '#34d399' }}>ممتاز! لا يوجد غياب في الجلسات المحددة. 🎉</td>
+                  </tr>
+                ) : (
+                  dataList.map((row, idx) => (
+                    <tr key={`${row.member_id}-${row.session_date}-${idx}`}>
+                      <td style={{ textAlign: 'center', fontWeight: 800, color: '#f87171' }}>
+                        {row.index || (idx + 1)}
+                      </td>
+                      <td>
+                        <span style={{ fontFamily: 'monospace', fontWeight: 800, color: '#38bdf8' }}>
+                          {row.member_id}
+                        </span>
+                      </td>
+                      <td style={{ fontWeight: 700, color: 'var(--text-main)' }}>{row.full_name}</td>
+                      <td>
+                        <span className="badge" style={{ background: 'rgba(212, 175, 55, 0.15)', color: 'var(--color-gold-light)', border: '1px solid rgba(212, 175, 55, 0.3)' }}>
+                          {row.class_name || '—'}
+                        </span>
+                      </td>
+                      <td>{row.stage || '—'}</td>
+                      <td>
+                        <span style={{ color: '#fbbf24', fontSize: '0.85rem' }}>{row.area || '—'}</span>
+                      </td>
+                      <td>
+                        <span style={{ color: '#38bdf8', fontWeight: 600 }}>{row.phone || '—'}</span>
+                      </td>
+                      <td>
+                        <span style={{ color: '#fca5a5', fontWeight: 600 }}>{row.session_date || '—'}</span>
+                        {row.session_title && (
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>
+                            {row.session_title}
+                          </span>
+                        )}
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center' }}>
+                          {row.phone && (
+                            <a
+                              href={getWaUrl(row.whatsapp_phone || row.phone, `سلام ونعمة يا فندم، كنا بنطمن على ${row.full_name} لغيابه عن اجتماع مدارس الأحد بكنيسة الشهيد مارجرجس والأنبا شنودة بالكرور`)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="btn btn-secondary"
+                              style={{ fontSize: '0.78rem', padding: '0.25rem 0.5rem', color: '#34d399', borderColor: 'rgba(52, 211, 153, 0.4)' }}
+                              title="تواصل واتساب مباشر للافتقاد"
+                            >
+                              <MessageCircle size={13} /> واتساب
+                            </a>
+                          )}
+                          {row.phone && (
+                            <a
+                              href={`tel:${row.phone}`}
+                              className="btn btn-secondary"
+                              style={{ fontSize: '0.78rem', padding: '0.25rem 0.45rem' }}
+                              title="اتصال هاتفي"
+                            >
+                              <Phone size={13} />
+                            </a>
+                          )}
+                          <button
+                            onClick={() => window.open(reportsApi.getMemberProfilePrintUrl(row.member_id), '_blank')}
+                            className="btn btn-secondary"
+                            style={{ fontSize: '0.78rem', padding: '0.25rem 0.45rem' }}
+                            title="طباعة استمارة المخدوم الشاملة"
+                          >
+                            <Printer size={13} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))

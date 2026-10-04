@@ -1,9 +1,9 @@
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, HTTPException, status
 from typing import Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.auth.dependencies import get_current_user, require_permission
+from app.auth.dependencies import get_current_user, require_permission, get_servant_class_ids
 from app.classes.schemas import (
     ClassGroupCreate,
     ClassGroupUpdate,
@@ -29,12 +29,14 @@ async def list_classes(
     current_user=Depends(get_current_user)
 ):
     service = ClassService(db)
+    allowed_class_ids = await get_servant_class_ids(current_user, db)
     items = await service.list_classes(
         group_type=group_type,
         season_id=season_id,
         stage=stage,
         status=status,
         is_active=is_active,
+        allowed_class_ids=allowed_class_ids,
         limit=limit
     )
     return success_response(data={"items": items, "total": len(items)}, message="تم جلب قائمة الفصول والمجموعات بنجاح")
@@ -58,6 +60,9 @@ async def get_class_group(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
+    allowed_class_ids = await get_servant_class_ids(current_user, db)
+    if allowed_class_ids is not None and class_id not in allowed_class_ids:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="ليس لديك صلاحية الوصول لهذا الفصل")
     service = ClassService(db)
     class_group = await service.get_class_group(class_id)
     return success_response(data=class_group, message="تم جلب تفاصيل الفصل بنجاح")
@@ -83,6 +88,9 @@ async def list_class_servants(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
+    allowed_class_ids = await get_servant_class_ids(current_user, db)
+    if allowed_class_ids is not None and class_id not in allowed_class_ids:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="ليس لديك صلاحية الوصول لهذا الفصل")
     service = ClassService(db)
     servants = await service.list_class_servants(class_id, active_only=active_only)
     return success_response(data={"items": servants, "total": len(servants)}, message="تم جلب قائمة خدام الفصل بنجاح")
@@ -120,6 +128,9 @@ async def list_class_members(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
+    allowed_class_ids = await get_servant_class_ids(current_user, db)
+    if allowed_class_ids is not None and class_id not in allowed_class_ids:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="ليس لديك صلاحية الوصول لهذا الفصل")
     service = ClassService(db)
     members = await service.list_class_members(class_id, active_only=active_only)
     return success_response(data={"items": members, "total": len(members)}, message="تم جلب قائمة مخدومي الفصل بنجاح")
@@ -130,8 +141,11 @@ async def add_member(
     class_id: str,
     data: AddMemberRequest,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_permission("classes:manage"))
+    current_user=Depends(require_permission("members:write"))
 ):
+    allowed_class_ids = await get_servant_class_ids(current_user, db)
+    if allowed_class_ids is not None and class_id not in allowed_class_ids:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="ليس لديك صلاحية لإضافة مخدوم لهذا الفصل")
     service = ClassService(db)
     result = await service.add_member(class_id, data)
     return success_response(data=result, message="تم إضافة المخدوم للفصل بنجاح")
@@ -141,7 +155,7 @@ async def add_member(
 async def transfer_member(
     data: TransferMemberRequest,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_permission("classes:manage"))
+    current_user=Depends(require_permission("members:archive"))
 ):
     service = ClassService(db)
     result = await service.transfer_member(data)
@@ -153,8 +167,11 @@ async def remove_member(
     class_id: str,
     member_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_permission("classes:manage"))
+    current_user=Depends(require_permission("members:write"))
 ):
+    allowed_class_ids = await get_servant_class_ids(current_user, db)
+    if allowed_class_ids is not None and class_id not in allowed_class_ids:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="ليس لديك صلاحية لإزالة مخدوم من هذا الفصل")
     service = ClassService(db)
     await service.remove_member(class_id, member_id)
     return success_response(data=None, message="تم إنهاء عضوية المخدوم بالفصل بنجاح")

@@ -1,9 +1,9 @@
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, HTTPException, status
 from typing import Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.auth.dependencies import get_current_user, require_permission
+from app.auth.dependencies import get_current_user, require_permission, get_servant_class_ids
 from app.followup.schemas import (
     FollowupTaskCreate,
     FollowupTaskUpdate,
@@ -18,12 +18,33 @@ router = APIRouter(prefix="/followup", tags=["Absence Tracking & Servant Follow-
 @router.post("/detect", response_model=dict)
 async def run_absence_detector(
     stage: Optional[str] = Query(None),
+    class_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user=Depends(require_permission("followup:manage"))
 ):
     service = FollowupService(db)
-    result = await service.run_absence_detector(stage=stage)
+    result = await service.run_absence_detector(stage=stage, class_id=class_id)
     return success_response(data=result, message=result["message"])
+
+
+@router.get("/tasks/by-area", response_model=dict)
+async def get_tasks_by_area(
+    class_id: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_permission("followup:read"))
+):
+    allowed_class_ids = await get_servant_class_ids(current_user, db)
+    if class_id and allowed_class_ids is not None and class_id not in allowed_class_ids:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="ليس لديك صلاحية لعرض افتقاد هذا الفصل")
+
+    service = FollowupService(db)
+    result = await service.get_tasks_grouped_by_area(
+        class_id=class_id,
+        allowed_class_ids=allowed_class_ids,
+        status=status
+    )
+    return success_response(data=result, message="تم تجميع مهام الافتقاد بحسب المناطق السكنية بنجاح")
 
 
 @router.get("/tasks", response_model=dict)
@@ -32,14 +53,22 @@ async def list_followup_tasks(
     priority: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
+    class_id: Optional[str] = Query(None),
+    area: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     limit: int = Query(50, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
     current_user=Depends(require_permission("followup:read"))
 ):
+    allowed_class_ids = await get_servant_class_ids(current_user, db)
+    if class_id and allowed_class_ids is not None and class_id not in allowed_class_ids:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="ليس لديك صلاحية لعرض افتقاد هذا الفصل")
+
     service = FollowupService(db)
     result = await service.list_tasks(
-        servant_id=servant_id, priority=priority, status=status, search=search, page=page, limit=limit
+        servant_id=servant_id, priority=priority, status=status, search=search,
+        class_id=class_id, area=area, allowed_class_ids=allowed_class_ids,
+        page=page, limit=limit
     )
     return success_response(data=result, message="تم جلب قائمة مهام الافتقاد بنجاح")
 

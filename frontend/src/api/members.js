@@ -40,5 +40,20 @@ export const membersApi = {
       },
     });
     return response.data;
+  },
+
+  updatePhotoData: async (memberId, photoData) => {
+    const response = await apiClient.put(`/members/${memberId}/photo-data`, { photo_data: photoData });
+    return response.data;
+  },
+
+  getMemberAttendanceHistory: async (memberId) => {
+    const response = await apiClient.get(`/members/${memberId}/attendance-history`);
+    return response.data;
+  },
+
+  getDistinctAreas: async () => {
+    const response = await apiClient.get('/members/areas/list');
+    return response.data;
   }
 };

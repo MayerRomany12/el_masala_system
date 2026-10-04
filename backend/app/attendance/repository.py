@@ -258,12 +258,19 @@ class AttendanceRepository:
         self,
         search: Optional[str] = None,
         stage: Optional[str] = None,
+        class_id: Optional[str] = None,
         status: Optional[str] = None,
+        allowed_class_ids: Optional[List[str]] = None,
         skip: int = 0,
         limit: int = 50,
     ) -> Tuple[List[Dict[str, Any]], int]:
         await self._evaluate_lazy_void()
         query = select(AttendanceSession)
+
+        if class_id:
+            query = query.where(AttendanceSession.class_id == class_id)
+        elif allowed_class_ids is not None:
+            query = query.where(AttendanceSession.class_id.in_(allowed_class_ids))
 
         if status:
             query = query.where(AttendanceSession.status == status)
@@ -476,3 +483,146 @@ class AttendanceRepository:
                 "scanned_at": reg.scanned_at,
             })
         return items
+
+    async def get_session_sheet(self, session_id: str, search: Optional[str] = None) -> Dict[str, Any]:
+        """
+        جلب شيت الحضور والغياب المرقم والمنسق للفصل بالكامل
+        موضحاً مين حضر ومين غاب مع الإحصائيات الفورية.
+        """
+        session_info = await self.get_session_by_id(session_id)
+        if not session_info:
+            return {}
+
+        from app.models.class_group import ClassGroupMember
+
+        if session_info.get("class_id"):
+            mem_q = (
+                select(
+                    Member.member_id,
+                    Member.full_name,
+                    Member.phone,
+                    Member.whatsapp_phone,
+                    Member.area,
+                    Member.stage,
+                    Member.photo_url
+                )
+                .join(ClassGroupMember, Member.member_id == ClassGroupMember.member_id)
+                .where(
+                    ClassGroupMember.class_id == session_info["class_id"],
+                    ClassGroupMember.is_active == True,
+                    Member.is_archived == False
+                )
+            )
+        else:
+            mem_q = select(
+                Member.member_id,
+                Member.full_name,
+                Member.phone,
+                Member.whatsapp_phone,
+                Member.area,
+                Member.stage,
+                Member.photo_url
+            ).where(Member.is_archived == False)
+            if session_info.get("stage") and session_info["stage"] != "ALL":
+                mem_q = mem_q.where(Member.stage == session_info["stage"])
+
+        if search:
+            p = f"%{search.strip()}%"
+            mem_q = mem_q.where(
+                or_(
+                    Member.full_name.ilike(p),
+                    Member.member_id.ilike(p),
+                    Member.phone.ilike(p),
+                    Member.area.ilike(p)
+                )
+            )
+
+        mem_q = mem_q.order_by(Member.full_name.asc())
+        mem_rows = (await self.db.execute(mem_q)).all()
+
+        rec_q = select(AttendanceRecord).where(
+            AttendanceRecord.session_id == session_id,
+            AttendanceRecord.status == "Valid"
+        )
+        rec_res = await self.db.execute(rec_q)
+        records = {r.member_id: r for r in rec_res.scalars().all()}
+
+        members_list = []
+        present_count = 0
+        for idx, row in enumerate(mem_rows, 1):
+            mid = row.member_id
+            is_present = (mid in records)
+            if is_present:
+                present_count += 1
+            rec = records.get(mid)
+            members_list.append({
+                "index": idx,
+                "member_id": mid,
+                "full_name": row.full_name,
+                "phone": row.phone or "",
+                "whatsapp_phone": row.whatsapp_phone or row.phone or "",
+                "area": row.area or "غير محدد",
+                "stage": row.stage,
+                "photo_url": row.photo_url,
+                "is_present": is_present,
+                "record_id": rec.record_id if rec else None,
+                "method": rec.method if rec else None,
+                "scanned_at": rec.scanned_at.isoformat() if rec and rec.scanned_at else None
+            })
+
+        total_members = len(members_list)
+        absent_count = total_members - present_count
+        rate = round((present_count / total_members * 100), 1) if total_members > 0 else 0.0
+
+        return {
+            "session": session_info,
+            "summary": {
+                "total_members": total_members,
+                "present_count": present_count,
+                "absent_count": absent_count,
+                "attendance_rate": rate
+            },
+            "members": members_list
+        }
+
+    async def toggle_member_attendance(
+        self,
+        session_id: str,
+        member_id: str,
+        user_id: str
+    ) -> Dict[str, Any]:
+        """
+        تبديل حالة حضور المخدوم فورياً بنقرة واحدة (حاضر / غائب) في كشف الفصل.
+        """
+        existing = await self.get_record_by_session_and_member(session_id, member_id)
+        if existing and existing["status"] == "Valid":
+            # إلغاء وتسجيل غياب
+            await self.cancel_record(existing["record_id"], user_id, "تسجيل غياب من كشف الفصل")
+            return {"action": "unmarked", "member_id": member_id, "is_present": False}
+        else:
+            if existing and existing["status"] == "Cancelled":
+                now_ts = datetime.now(timezone.utc)
+                await self.db.execute(
+                    update(AttendanceRecord)
+                    .where(AttendanceRecord.record_id == existing["record_id"])
+                    .values(
+                        status="Valid",
+                        scanned_by_user=user_id,
+                        method="Manual",
+                        scanned_at=now_ts,
+                        cancelled_by=None,
+                        cancelled_at=None,
+                        cancellation_reason=None
+                    )
+                )
+                await self.db.flush()
+                rec = await self.get_record_by_id(existing["record_id"])
+            else:
+                rec = await self.create_record(
+                    session_id=session_id,
+                    member_id=member_id,
+                    user_id=user_id,
+                    method="Manual"
+                )
+            return {"action": "marked", "member_id": member_id, "is_present": True, "record": rec}
+

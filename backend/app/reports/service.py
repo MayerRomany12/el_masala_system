@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.reports.repository import ReportsRepository
 from app.settings.repository import SettingsRepository
-from app.reports.export_engine import generate_csv_bytes, generate_excel_bytes, generate_pdf_html
+from app.reports.export_engine import generate_csv_bytes, generate_excel_bytes, generate_pdf_html, generate_member_profile_html
 from app.core.errors import BadRequestException
 
 
@@ -14,8 +14,46 @@ class ReportsService:
         self.repo = ReportsRepository(db)
         self.settings_repo = SettingsRepository(db)
 
-    async def get_attendance_report(self, stage: Optional[str] = None, from_date: Optional[date] = None, to_date: Optional[date] = None) -> List[Dict[str, Any]]:
-        return await self.repo.get_attendance_report(stage=stage, from_date=from_date, to_date=to_date)
+    async def get_attendance_report(
+        self,
+        stage: Optional[str] = None,
+        class_id: Optional[str] = None,
+        allowed_class_ids: Optional[List[str]] = None,
+        from_date: Optional[date] = None,
+        to_date: Optional[date] = None
+    ) -> List[Dict[str, Any]]:
+        return await self.repo.get_attendance_report(
+            stage=stage, class_id=class_id, allowed_class_ids=allowed_class_ids,
+            from_date=from_date, to_date=to_date
+        )
+
+    async def get_who_attended_report(
+        self,
+        session_id: Optional[str] = None,
+        class_id: Optional[str] = None,
+        stage: Optional[str] = None,
+        from_date: Optional[date] = None,
+        to_date: Optional[date] = None,
+        allowed_class_ids: Optional[List[str]] = None
+    ) -> List[Dict[str, Any]]:
+        return await self.repo.get_who_attended_report(
+            session_id=session_id, class_id=class_id, stage=stage,
+            from_date=from_date, to_date=to_date, allowed_class_ids=allowed_class_ids
+        )
+
+    async def get_who_was_absent_report(
+        self,
+        session_id: Optional[str] = None,
+        class_id: Optional[str] = None,
+        stage: Optional[str] = None,
+        from_date: Optional[date] = None,
+        to_date: Optional[date] = None,
+        allowed_class_ids: Optional[List[str]] = None
+    ) -> List[Dict[str, Any]]:
+        return await self.repo.get_who_was_absent_report(
+            session_id=session_id, class_id=class_id, stage=stage,
+            from_date=from_date, to_date=to_date, allowed_class_ids=allowed_class_ids
+        )
 
     async def get_financial_report(self, event_type: Optional[str] = None, from_date: Optional[date] = None, to_date: Optional[date] = None) -> List[Dict[str, Any]]:
         return await self.repo.get_financial_report(event_type=event_type, from_date=from_date, to_date=to_date)
@@ -28,9 +66,12 @@ class ReportsService:
 
     async def export_report(
         self,
-        report_type: str,   # attendance, financials
+        report_type: str,   # attendance, who_attended, who_absent, financials, members, followup, birthdays
         export_format: str, # excel, pdf, csv
         stage: Optional[str] = None,
+        class_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+        allowed_class_ids: Optional[List[str]] = None,
         event_type: Optional[str] = None,
         from_date: Optional[date] = None,
         to_date: Optional[date] = None
@@ -50,15 +91,58 @@ class ReportsService:
 
         if report_type == "attendance":
             title = "تقرير نسبة الحضور والانتظام الكنسي"
-            data_list = await self.repo.get_attendance_report(stage=stage, from_date=from_date, to_date=to_date)
+            data_list = await self.repo.get_attendance_report(
+                stage=stage, class_id=class_id, allowed_class_ids=allowed_class_ids,
+                from_date=from_date, to_date=to_date
+            )
             headers_map = {
                 "session_id": "رمز الجلسة",
                 "session_date": "تاريخ الجلسة",
+                "class_name": "الفصل",
                 "stage": "المرحلة الخدمية",
                 "session_title": "عنوان الجلسة",
                 "targeted_members_count": "الأطفال المستهدفين",
                 "present_count": "عدد الحاضرين",
+                "absent_count": "عدد الغائبين",
                 "attendance_percentage": "نسبة الحضور (%)"
+            }
+
+        elif report_type == "who_attended":
+            title = "كشف أسماء الحاضرين (مين حضر)"
+            data_list = await self.repo.get_who_attended_report(
+                session_id=session_id, class_id=class_id, stage=stage,
+                from_date=from_date, to_date=to_date, allowed_class_ids=allowed_class_ids
+            )
+            headers_map = {
+                "index": "م",
+                "full_name": "اسم المخدوم",
+                "member_id": "كود العضوية",
+                "class_name": "الفصل",
+                "stage": "المرحلة",
+                "area": "المنطقة",
+                "phone": "الهاتف",
+                "session_date": "تاريخ الجلسة",
+                "method": "طريقة التسجيل",
+                "scanned_at": "وقت التسجيل"
+            }
+
+        elif report_type == "who_absent":
+            title = "كشف أسماء الغائبين (مين غاب)"
+            data_list = await self.repo.get_who_was_absent_report(
+                session_id=session_id, class_id=class_id, stage=stage,
+                from_date=from_date, to_date=to_date, allowed_class_ids=allowed_class_ids
+            )
+            headers_map = {
+                "index": "م",
+                "full_name": "اسم المخدوم",
+                "member_id": "كود العضوية",
+                "class_name": "الفصل",
+                "stage": "المرحلة",
+                "area": "المنطقة",
+                "phone": "الهاتف",
+                "whatsapp_phone": "الواتساب",
+                "session_date": "تاريخ الجلسة",
+                "session_title": "عنوان الجلسة"
             }
 
         elif report_type == "financials":
@@ -170,3 +254,16 @@ class ReportsService:
 
         else:
             raise BadRequestException(f"صيغة التصدير ({export_format}) غير مدعومة")
+
+    async def generate_member_profile_report(self, member_id: str) -> str:
+        from app.members.repository import MembersRepository
+        members_repo = MembersRepository(self.db)
+        member = await members_repo.get_by_id(member_id)
+        if not member:
+            raise BadRequestException("المخدوم غير موجود")
+        history = await members_repo.get_member_attendance_history(member_id)
+        church_name = await self.settings_repo.get_setting_value(
+            "church_name", "كنيسة الشهيد العظيم مارجرجس والأنبا شنودة بالكرور"
+        )
+        return generate_member_profile_html(member, history, church_name)
+

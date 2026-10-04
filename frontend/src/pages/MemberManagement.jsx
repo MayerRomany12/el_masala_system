@@ -31,7 +31,8 @@ import {
   Download,
   QrCode,
   Copy,
-  Check
+  Check,
+  Printer
 } from 'lucide-react';
 
 // ─── Modal after newly creating a member with QR code & download button ──────
@@ -343,7 +344,9 @@ export const MemberManagement = () => {
 
   // Filters State
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedClassId, setSelectedClassId] = useState('');  // بدل selectedStage
+  const [selectedClassId, setSelectedClassId] = useState('');
+  const [selectedArea, setSelectedArea] = useState('');
+  const [areasList, setAreasList] = useState([]);
   const [selectedStatus, setSelectedStatus] = useState('');
   const [page, setPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
@@ -353,15 +356,39 @@ export const MemberManagement = () => {
   const [createdMember, setCreatedMember] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // جلب الفصول الديناميكية من API مرة واحدة عند التحميل
+  // جلب الفصول والمناطق الديناميكية من API
   useEffect(() => {
-    apiClient.get('/classes/?status=Active&limit=50')
+    apiClient.get('/classes/?status=Active&limit=100')
       .then(res => {
         const data = res?.data?.data?.items || res?.data?.items || [];
         setClasses(data);
       })
       .catch(() => setClasses([]));
+
+    membersApi.getDistinctAreas()
+      .then(res => {
+        setAreasList(res?.data || res || []);
+      })
+      .catch(() => setAreasList([]));
   }, []);
+
+  const handlePrintMember = async (memberId) => {
+    try {
+      const res = await apiClient.get(`/reports/member/${memberId}/print-profile`);
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        printWindow.document.open();
+        printWindow.document.write(res.data);
+        printWindow.document.close();
+        setTimeout(() => {
+          printWindow.focus();
+          printWindow.print();
+        }, 600);
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || 'تعذر استخراج استمارة المخدوم للطباعة');
+    }
+  };
 
   // Fetch Data
   const fetchData = useCallback(async () => {
@@ -372,6 +399,7 @@ export const MemberManagement = () => {
         membersApi.getMembers({
           search: searchTerm || undefined,
           class_id: selectedClassId || undefined,
+          area: selectedArea || undefined,
           status: selectedStatus || undefined,
           page,
           limit: 20
@@ -391,7 +419,7 @@ export const MemberManagement = () => {
     } finally {
       setLoading(false);
     }
-  }, [searchTerm, selectedClassId, selectedStatus, page]);
+  }, [searchTerm, selectedClassId, selectedArea, selectedStatus, page]);
 
   useEffect(() => {
     fetchData();
@@ -556,7 +584,7 @@ export const MemberManagement = () => {
         </div>
 
         {/* Class Filter - Dynamic from API */}
-        <div style={{ flex: '0 1 220px' }}>
+        <div style={{ flex: '0 1 200px' }}>
           <select
             className="form-input"
             value={selectedClassId}
@@ -565,6 +593,20 @@ export const MemberManagement = () => {
             <option value="">كل الفصول الخدمية</option>
             {classes.map((cls) => (
               <option key={cls.class_id} value={cls.class_id}>{cls.name}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Area Filter */}
+        <div style={{ flex: '0 1 180px' }}>
+          <select
+            className="form-input"
+            value={selectedArea}
+            onChange={(e) => { setSelectedArea(e.target.value); setPage(1); }}
+          >
+            <option value="">كل المناطق السكنية</option>
+            {areasList.map((a) => (
+              <option key={a} value={a}>{a}</option>
             ))}
           </select>
         </div>
@@ -667,8 +709,17 @@ export const MemberManagement = () => {
                           )}
                         </div>
                         <div>
-                          <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>{member.full_name}</div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>الجنس: {member.gender}</div>
+                          <div style={{ fontWeight: 700, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                            <span>{member.full_name}</span>
+                            {member.area && (
+                              <span style={{ fontSize: '0.7rem', padding: '1px 6px', background: 'rgba(168, 85, 247, 0.15)', color: '#c084fc', borderRadius: '4px', border: '1px solid rgba(168, 85, 247, 0.3)' }}>
+                                {member.area}
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                            الجنس: {member.gender} {member.email ? `• ✉️ ${member.email}` : ''}
+                          </div>
                         </div>
                       </div>
                     </td>
@@ -759,6 +810,15 @@ export const MemberManagement = () => {
                           title="عرض الملف الكامل"
                         >
                           <Eye size={15} />
+                        </button>
+
+                        <button
+                          onClick={() => handlePrintMember(member.member_id)}
+                          className="btn btn-secondary"
+                          style={{ padding: '0.35rem 0.6rem', fontSize: '0.8rem', color: '#60a5fa' }}
+                          title="طباعة استمارة المخدوم الشاملة (PDF)"
+                        >
+                          <Printer size={15} />
                         </button>
 
                         {/* Unarchive Quick Button if archived */}

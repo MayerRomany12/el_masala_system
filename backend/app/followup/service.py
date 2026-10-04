@@ -18,8 +18,8 @@ class FollowupService:
         self.repo = FollowupRepository(db)
         self.member_repo = MemberRepository(db)
 
-    async def run_absence_detector(self, stage: Optional[str] = None) -> Dict[str, Any]:
-        return await self.repo.run_absence_detector(stage=stage)
+    async def run_absence_detector(self, stage: Optional[str] = None, class_id: Optional[str] = None) -> Dict[str, Any]:
+        return await self.repo.run_absence_detector(stage=stage, class_id=class_id)
 
     async def list_tasks(
         self,
@@ -27,6 +27,9 @@ class FollowupService:
         priority: Optional[str] = None,
         status: Optional[str] = None,
         search: Optional[str] = None,
+        class_id: Optional[str] = None,
+        area: Optional[str] = None,
+        allowed_class_ids: Optional[List[str]] = None,
         page: int = 1,
         limit: int = 50,
     ) -> Dict[str, Any]:
@@ -35,9 +38,23 @@ class FollowupService:
         skip = (page - 1) * limit
 
         items, total = await self.repo.get_tasks(
-            servant_id=servant_id, priority=priority, status=status, search=search, skip=skip, limit=limit
+            servant_id=servant_id, priority=priority, status=status, search=search,
+            class_id=class_id, area=area, allowed_class_ids=allowed_class_ids,
+            skip=skip, limit=limit
         )
         return {"total": total, "page": page, "limit": limit, "items": items}
+
+    async def get_tasks_grouped_by_area(
+        self,
+        class_id: Optional[str] = None,
+        allowed_class_ids: Optional[List[str]] = None,
+        status: Optional[str] = None
+    ) -> Dict[str, Any]:
+        return await self.repo.get_tasks_grouped_by_area(
+            class_id=class_id,
+            allowed_class_ids=allowed_class_ids,
+            status=status
+        )
 
     async def get_task_by_id(self, task_id: str) -> Dict[str, Any]:
         task = await self.repo.get_task_by_id(task_id)

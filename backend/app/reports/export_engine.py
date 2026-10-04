@@ -184,3 +184,144 @@ def generate_pdf_html(
 </body>
 </html>'''
     return html_content
+
+
+def generate_member_profile_html(
+    member: Dict[str, Any],
+    history: Dict[str, Any],
+    church_name: str
+) -> str:
+    """
+    توليد وثيقة بروفايل رسمية للمخدوم مع سجل حضوره وغيابه وبياناته بالكامل للطباعة والـ PDF
+    """
+    now_str = datetime.now().strftime("%Y/%m/%d - %I:%M %p")
+    photo_src = member.get("photo_url")
+    if not photo_src:
+        photo_html = '<div style="width:110px; height:110px; border-radius:50%; background:#e0f2fe; border:3px solid #0284c7; display:flex; align-items:center; justify-content:center; font-size:36px; color:#0284c7; font-weight:bold;">✝</div>'
+    else:
+        photo_html = f'<img src="{photo_src}" style="width:110px; height:110px; border-radius:50%; object-fit:cover; border:3px solid #0284c7; box-shadow:0 4px 10px rgba(0,0,0,0.15);" />'
+
+    classes_str = "، ".join([c["class_name"] for c in member.get("active_classes", [])]) or "غير مسكن"
+    summary = history.get("summary") or history
+    timeline = history.get("timeline") or []
+
+    timeline_rows = ""
+    for idx, item in enumerate(timeline[:15], 1):
+        status_badge = '<span style="color:#16a34a; font-weight:bold;">✓ حاضر</span>' if item.get("attended") else '<span style="color:#dc2626; font-weight:bold;">✗ غائب</span>'
+        timeline_rows += f'''
+        <tr>
+            <td style="padding:6px 10px; border-bottom:1px solid #e2e8f0; text-align:center;">{idx}</td>
+            <td style="padding:6px 10px; border-bottom:1px solid #e2e8f0;">{item.get("session_date", "")}</td>
+            <td style="padding:6px 10px; border-bottom:1px solid #e2e8f0;">{item.get("class_name", "")}</td>
+            <td style="padding:6px 10px; border-bottom:1px solid #e2e8f0;">{item.get("title", "")}</td>
+            <td style="padding:6px 10px; border-bottom:1px solid #e2e8f0; text-align:center;">{status_badge}</td>
+        </tr>
+        '''
+
+    html_content = f'''<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <meta charset="utf-8">
+    <title>ملف المخدوم — {member.get("full_name")}</title>
+    <style>
+        body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #fff; color: #1e293b; margin: 0; padding: 25px; }}
+        .header-box {{ display: flex; align-items: center; justify-content: space-between; border-bottom: 3px double #facc15; padding-bottom: 12px; margin-bottom: 20px; }}
+        .title-main {{ font-size: 19px; font-weight: 900; color: #0284c7; margin: 0; }}
+        .sub-title {{ font-size: 13px; color: #64748b; margin-top: 4px; font-weight: bold; }}
+        .card-box {{ border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin-bottom: 20px; background: #f8fafc; }}
+        .grid-2 {{ display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px; }}
+        .stat-card {{ flex: 1; padding: 10px 14px; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; text-align: center; }}
+        table {{ width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; }}
+        th {{ background: #0284c7; color: #fff; padding: 8px 10px; text-align: right; }}
+        @media print {{
+            body {{ padding: 0; }}
+            .no-print {{ display: none; }}
+        }}
+    </style>
+</head>
+<body>
+    <div class="no-print" style="margin-bottom: 15px; text-align: left;">
+        <button onclick="window.print()" style="padding: 9px 20px; background: #0284c7; border: 1px solid #facc15; color: #fff; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 14px;">
+            طباعة الملف / حفظ كـ PDF 🖨️
+        </button>
+    </div>
+
+    <div class="header-box">
+        <div>
+            <h1 class="title-main">{church_name}</h1>
+            <div class="sub-title">خدمة مدارس الأحد — الاستمارة والملف الشامل للمخدوم</div>
+        </div>
+        <div style="font-size: 11px; color: #64748b; text-align: left;">
+            <div>تاريخ الاستخراج: {now_str}</div>
+            <div>كود العضوية: <strong>{member.get("member_id")}</strong></div>
+        </div>
+    </div>
+
+    <!-- Personal Profile Section -->
+    <div class="card-box" style="display: flex; gap: 20px; align-items: center;">
+        <div>{photo_html}</div>
+        <div style="flex: 1;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <h2 style="margin: 0; font-size: 20px; color: #0f172a;">{member.get("full_name")}</h2>
+                <span style="background: #e0f2fe; color: #0369a1; padding: 4px 10px; border-radius: 20px; font-weight: bold; font-size: 12px;">{member.get("stage")}</span>
+            </div>
+            <div class="grid-2">
+                <div><strong>الفصول الخدمية:</strong> {classes_str}</div>
+                <div><strong>المنطقة السكنية:</strong> {member.get("area") or "غير محدد"}</div>
+                <div><strong>رقم ولي الأمر:</strong> {member.get("phone") or "—"}</div>
+                <div><strong>رقم الواتساب:</strong> {member.get("whatsapp_phone") or "—"}</div>
+                <div><strong>البريد الإلكتروني:</strong> {member.get("email") or "—"}</div>
+                <div><strong>أب الاعتراف:</strong> {member.get("father_of_confession") or "—"}</div>
+                <div><strong>تاريخ الميلاد:</strong> {str(member.get("date_of_birth") or "—")}</div>
+                <div><strong>العنوان:</strong> {member.get("address") or "—"}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Attendance Stats Summary -->
+    <div style="display: flex; gap: 12px; margin-bottom: 20px;">
+        <div class="stat-card">
+            <div style="font-size: 12px; color: #64748b;">إجمالي الجلسات</div>
+            <div style="font-size: 20px; font-weight: 900; color: #0f172a; margin-top: 4px;">{summary.get("total_sessions", 0)}</div>
+        </div>
+        <div class="stat-card" style="border-top: 3px solid #16a34a;">
+            <div style="font-size: 12px; color: #16a34a; font-weight: bold;">عدد مرات الحضور</div>
+            <div style="font-size: 20px; font-weight: 900; color: #16a34a; margin-top: 4px;">{summary.get("attended_count", 0)}</div>
+        </div>
+        <div class="stat-card" style="border-top: 3px solid #dc2626;">
+            <div style="font-size: 12px; color: #dc2626; font-weight: bold;">عدد مرات الغياب</div>
+            <div style="font-size: 20px; font-weight: 900; color: #dc2626; margin-top: 4px;">{summary.get("absent_count", 0)}</div>
+        </div>
+        <div class="stat-card" style="border-top: 3px solid #0284c7;">
+            <div style="font-size: 12px; color: #0284c7; font-weight: bold;">نسبة الانتظام</div>
+            <div style="font-size: 20px; font-weight: 900; color: #0284c7; margin-top: 4px;">{summary.get("attendance_rate", 0)}%</div>
+        </div>
+    </div>
+
+    <!-- Recent Attendance Records Table -->
+    <h3 style="font-size: 14px; margin-bottom: 6px; color: #0284c7;">سجل آخر الجلسات والحضور</h3>
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 40px; text-align: center;">م</th>
+                <th>تاريخ الجلسة</th>
+                <th>الفصل / الاجتماع</th>
+                <th>عنوان الجلسة</th>
+                <th style="width: 90px; text-align: center;">حالة الحضور</th>
+            </tr>
+        </thead>
+        <tbody>
+            {timeline_rows or '<tr><td colspan="5" style="text-align:center; padding:15px;">لا توجد جلسات مسجلة بعد</td></tr>'}
+        </tbody>
+    </table>
+
+    <!-- Signature Section -->
+    <div style="display: flex; justify-content: space-between; margin-top: 40px; padding-top: 20px; border-top: 1px dashed #cbd5e1; font-size: 13px; font-weight: bold; color: #475569;">
+        <div>توقيع خادم الفصل: .........................</div>
+        <div>توقيع أمين الخدمة: .........................</div>
+        <div>توقيع كاهن الكنيسة: .........................</div>
+    </div>
+</body>
+</html>'''
+    return html_content
+

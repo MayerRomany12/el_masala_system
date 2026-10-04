@@ -72,7 +72,7 @@ const ProtectedLayout = () => {
             <Route path="/classes/:id" element={<ClassDetailsPage />} />
 
             <Route path="/summer-activities" element={<SummerActivityManagement />} />
-            <Route path="/cards" element={<CardManagement />} />
+            <Route path="/cards" element={<Navigate to="/members" replace />} />
             <Route path="/scan" element={<QRScanner />} />
             <Route path="/events" element={<EventManagement />} />
             <Route path="/attendance" element={<AttendanceManagement />} />

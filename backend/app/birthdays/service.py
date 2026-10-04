@@ -14,10 +14,15 @@ class BirthdayService:
         self,
         period: str = "today",
         stage: Optional[str] = None,
+        class_id: Optional[str] = None,
+        allowed_class_ids: Optional[List[str]] = None,
         gift_status: Optional[str] = None,
         month: Optional[int] = None
     ) -> List[Dict[str, Any]]:
-        raw_items = await self.repo.get_birthdays(period=period, stage=stage, gift_status=gift_status, month=month)
+        raw_items = await self.repo.get_birthdays(
+            period=period, stage=stage, class_id=class_id,
+            allowed_class_ids=allowed_class_ids, gift_status=gift_status, month=month
+        )
         
         today_dt = date.today()
         current_year = today_dt.year

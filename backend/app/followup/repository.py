@@ -52,6 +52,8 @@ class FollowupRepository:
             "member_name": mem.full_name,
             "member_stage": mem.stage,
             "member_phone": mem.phone,
+            "member_whatsapp": getattr(mem, "whatsapp_phone", None) or mem.phone,
+            "member_area": getattr(mem, "area", None) or "غير محدد",
             "last_absence_session_id": task.last_absence_session_id,
             "consecutive_weeks": task.consecutive_weeks,
             "assigned_servant_id": task.assigned_servant_id,
@@ -144,13 +146,28 @@ class FollowupRepository:
     async def calculate_consecutive_absences_for_member(
         self,
         member_id: str,
-        member_stage: str
+        member_stage: str,
+        class_id: Optional[str] = None
     ) -> Tuple[int, Optional[str]]:
         """
-        حساب الغياب المتتالي بناءً على الجلسات الفعلية السابقة لـ Stage المخدوم.
+        حساب الغياب المتتالي بناءً على جلسات فصل المخدوم الأساسية.
         """
+        from app.models.class_group import ClassGroupMember
+        if not class_id:
+            c_res = await self.db.execute(
+                select(ClassGroupMember.class_id).where(
+                    ClassGroupMember.member_id == member_id,
+                    ClassGroupMember.is_active == True
+                )
+            )
+            c_row = c_res.first()
+            if c_row:
+                class_id = c_row[0]
+
         query = select(AttendanceSession).order_by(AttendanceSession.session_date.desc(), AttendanceSession.created_at.desc())
-        if member_stage:
+        if class_id:
+            query = query.where(AttendanceSession.class_id == class_id)
+        elif member_stage:
             stage_prefix = member_stage.split('-')[0].strip()
             query = query.where(or_(AttendanceSession.stage == "ALL", AttendanceSession.stage.ilike(f"%{stage_prefix}%")))
 
@@ -178,17 +195,23 @@ class FollowupRepository:
 
         return consecutive, last_absence_session_id
 
-    async def run_absence_detector(self, stage: Optional[str] = None) -> Dict[str, Any]:
+    async def run_absence_detector(self, stage: Optional[str] = None, class_id: Optional[str] = None) -> Dict[str, Any]:
         """
-        محرك الكشف التلقائي عن الغائبين وتحديث مهام الافتقاد بدون تكرار
+        محرك الكشف التلقائي عن الغائبين وتحديث مهام الافتقاد بحسب الفصل أو المرحلة
         """
         from app.settings.repository import SettingsRepository
+        from app.models.class_group import ClassGroupMember
         settings_repo = SettingsRepository(self.db)
         threshold_str = await settings_repo.get_setting_value("absence_threshold_weeks", "2")
         threshold = int(threshold_str)
 
         mem_query = select(Member).where(Member.status == "Active", Member.is_archived == False)
-        if stage and stage != "ALL":
+        if class_id:
+            mem_query = mem_query.join(ClassGroupMember, Member.member_id == ClassGroupMember.member_id).where(
+                ClassGroupMember.class_id == class_id,
+                ClassGroupMember.is_active == True
+            )
+        elif stage and stage != "ALL":
             stage_prefix = stage.split('-')[0].strip()
             mem_query = mem_query.where(Member.stage.ilike(f"%{stage_prefix}%"))
 
@@ -199,7 +222,7 @@ class FollowupRepository:
         tasks_updated = 0
 
         for m in members:
-            consecutive, last_session_id = await self.calculate_consecutive_absences_for_member(m.member_id, m.stage)
+            consecutive, last_session_id = await self.calculate_consecutive_absences_for_member(m.member_id, m.stage, class_id=class_id)
 
             # Dynamic Threshold Rule from SystemSettings
             if consecutive >= threshold:
@@ -301,11 +324,38 @@ class FollowupRepository:
         priority: Optional[str] = None,
         status: Optional[str] = None,
         search: Optional[str] = None,
+        class_id: Optional[str] = None,
+        area: Optional[str] = None,
+        allowed_class_ids: Optional[List[str]] = None,
         skip: int = 0,
         limit: int = 50,
     ) -> Tuple[List[Dict[str, Any]], int]:
+        from app.models.class_group import ClassGroupMember
         query = select(FollowupTask).join(Member, FollowupTask.member_id == Member.member_id)
 
+        if class_id:
+            query = query.where(
+                exists(
+                    select(1).select_from(ClassGroupMember).where(
+                        ClassGroupMember.member_id == Member.member_id,
+                        ClassGroupMember.class_id == class_id,
+                        ClassGroupMember.is_active == True
+                    )
+                )
+            )
+        elif allowed_class_ids is not None:
+            query = query.where(
+                exists(
+                    select(1).select_from(ClassGroupMember).where(
+                        ClassGroupMember.member_id == Member.member_id,
+                        ClassGroupMember.class_id.in_(allowed_class_ids),
+                        ClassGroupMember.is_active == True
+                    )
+                )
+            )
+
+        if area:
+            query = query.where(Member.area == area)
         if status:
             query = query.where(FollowupTask.status == status)
         if priority:
@@ -319,6 +369,7 @@ class FollowupRepository:
                     Member.full_name.ilike(pattern),
                     Member.phone.ilike(pattern),
                     Member.member_id.ilike(pattern),
+                    Member.area.ilike(pattern),
                     FollowupTask.task_id.ilike(pattern)
                 )
             )
@@ -336,6 +387,38 @@ class FollowupRepository:
                 items.append(full_t)
 
         return items, total
+
+    async def get_tasks_grouped_by_area(
+        self,
+        class_id: Optional[str] = None,
+        allowed_class_ids: Optional[List[str]] = None,
+        status: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        تجميع مهام الافتقاد بحسب المناطق السكنية لتسهيل توزيع ومتابعة الافتقاد الميداني
+        """
+        items, _ = await self.get_tasks(
+            class_id=class_id,
+            allowed_class_ids=allowed_class_ids,
+            status=status,
+            limit=500
+        )
+        areas_dict = {}
+        for t in items:
+            area_name = t.get("member_area") or "غير محدد"
+            if area_name not in areas_dict:
+                areas_dict[area_name] = []
+            areas_dict[area_name].append(t)
+
+        area_summary = [
+            {"area": a, "count": len(tasks), "tasks": tasks}
+            for a, tasks in sorted(areas_dict.items(), key=lambda x: len(x[1]), reverse=True)
+        ]
+        return {
+            "total_tasks": len(items),
+            "total_areas": len(area_summary),
+            "areas": area_summary
+        }
 
     async def update_task(self, task_id: str, update_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         if "due_date" in update_data and update_data["due_date"]:

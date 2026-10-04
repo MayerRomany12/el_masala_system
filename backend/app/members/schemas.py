@@ -22,6 +22,8 @@ class MemberBase(BaseModel):
     secondary_phone: Optional[str] = Field(default=None, description="رقم آخر لولي الأمر")
     member_phone: Optional[str] = Field(default=None, description="رقم الطفل المخدوم نفسه")
     whatsapp_phone: Optional[str] = Field(default=None, description="رقم واتساب المتابعة")
+    email: Optional[str] = Field(default=None, description="البريد الإلكتروني (Gmail)")
+    area: Optional[str] = Field(default=None, description="المنطقة السكنية للافتقاد")
     father_of_confession: Optional[str] = Field(default=None, description="اسم أب الاعتراف")
     address: Optional[str] = Field(default=None, description="عنوان السكن")
     notes: Optional[str] = Field(default=None, description="ملاحظات خادمة أو صحية")
@@ -44,12 +46,17 @@ class MemberUpdate(BaseModel):
     secondary_phone: Optional[str] = None
     member_phone: Optional[str] = None
     whatsapp_phone: Optional[str] = None
+    email: Optional[str] = None
+    area: Optional[str] = None
     father_of_confession: Optional[str] = None
     address: Optional[str] = None
     notes: Optional[str] = None
     status: Optional[str] = None
     photo_url: Optional[str] = None
     is_archived: Optional[bool] = None
+
+class PhotoDataPayload(BaseModel):
+    photo_data: str = Field(..., description="صورة Base64 مقصوصة ومضغوطة بصيغة data:image/...")
 
 class MemberStatusUpdate(BaseModel):
     status: str = Field(..., description="الحالة الجديدة (Active, Inactive, Archived)")

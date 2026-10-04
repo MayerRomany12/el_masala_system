@@ -17,6 +17,8 @@ class Member(Base):
     secondary_phone      = Column(String(30),  nullable=True)
     member_phone         = Column(String(30),  nullable=True)
     whatsapp_phone       = Column(String(30),  nullable=True)
+    email                = Column(String(200), nullable=True)
+    area                 = Column(String(100), nullable=True, index=True)
     father_of_confession = Column(String(200), nullable=True)
     address              = Column(Text, nullable=True)
     notes                = Column(Text, nullable=True)

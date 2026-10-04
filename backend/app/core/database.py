@@ -68,7 +68,9 @@ async def init_db():
         try:
             await conn.execute(text("ALTER TABLE members ADD COLUMN IF NOT EXISTS secondary_phone VARCHAR(30);"))
             await conn.execute(text("ALTER TABLE members ADD COLUMN IF NOT EXISTS member_phone VARCHAR(30);"))
-            logger.info("تم التحقق من إضافة عمودي secondary_phone و member_phone لجدول members بنجاح")
+            await conn.execute(text("ALTER TABLE members ADD COLUMN IF NOT EXISTS email VARCHAR(200);"))
+            await conn.execute(text("ALTER TABLE members ADD COLUMN IF NOT EXISTS area VARCHAR(100);"))
+            logger.info("تم التحقق من إضافة أعمدة secondary_phone, member_phone, email, area لجدول members بنجاح")
         except Exception as e:
             logger.exception(f"فشل تطبيق التحديث الهيكلي لجدول members: {e}")
             raise e

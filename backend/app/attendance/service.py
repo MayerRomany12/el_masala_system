@@ -78,7 +78,9 @@ class AttendanceService:
         self,
         search: Optional[str] = None,
         stage: Optional[str] = None,
+        class_id: Optional[str] = None,
         status: Optional[str] = None,
+        allowed_class_ids: Optional[List[str]] = None,
         page: int = 1,
         limit: int = 50,
     ) -> Dict[str, Any]:
@@ -87,9 +89,22 @@ class AttendanceService:
         skip = (page - 1) * limit
 
         items, total = await self.repo.get_sessions(
-            search=search, stage=stage, status=status, skip=skip, limit=limit
+            search=search, stage=stage, class_id=class_id, status=status,
+            allowed_class_ids=allowed_class_ids, skip=skip, limit=limit
         )
         return {"total": total, "page": page, "limit": limit, "items": items}
+
+    async def get_session_sheet(self, session_id: str, search: Optional[str] = None) -> Dict[str, Any]:
+        session = await self.get_session_by_id(session_id)
+        if not session:
+            raise NotFoundException(f"جلسة الحضور {session_id} غير موجودة")
+        return await self.repo.get_session_sheet(session_id, search=search)
+
+    async def toggle_member_attendance(self, session_id: str, member_id: str, user_id: str) -> Dict[str, Any]:
+        session = await self.get_session_by_id(session_id)
+        if not session:
+            raise NotFoundException(f"جلسة الحضور {session_id} غير موجودة")
+        return await self.repo.toggle_member_attendance(session_id, member_id, user_id)
 
     async def update_session_status(self, session_id: str, new_status: str) -> Dict[str, Any]:
         valid_statuses = ["Scheduled", "Open", "Completed", "Closed", "Cancelled", "Void"]

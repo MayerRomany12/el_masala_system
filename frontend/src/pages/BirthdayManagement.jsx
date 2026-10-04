@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { apiClient } from '../api/client';
 import { birthdaysApi } from '../api/birthdays';
 import { getWaUrl } from '../utils/phone';
 import { getPhotoUrl } from '../utils/photo';
@@ -60,6 +61,8 @@ export const BirthdayManagement = () => {
 
   // Active Period Tab: 'today', 'week', 'month', 'all'
   const [activePeriod, setActivePeriod] = useState('today');
+  const [classesList, setClassesList] = useState([]);
+  const [selectedClassId, setSelectedClassId] = useState('');
   const [selectedStage, setSelectedStage] = useState('');
   const [selectedGiftStatus, setSelectedGiftStatus] = useState('');
   const [selectedMonth, setSelectedMonth] = useState('');
@@ -86,6 +89,16 @@ export const BirthdayManagement = () => {
   const [historyMember, setHistoryMember] = useState(null);
   const [historyList, setHistoryList] = useState([]);
 
+  // Load classes
+  useEffect(() => {
+    apiClient.get('/classes/?status=Active&limit=100')
+      .then(res => {
+        const items = res?.data?.data?.items || res?.data?.items || [];
+        setClassesList(items);
+      })
+      .catch(() => setClassesList([]));
+  }, []);
+
   // Fetch Birthdays
   const fetchBirthdays = useCallback(async () => {
     setLoading(true);
@@ -93,6 +106,7 @@ export const BirthdayManagement = () => {
     try {
       const res = await birthdaysApi.getBirthdays({
         period: selectedMonth ? 'all' : activePeriod,
+        class_id: selectedClassId || null,
         stage: selectedStage || null,
         gift_status: selectedGiftStatus || null,
         month: selectedMonth ? Number(selectedMonth) : null
@@ -115,7 +129,7 @@ export const BirthdayManagement = () => {
     } finally {
       setLoading(false);
     }
-  }, [activePeriod, selectedStage, selectedGiftStatus, selectedMonth]);
+  }, [activePeriod, selectedClassId, selectedStage, selectedGiftStatus, selectedMonth]);
 
   // Quick summary counts fetch
   const fetchSummaryCounts = useCallback(async () => {
@@ -305,6 +319,18 @@ export const BirthdayManagement = () => {
 
         {/* Filters */}
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <select
+            className="form-input"
+            style={{ width: '180px', fontSize: '0.85rem' }}
+            value={selectedClassId}
+            onChange={(e) => setSelectedClassId(e.target.value)}
+          >
+            <option value="">جميع الفصول 🏫</option>
+            {classesList.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+
           <select
             className="form-input"
             style={{ width: '170px', fontSize: '0.85rem' }}

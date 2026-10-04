@@ -1,9 +1,9 @@
-from fastapi import APIRouter, Depends, Query, Header, status
+from fastapi import APIRouter, Depends, Query, Header, HTTPException, status
 from typing import Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.auth.dependencies import get_current_user, require_permission
+from app.auth.dependencies import get_current_user, require_permission, get_servant_class_ids
 from app.attendance.schemas import (
     AttendanceSessionCreate,
     AttendanceSessionRecurrenceUpdate,
@@ -11,6 +11,10 @@ from app.attendance.schemas import (
     AttendanceCancelRequest,
     AuthorizedDeviceCreate
 )
+from pydantic import BaseModel, Field
+
+class AttendanceToggleRequest(BaseModel):
+    member_id: str = Field(..., description="رمز العضوية K-XXXXXX")
 from app.attendance.service import AttendanceService
 from app.shared.response import success_response
 
@@ -48,6 +52,10 @@ async def create_attendance_session(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(require_permission("attendance:session"))
 ):
+    if session_in.class_id:
+        allowed = await get_servant_class_ids(current_user, db)
+        if allowed is not None and session_in.class_id not in allowed:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="ليس لديك صلاحية لفتح جلسة حضور لهذا الفصل")
     service = AttendanceService(db)
     new_session = await service.create_session(session_in, current_user.get("user_id"))
     return success_response(data=new_session, message=f"تم فتح جلسة حضور جديدة بالرمز {new_session['session_id']}")
@@ -57,15 +65,21 @@ async def create_attendance_session(
 async def list_attendance_sessions(
     search: Optional[str] = Query(None),
     stage: Optional[str] = Query(None),
+    class_id: Optional[str] = Query(None, description="تصفية بحسب الفصل الخدمي"),
     status: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     limit: int = Query(50, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
     current_user=Depends(require_permission("attendance:session"))
 ):
+    allowed_class_ids = await get_servant_class_ids(current_user, db)
+    if class_id and allowed_class_ids is not None and class_id not in allowed_class_ids:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="ليس لديك صلاحية لعرض جلسات هذا الفصل")
+
     service = AttendanceService(db)
     result = await service.list_sessions(
-        search=search, stage=stage, status=status, page=page, limit=limit
+        search=search, stage=stage, class_id=class_id, status=status,
+        allowed_class_ids=allowed_class_ids, page=page, limit=limit
     )
     return success_response(data=result, message="تم جلب جلسات الحضور بنجاح")
 
@@ -78,7 +92,51 @@ async def get_attendance_session(
 ):
     service = AttendanceService(db)
     session = await service.get_session_by_id(session_id)
+    if session.get("class_id"):
+        allowed = await get_servant_class_ids(current_user, db)
+        if allowed is not None and session["class_id"] not in allowed:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="ليس لديك صلاحية للوصول لجلسة هذا الفصل")
     return success_response(data=session, message="تم جلب تفاصيل الجلسة والإحصائيات")
+
+
+@router.get("/sessions/{session_id}/sheet", response_model=dict)
+async def get_session_sheet(
+    session_id: str,
+    search: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_permission("attendance:session"))
+):
+    service = AttendanceService(db)
+    session = await service.get_session_by_id(session_id)
+    if session.get("class_id"):
+        allowed = await get_servant_class_ids(current_user, db)
+        if allowed is not None and session["class_id"] not in allowed:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="ليس لديك صلاحية لعرض كشف هذا الفصل")
+    sheet = await service.get_session_sheet(session_id, search=search)
+    return success_response(data=sheet, message="تم جلب كشف حضور وغياب الفصل بنجاح")
+
+
+@router.post("/sessions/{session_id}/toggle", response_model=dict)
+async def toggle_member_attendance(
+    session_id: str,
+    body: AttendanceToggleRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_permission("attendance:scan"))
+):
+    service = AttendanceService(db)
+    session = await service.get_session_by_id(session_id)
+    if session.get("class_id"):
+        allowed = await get_servant_class_ids(current_user, db)
+        if allowed is not None and session["class_id"] not in allowed:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="ليس لديك صلاحية لتسجيل الحضور في هذا الفصل")
+    result = await service.toggle_member_attendance(
+        session_id=session_id,
+        member_id=body.member_id,
+        user_id=current_user.get("user_id")
+    )
+    msg = "تم تسجيل الحضور 🟢" if result.get("is_present") else "تم تسجيل الغياب 🔴"
+    return success_response(data=result, message=msg)
+
 
 
 @router.patch("/sessions/{session_id}/status", response_model=dict)

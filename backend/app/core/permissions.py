@@ -13,6 +13,10 @@ ALL_PERMISSIONS: Set[str] = {
     "settings:write",
     "stages:manage",
 
+    # Classes & Groups Management
+    "classes:read",
+    "classes:manage",
+
     # Members Registry
     "members:read",
     "members:write",

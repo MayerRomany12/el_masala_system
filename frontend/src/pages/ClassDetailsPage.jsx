@@ -15,10 +15,11 @@ import {
   Phone,
   MessageSquare,
   AlertCircle,
-  CheckCircle,
   Plus,
   X,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Copy,
+  Check
 } from 'lucide-react';
 
 export const ClassDetailsPage = () => {
@@ -34,6 +35,11 @@ export const ClassDetailsPage = () => {
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('members'); // 'members', 'servants', 'addMember', 'addServant'
+
+  // WhatsApp Broadcast Modal states
+  const [isBroadcastModalOpen, setIsBroadcastModalOpen] = useState(false);
+  const [broadcastMessage, setBroadcastMessage] = useState('سلام ونعمة يا أحبائي أولياء أمور {الاسم}، بنفكركم بميعاد اجتماع مدارس الأحد القادم...');
+  const [copiedAll, setCopiedAll] = useState(false);
 
   // Member search for adding to class
   const [allMembers, setAllMembers] = useState([]);
@@ -153,6 +159,18 @@ export const ClassDetailsPage = () => {
     }
   };
 
+  const handleCopyAllPhones = () => {
+    const phones = members.map(m => m.phone || m.whatsapp_phone).filter(Boolean);
+    const uniquePhones = [...new Set(phones)];
+    if (uniquePhones.length === 0) {
+      alert('لا توجد أرقام هواتف مسجلة لأعضاء هذا الفصل');
+      return;
+    }
+    navigator.clipboard.writeText(uniquePhones.join(', '));
+    setCopiedAll(true);
+    setTimeout(() => setCopiedAll(false), 2200);
+  };
+
   const handleRemoveServant = async (servantId, servantName) => {
     if (!window.confirm(`هل أنت متأكد من إلغاء إشراف الخادم (${servantName})؟`)) return;
     try {
@@ -249,6 +267,26 @@ export const ClassDetailsPage = () => {
               المرحلة: <strong style={{ color: 'var(--text-main)' }}>{classData.stage || 'عام'}</strong> | النوع: <strong style={{ color: 'var(--text-main)' }}>{classData.group_type === 'Summer' ? 'نشاط صيفي' : 'فصل خدمي أساسي'}</strong>
               {classData.description && ` — ${classData.description}`}
             </p>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+            <button
+              onClick={() => setIsBroadcastModalOpen(true)}
+              className="btn btn-secondary"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', color: '#34d399', borderColor: 'rgba(52, 211, 153, 0.3)' }}
+            >
+              <MessageSquare size={16} />
+              <span>رسالة جماعية لأولياء الأمور (WhatsApp)</span>
+            </button>
+
+            <Link
+              to="/attendance"
+              className="btn btn-primary"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', fontWeight: 700 }}
+            >
+              <FileSpreadsheet size={16} />
+              <span>كشف حضور الفصل</span>
+            </Link>
           </div>
         </div>
       </div>
@@ -385,6 +423,7 @@ export const ClassDetailsPage = () => {
                   <tr>
                     <th>المخدوم</th>
                     <th>كود ID</th>
+                    <th>المنطقة</th>
                     <th>الهاتف والواتساب</th>
                     <th>المجموعة</th>
                     <th style={{ textAlign: 'left' }}>إجراءات</th>
@@ -424,6 +463,23 @@ export const ClassDetailsPage = () => {
                           <span style={{ fontFamily: 'monospace', fontSize: '0.8rem', color: 'var(--color-primary-light)' }}>
                             {memberId}
                           </span>
+                        </td>
+                        <td>
+                          {m.area ? (
+                            <span style={{
+                              fontSize: '0.75rem',
+                              padding: '2px 6px',
+                              background: 'rgba(168, 85, 247, 0.12)',
+                              color: '#c084fc',
+                              borderRadius: '4px',
+                              border: '1px solid rgba(168, 85, 247, 0.3)',
+                              fontWeight: 700
+                            }}>
+                              {m.area}
+                            </span>
+                          ) : (
+                            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>—</span>
+                          )}
                         </td>
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -715,6 +771,115 @@ export const ClassDetailsPage = () => {
                 disabled={!targetClassId || transferring}
               >
                 {transferring ? 'جاري النقل...' : 'تأكيد النقل'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* WhatsApp Broadcast Modal */}
+      {isBroadcastModalOpen && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.85)',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '1rem',
+          backdropFilter: 'blur(4px)'
+        }}>
+          <div className="glass-card" style={{ width: '100%', maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#34d399', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <MessageSquare size={20} />
+                <span>رسالة لأولياء أمور أعضاء الفصل ({members.length})</span>
+              </h3>
+              <button onClick={() => setIsBroadcastModalOpen(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div>
+              <label className="form-label">نص الرسالة الموحدة (استخدم {'{الاسم}'} ليتم استبداله باسم كل طفل):</label>
+              <textarea
+                className="form-input"
+                rows={3}
+                value={broadcastMessage}
+                onChange={(e) => setBroadcastMessage(e.target.value)}
+                placeholder="سلام ونعمة يا أحبائي أولياء أمور {الاسم}..."
+              />
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', background: 'rgba(255,255,255,0.05)', padding: '0.75rem 1rem', borderRadius: '8px' }}>
+              <div>
+                <strong style={{ fontSize: '0.85rem' }}>أرقام هواتف الفصل:</strong>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>
+                  {members.filter(m => m.phone).length} أرقام مسجلة
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={handleCopyAllPhones}
+                className="btn btn-secondary"
+                style={{ fontSize: '0.82rem', gap: '6px' }}
+              >
+                {copiedAll ? <Check size={14} color="#34d399" /> : <Copy size={14} />}
+                <span>{copiedAll ? 'تم نسخ جميع الأرقام!' : 'نسخ كافة الأرقام للمجموعة'}</span>
+              </button>
+            </div>
+
+            {/* Members Quick Send Table */}
+            <div style={{ maxHeight: '250px', overflowY: 'auto' }}>
+              <table className="custom-table" style={{ width: '100%', fontSize: '0.85rem' }}>
+                <thead>
+                  <tr>
+                    <th>اسم الطفل</th>
+                    <th>الهاتف</th>
+                    <th style={{ textAlign: 'center' }}>إرسال مباشر</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {members.map(m => {
+                    const phone = m.whatsapp_phone || m.phone;
+                    const personalizedText = broadcastMessage.replace(/\{الاسم\}/g, m.full_name || '');
+                    const cleanPhone = phone ? phone.replace(/\D/g, '').replace(/^0+/, '') : '';
+                    const waLink = cleanPhone ? `https://wa.me/20${cleanPhone}?text=${encodeURIComponent(personalizedText)}` : null;
+
+                    return (
+                      <tr key={m.member_id || m.id}>
+                        <td style={{ fontWeight: 700 }}>{m.full_name}</td>
+                        <td style={{ fontFamily: 'monospace' }} dir="ltr">{phone || '—'}</td>
+                        <td style={{ textAlign: 'center' }}>
+                          {waLink ? (
+                            <a
+                              href={waLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="btn btn-secondary"
+                              style={{ padding: '0.25rem 0.6rem', fontSize: '0.78rem', color: '#34d399', borderColor: 'rgba(52, 211, 153, 0.3)' }}
+                            >
+                              <MessageSquare size={13} />
+                              <span>إرسال واتساب</span>
+                            </a>
+                          ) : (
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>لا يوجد هاتف</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button onClick={() => setIsBroadcastModalOpen(false)} className="btn btn-secondary">
+                إغلاق
               </button>
             </div>
           </div>

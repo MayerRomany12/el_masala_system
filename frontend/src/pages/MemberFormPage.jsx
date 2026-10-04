@@ -4,6 +4,7 @@ import { membersApi } from '../api/members';
 import { apiClient } from '../api/client';
 import { normalizePhone, isValidFullName, isValidEgyptianMobile } from '../utils/phone';
 import { getPhotoUrl } from '../utils/photo';
+import { PhotoCropperModal } from '../components/PhotoCropperModal';
 import {
   ArrowRight,
   UserPlus,
@@ -16,7 +17,8 @@ import {
   AlertCircle,
   Calendar,
   Heart,
-  CheckCircle
+  CheckCircle,
+  Mail
 } from 'lucide-react';
 
 export const MemberFormPage = () => {
@@ -25,6 +27,7 @@ export const MemberFormPage = () => {
   const isEditMode = Boolean(id);
 
   const [classes, setClasses] = useState([]);
+  const [areasList, setAreasList] = useState([]);
   const [loading, setLoading] = useState(isEditMode);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -36,6 +39,8 @@ export const MemberFormPage = () => {
     date_of_birth: '',
     class_id: '',
     group_name: '',
+    email: '',
+    area: '',
     phone: '',
     secondary_phone: '',
     member_phone: '',
@@ -47,10 +52,12 @@ export const MemberFormPage = () => {
     photo_url: ''
   });
 
-  const [selectedPhotoFile, setSelectedPhotoFile] = useState(null);
+  const [rawPhotoSrc, setRawPhotoSrc] = useState(null);
+  const [isCropperOpen, setIsCropperOpen] = useState(false);
+  const [croppedPhotoData, setCroppedPhotoData] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
 
-  // Load available classes
+  // Load available classes & areas
   useEffect(() => {
     apiClient.get('/classes/?status=Active&limit=100')
       .then(res => {
@@ -62,6 +69,15 @@ export const MemberFormPage = () => {
       })
       .catch(err => {
         console.error('Error fetching classes:', err);
+      });
+
+    membersApi.getDistinctAreas()
+      .then(res => {
+        const areas = res?.data || res || [];
+        setAreasList(areas);
+      })
+      .catch(err => {
+        console.error('Error fetching areas:', err);
       });
   }, [isEditMode]);
 
@@ -79,6 +95,8 @@ export const MemberFormPage = () => {
           date_of_birth: member.date_of_birth || '',
           class_id: member.active_class_id || member.class_id || '',
           group_name: member.group_name || '',
+          email: member.email || '',
+          area: member.area || '',
           phone: member.phone || '',
           secondary_phone: member.secondary_phone || '',
           member_phone: member.member_phone || '',
@@ -104,9 +122,19 @@ export const MemberFormPage = () => {
   const handlePhotoSelect = (e) => {
     const file = e.target.files?.[0];
     if (file) {
-      setSelectedPhotoFile(file);
-      setPhotoPreview(URL.createObjectURL(file));
+      const reader = new FileReader();
+      reader.onload = () => {
+        setRawPhotoSrc(reader.result);
+        setIsCropperOpen(true);
+      };
+      reader.readAsDataURL(file);
     }
+  };
+
+  const handleCropComplete = (croppedBase64) => {
+    setCroppedPhotoData(croppedBase64);
+    setPhotoPreview(croppedBase64);
+    setFormData(prev => ({ ...prev, photo_url: croppedBase64 }));
   };
 
   const handleSubmit = async (e) => {
@@ -154,11 +182,14 @@ export const MemberFormPage = () => {
       ...formData,
       stage: resolvedStage,
       full_name: formData.full_name.trim(),
+      email: formData.email?.trim() || null,
+      area: formData.area?.trim() || null,
       date_of_birth: formData.date_of_birth || null,
       group_name: formData.group_name?.trim() || null,
       father_of_confession: formData.father_of_confession?.trim() || null,
       address: formData.address?.trim() || null,
       notes: formData.notes?.trim() || null,
+      photo_url: croppedPhotoData || formData.photo_url || null,
       phone: normalizePhone(formData.phone),
       secondary_phone: formData.secondary_phone ? normalizePhone(formData.secondary_phone) : null,
       member_phone: formData.member_phone ? normalizePhone(formData.member_phone) : null,
@@ -177,7 +208,7 @@ export const MemberFormPage = () => {
         const createdData = res?.data || res;
         savedMemberId = createdData.member_id || createdData.id;
 
-        // Auto enroll into chosen class if needed
+        // Auto enroll into chosen class
         if (formData.class_id && savedMemberId) {
           try {
             await apiClient.post(`/classes/${formData.class_id}/members`, {
@@ -189,12 +220,12 @@ export const MemberFormPage = () => {
         }
       }
 
-      // Upload photo if file was selected
-      if (selectedPhotoFile && savedMemberId) {
+      // If photo was cropped, save photo data URL directly into DB
+      if (croppedPhotoData && savedMemberId) {
         try {
-          await membersApi.uploadPhoto(savedMemberId, selectedPhotoFile);
+          await membersApi.updatePhotoData(savedMemberId, croppedPhotoData);
         } catch (photoErr) {
-          console.error('Error uploading photo:', photoErr);
+          console.error('Error saving photo data:', photoErr);
         }
       }
 
@@ -228,6 +259,14 @@ export const MemberFormPage = () => {
 
   return (
     <div style={{ maxWidth: '850px', margin: '0 auto', paddingBottom: '2rem' }}>
+      {/* Photo Cropper Modal */}
+      <PhotoCropperModal
+        isOpen={isCropperOpen}
+        imageSrc={rawPhotoSrc}
+        onClose={() => setIsCropperOpen(false)}
+        onCropComplete={handleCropComplete}
+      />
+
       {/* Top Navigation & Header */}
       <div style={{ marginBottom: '1.25rem' }}>
         <button
@@ -312,15 +351,16 @@ export const MemberFormPage = () => {
       )}
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-        {/* Photo Upload Section */}
+        {/* Photo Upload Section with circular frame */}
         <div className="glass-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
             <div style={{
-              width: '64px',
-              height: '64px',
+              width: '74px',
+              height: '74px',
               borderRadius: '50%',
               background: 'var(--bg-secondary)',
-              border: '2px solid var(--color-primary-light)',
+              border: '3px solid var(--color-gold, #f59e0b)',
+              boxShadow: '0 0 14px rgba(245, 158, 11, 0.25)',
               overflow: 'hidden',
               display: 'flex',
               alignItems: 'center',
@@ -330,20 +370,20 @@ export const MemberFormPage = () => {
               {photoPreview ? (
                 <img src={photoPreview} alt="معاينة الصورة" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               ) : (
-                <User size={30} style={{ color: 'var(--text-muted)' }} />
+                <User size={34} style={{ color: 'var(--text-muted)' }} />
               )}
             </div>
             <div>
-              <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-main)' }}>صورة المخدوم</div>
+              <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-main)' }}>صورة المخدوم في الإطار</div>
               <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                اختياري - صورة واضحة للتعرف البصري والبطاقة
+                يتم حفظ الصورة بصيغة مضغوطة دائمة لا تُفقد عند التحديث
               </div>
             </div>
           </div>
 
           <label className="btn btn-secondary" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}>
             <Camera size={16} />
-            <span>{photoPreview ? 'تغيير الصورة' : 'اختيار صورة'}</span>
+            <span>{photoPreview ? 'تغيير وتأطير الصورة' : 'اختيار وتأطير الصورة'}</span>
             <input
               type="file"
               accept="image/*"
@@ -421,6 +461,22 @@ export const MemberFormPage = () => {
                 onChange={(e) => setFormData({ ...formData, group_name: e.target.value })}
                 placeholder="مثال: أسرة مارمرقس"
               />
+            </div>
+
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">البريد الإلكتروني / Gmail (اختياري)</label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="email"
+                  className="form-input"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  placeholder="name@gmail.com"
+                  dir="ltr"
+                  style={{ textAlign: 'right', paddingLeft: '2.5rem' }}
+                />
+                <Mail size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+              </div>
             </div>
 
             <div className="form-group" style={{ marginBottom: 0 }}>
@@ -519,7 +575,7 @@ export const MemberFormPage = () => {
           </div>
         </div>
 
-        {/* 3. Address & Health Notes */}
+        {/* 3. Address, Area & Health Notes */}
         <div className="glass-card">
           <div style={{
             display: 'flex',
@@ -533,31 +589,48 @@ export const MemberFormPage = () => {
             fontWeight: 700
           }}>
             <MapPin size={18} />
-            <span>بيانات السكن والرعاية</span>
+            <span>بيانات السكن والمنطقة وتوزيع الافتقاد</span>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem' }}>
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">عنوان السكن (اختياري)</label>
+              <label className="form-label">المنطقة السكنية (لتقسيم الافتقاد الجغرافي)</label>
+              <input
+                type="text"
+                list="areas-datalist"
+                className="form-input"
+                value={formData.area}
+                onChange={(e) => setFormData({ ...formData, area: e.target.value })}
+                placeholder="مثال: الكرور، عزبة شنودة، الشيخ هارون..."
+              />
+              <datalist id="areas-datalist">
+                {areasList.map((a) => (
+                  <option key={a} value={a} />
+                ))}
+              </datalist>
+            </div>
+
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">العنوان التفصيلي (اختياري)</label>
               <input
                 type="text"
                 className="form-input"
                 value={formData.address}
                 onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                placeholder="عزبة شنوده - الكرور - الشارع..."
+                placeholder="الشارع، رقم العمارة، علامة مميزة..."
               />
             </div>
+          </div>
 
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">ملاحظات خدمة ورعاية خاصة</label>
-              <textarea
-                className="form-input"
-                rows={3}
-                value={formData.notes}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                placeholder="أي ملاحظات خاصة بالتلميذ أو الرعاية الصحية أو العائلية..."
-              />
-            </div>
+          <div className="form-group" style={{ marginTop: '1rem', marginBottom: 0 }}>
+            <label className="form-label">ملاحظات خدمة ورعاية خاصة</label>
+            <textarea
+              className="form-input"
+              rows={3}
+              value={formData.notes}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              placeholder="أي ملاحظات خاصة بالتلميذ أو الرعاية الصحية أو العائلية..."
+            />
           </div>
         </div>
 
@@ -581,7 +654,7 @@ export const MemberFormPage = () => {
             type="submit"
             className="btn btn-primary"
             disabled={submitting}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700 }}
           >
             <Save size={16} />
             <span>{submitting ? 'جاري الحفظ...' : isEditMode ? 'حفظ التعديلات' : 'تسجيل المخدوم'}</span>

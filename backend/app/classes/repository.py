@@ -72,6 +72,7 @@ class ClassRepository:
         stage: Optional[str] = None,
         status: Optional[str] = None,
         is_active: Optional[bool] = None,
+        allowed_class_ids: Optional[List[str]] = None,
         limit: int = 100
     ) -> List[Dict[str, Any]]:
         query = (
@@ -96,6 +97,8 @@ class ClassRepository:
         )
 
         filters = []
+        if allowed_class_ids is not None:
+            filters.append(ClassGroup.class_id.in_(allowed_class_ids))
         if group_type:
             filters.append(ClassGroup.group_type == group_type)
         if season_id:
@@ -340,7 +343,9 @@ class ClassRepository:
                 Member.secondary_phone,
                 Member.member_phone,
                 Member.stage,
-                Member.educational_year,
+                Member.area,
+                Member.email,
+                Member.photo_url,
                 Member.gender,
                 Member.father_of_confession
             )
@@ -354,7 +359,7 @@ class ClassRepository:
         res = await self.db.execute(query)
         members = []
         for row in res.all():
-            cgm, full_name, phone, secondary_phone, member_phone, stage, educational_year, gender, father_of_confession = row
+            cgm, full_name, phone, secondary_phone, member_phone, stage, area, email, photo_url, gender, father_of_confession = row
             members.append({
                 "membership_id": cgm.membership_id,
                 "class_id": cgm.class_id,
@@ -364,7 +369,9 @@ class ClassRepository:
                 "secondary_phone": secondary_phone,
                 "member_phone": member_phone,
                 "stage": stage,
-                "educational_year": educational_year,
+                "area": area or "",
+                "email": email or "",
+                "photo_url": photo_url,
                 "gender": gender,
                 "father_of_confession": father_of_confession,
                 "is_active": cgm.is_active,
