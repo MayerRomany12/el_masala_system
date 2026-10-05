@@ -73,3 +73,13 @@ async def get_unread_count(
     service = MessagesService(db)
     count = await service.get_unread_count(current_user.get("user_id"))
     return success_response(data={"unread_count": count}, message="تم جلب عدّاد الرسائل غير المقروءة")
+
+
+@router.get("/recipients", response_model=dict)
+async def get_recipients(
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    service = MessagesService(db)
+    items = await service.get_recipients(exclude_user_id=current_user.get("user_id"))
+    return success_response(data={"items": items}, message="تم جلب قائمة المستلمين بنجاح")

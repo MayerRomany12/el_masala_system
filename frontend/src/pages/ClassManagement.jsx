@@ -93,10 +93,11 @@ export const ClassManagement = () => {
   // ─── Statistics Calculation ───────────────────────────────────────────────
   const stats = useMemo(() => {
     const total = classes.length;
-    const regular = classes.filter((c) => c.group_type === 'Regular').length;
+    const sundaySchool = classes.filter((c) => c.group_type === 'SundaySchool' || c.group_type === 'Regular' || c.group_type === 'Standard').length;
     const summer = classes.filter((c) => c.group_type === 'Summer').length;
+    const general = classes.filter((c) => c.group_type === 'General').length;
     const totalMembers = classes.reduce((sum, c) => sum + (c.active_members_count || 0), 0);
-    return { total, regular, summer, totalMembers };
+    return { total, sundaySchool, summer, general, totalMembers };
   }, [classes]);
 
   // ─── Filtered Classes ─────────────────────────────────────────────────────
@@ -108,7 +109,10 @@ export const ClassManagement = () => {
         cls.class_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         cls.description?.toLowerCase().includes(searchTerm.toLowerCase());
 
-      const matchesType = filterType === 'ALL' || cls.group_type === filterType;
+      const matchesType =
+        filterType === 'ALL' ||
+        cls.group_type === filterType ||
+        (filterType === 'SundaySchool' && (cls.group_type === 'Regular' || cls.group_type === 'Standard'));
       const matchesStage = !filterStage || cls.stage === filterStage;
       const matchesSeason = !filterSeason || cls.season_id === filterSeason;
 
@@ -253,9 +257,10 @@ export const ClassManagement = () => {
             value={filterType}
             onChange={(e) => setFilterType(e.target.value)}
           >
-            <option value="ALL">جميع الأنواع</option>
-            <option value="Regular">فصول الخدمة الأساسية</option>
-            <option value="Summer">النشاط الصيفي</option>
+            <option value="ALL">جميع أنواع الخدمة</option>
+            <option value="SundaySchool">مدارس أحد ⛪</option>
+            <option value="Summer">نشاط صيفي ☀️</option>
+            <option value="General">عام 🌟</option>
           </select>
         </div>
 
@@ -349,12 +354,26 @@ export const ClassManagement = () => {
                     <span
                       className="badge"
                       style={{
-                        background: isSummer ? 'rgba(245, 158, 11, 0.15)' : 'rgba(56, 189, 248, 0.12)',
-                        color: isSummer ? '#fbbf24' : 'var(--color-primary-light)',
+                        background:
+                          cls.group_type === 'Summer'
+                            ? 'rgba(245, 158, 11, 0.15)'
+                            : cls.group_type === 'General'
+                            ? 'rgba(168, 85, 247, 0.15)'
+                            : 'rgba(56, 189, 248, 0.12)',
+                        color:
+                          cls.group_type === 'Summer'
+                            ? '#fbbf24'
+                            : cls.group_type === 'General'
+                            ? '#c084fc'
+                            : 'var(--color-primary-light)',
                         border: '1px solid var(--border-subtle)'
                       }}
                     >
-                      {isSummer ? '☀️ نشاط صيفي' : '⛪ فصل أساسي'}
+                      {cls.group_type === 'Summer'
+                        ? '☀️ نشاط صيفي'
+                        : cls.group_type === 'General'
+                        ? '🌟 عام'
+                        : '⛪ مدارس أحد'}
                     </span>
                     <span style={{ fontSize: '0.8rem', fontFamily: 'monospace', color: 'var(--text-muted)' }}>
                       {cls.class_id}

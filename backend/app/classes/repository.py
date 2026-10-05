@@ -18,11 +18,17 @@ class ClassRepository:
 
     async def create_class_group(self, data: Dict[str, Any]) -> Dict[str, Any]:
         prefix = "SMR" if data.get("group_type") == "Summer" else "CLS"
+        valid_cols = {c.name for c in ClassGroup.__table__.columns}
+        clean_data = dict(data)
+        if "is_active" in clean_data and "status" not in clean_data:
+            clean_data["status"] = "Active" if clean_data["is_active"] else "Inactive"
+        clean_data = {k: v for k, v in clean_data.items() if k in valid_cols and k != "class_id"}
+
         max_retries = 10
         for _ in range(max_retries):
             rand_num = secrets.randbelow(1_000_000)
             candidate_id = f"{prefix}-{rand_num:06d}"
-            class_group = ClassGroup(class_id=candidate_id, **data)
+            class_group = ClassGroup(class_id=candidate_id, **clean_data)
             self.db.add(class_group)
             try:
                 await self.db.flush()
@@ -133,12 +139,19 @@ class ClassRepository:
         if not data:
             return await self.get_by_id(class_id)
         
-        await self.db.execute(
-            update(ClassGroup)
-            .where(ClassGroup.class_id == class_id)
-            .values(**data)
-        )
-        await self.db.flush()
+        valid_cols = {c.name for c in ClassGroup.__table__.columns}
+        clean_data = dict(data)
+        if "is_active" in clean_data and "status" not in clean_data:
+            clean_data["status"] = "Active" if clean_data["is_active"] else "Inactive"
+        clean_data = {k: v for k, v in clean_data.items() if k in valid_cols and k != "class_id"}
+
+        if clean_data:
+            await self.db.execute(
+                update(ClassGroup)
+                .where(ClassGroup.class_id == class_id)
+                .values(**clean_data)
+            )
+            await self.db.flush()
         return await self.get_by_id(class_id)
 
     # ---------------- SERVANTS MANAGEMENT ---------------- #

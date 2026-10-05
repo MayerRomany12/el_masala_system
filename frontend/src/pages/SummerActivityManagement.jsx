@@ -73,16 +73,17 @@ export const SummerActivityManagement = () => {
     try {
       setError('');
       await apiClient.post('/classes', {
-        ...newGroup,
-        group_type: 'Summer',
-        season_id: selectedSeason || newGroup.season_id
+        name: newGroup.name.trim(),
+        group_type: newGroup.group_type || 'Summer',
+        stage: newGroup.stage,
+        description: newGroup.description?.trim() || null
       });
-      setSuccess('تم إنشاء مجموعة النشاط الصيفي بنجاح ☀️');
+      setSuccess('تم إنشاء مجموعة النشاط بنجاح ☀️');
       setShowCreateModal(false);
-      setNewGroup({ name: '', season_id: '', stage: 'ابتدائي', description: '' });
+      setNewGroup({ name: '', group_type: 'Summer', stage: 'ابتدائي', description: '' });
       fetchSummerGroups();
     } catch (err) {
-      setError(err.response?.data?.detail || 'تعذر إنشاء مجموعة النشاط الصيفي');
+      setError(err.response?.data?.detail || err.response?.data?.message || 'تعذر إنشاء مجموعة النشاط');
     }
   };
 
@@ -233,35 +234,50 @@ export const SummerActivityManagement = () => {
             <form onSubmit={handleCreateSummerGroup}>
               <div className="modal-body">
                 <div className="form-group">
-                  <label className="form-label">اسم النشاط / المجموعة الصيفية:</label>
+                  <label className="form-label">اسم النشاط / المجموعة*</label>
                   <input
                     type="text"
                     required
-                    placeholder="مثال: ورشة الكورال - صيف 2026"
+                    placeholder="مثال: ورشة الكورال والألحان"
                     className="form-input"
                     value={newGroup.name}
                     onChange={e => setNewGroup({ ...newGroup, name: e.target.value })}
                   />
                 </div>
 
-                <div className="form-group">
-                  <label className="form-label">المرحلة الدراسية المستهدفة:</label>
-                  <select
-                    className="form-input"
-                    value={newGroup.stage}
-                    onChange={e => setNewGroup({ ...newGroup, stage: e.target.value })}
-                  >
-                    <option value="حضانة">حضانة</option>
-                    <option value="ابتدائي">ابتدائي</option>
-                    <option value="إعدادي">إعدادي</option>
-                    <option value="ثانوي">ثانوي</option>
-                    <option value="جامعيين وخريجين">جامعيين وخريجين</option>
-                    <option value="عام">عام لكافة الأعمار</option>
-                  </select>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+                  <div className="form-group">
+                    <label className="form-label">نوع الخدمة*</label>
+                    <select
+                      className="form-input"
+                      value={newGroup.group_type || 'Summer'}
+                      onChange={e => setNewGroup({ ...newGroup, group_type: e.target.value })}
+                    >
+                      <option value="Summer">نشاط صيفي ☀️</option>
+                      <option value="SundaySchool">مدارس أحد ⛪</option>
+                      <option value="General">عام 🌟</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">المرحلة الدراسية*</label>
+                    <select
+                      className="form-input"
+                      value={newGroup.stage}
+                      onChange={e => setNewGroup({ ...newGroup, stage: e.target.value })}
+                    >
+                      <option value="حضانة">حضانة</option>
+                      <option value="ابتدائي">ابتدائي</option>
+                      <option value="إعدادي">إعدادي</option>
+                      <option value="ثانوي">ثانوي</option>
+                      <option value="جامعيين وخريجين">جامعيين وخريجين</option>
+                      <option value="أنشطة عامة">أنشطة عامة (ألحان / كورال / كشافة)</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">وصف تفصيلي للنشاط:</label>
+                  <label className="form-label">وصف تفصيلي للنشاط (اختياري):</label>
                   <textarea
                     className="form-input"
                     rows={3}

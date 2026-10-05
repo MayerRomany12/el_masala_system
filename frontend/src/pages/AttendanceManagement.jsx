@@ -38,6 +38,31 @@ import {
   ChevronDown
 } from 'lucide-react';
 
+// Helper to generate Arabic weekday and date string (e.g. جلسة حضور يوم السبت 29 سبتمبر 2026)
+const formatArabicSessionTitle = (dateStr) => {
+  if (!dateStr) return '';
+  try {
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      const year = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const day = parseInt(parts[2], 10);
+      const d = new Date(year, month, day);
+
+      const daysOfWeek = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+      const monthsOfYear = [
+        'يناير', 'فبراير', 'مارس', 'إبريل', 'مايو', 'يونيو',
+        'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
+      ];
+
+      const dayName = daysOfWeek[d.getDay()];
+      const monthName = monthsOfYear[d.getMonth()];
+      return `جلسة حضور يوم ${dayName} ${day} ${monthName} ${year}`;
+    }
+  } catch (e) {}
+  return `جلسة حضور ${dateStr}`;
+};
+
 export const AttendanceManagement = () => {
   // Classes & Sessions states
   const [classesList, setClassesList] = useState([]);
@@ -77,8 +102,8 @@ export const AttendanceManagement = () => {
   // New Session Modal
   const [isSessionModalOpen, setIsSessionModalOpen] = useState(false);
   const [sessionFormData, setSessionFormData] = useState({
-    class_id: '',
-    title: '',
+    selected_class_ids: [],
+    title: formatArabicSessionTitle(new Date().toISOString().split('T')[0]),
     session_date: new Date().toISOString().split('T')[0],
     recurrence: 'Weekly'
   });
@@ -488,34 +513,38 @@ export const AttendanceManagement = () => {
     }, 600);
   };
 
-  // 8. Create New Session for the Class
+  // 8. Create New Session(s) for Selected Class(es)
   const handleCreateSession = async (e) => {
     e.preventDefault();
-    if (!sessionFormData.class_id) {
-      alert('يرجى اختيار الفصل');
+    const classIds = sessionFormData.selected_class_ids || [];
+    if (classIds.length === 0) {
+      alert('يرجى اختيار فصل واحد على الأقل لفتح جلسة الحضور');
       return;
     }
 
     setSessionFormLoading(true);
     try {
-      const selectedCls = classesList.find(c => c.class_id === sessionFormData.class_id);
-      const stage = selectedCls?.stage || selectedCls?.name || 'عام';
-      const title = sessionFormData.title || `جلسة ${selectedCls?.name || ''} - ${sessionFormData.session_date}`;
+      const sessionDate = sessionFormData.session_date;
+      const title = sessionFormData.title?.trim() || formatArabicSessionTitle(sessionDate);
 
-      const res = await attendanceApi.createSession({
-        class_id: sessionFormData.class_id,
-        stage: stage,
-        title: title,
-        session_date: sessionFormData.session_date,
-        recurrence: sessionFormData.recurrence || 'Weekly'
-      });
-
-      if (res.success) {
-        setIsSessionModalOpen(false);
-        await fetchSessions(sessionFormData.class_id);
+      for (const classId of classIds) {
+        const clsObj = classesList.find(c => c.class_id === classId);
+        const stage = clsObj?.stage || clsObj?.name || 'عام';
+        await attendanceApi.createSession({
+          class_id: classId,
+          stage: stage,
+          title: title,
+          session_date: sessionDate,
+          recurrence: sessionFormData.recurrence || 'Weekly'
+        });
       }
+
+      setIsSessionModalOpen(false);
+      const targetClassId = classIds[0];
+      setSelectedClassId(targetClassId);
+      await fetchSessions(targetClassId);
     } catch (err) {
-      alert(err.response?.data?.message || 'تعذر إنشاء الجلسة');
+      alert(err.response?.data?.message || 'تعذر إنشاء جلسات الحضور');
     } finally {
       setSessionFormLoading(false);
     }
@@ -546,10 +575,11 @@ export const AttendanceManagement = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
           <button
             onClick={() => {
+              const todayStr = new Date().toISOString().split('T')[0];
               setSessionFormData({
-                class_id: selectedClassId || (classesList[0]?.class_id || ''),
-                title: '',
-                session_date: new Date().toISOString().split('T')[0],
+                selected_class_ids: selectedClassId ? [selectedClassId] : (classesList[0] ? [classesList[0].class_id] : []),
+                session_date: todayStr,
+                title: formatArabicSessionTitle(todayStr),
                 recurrence: 'Weekly'
               });
               setIsSessionModalOpen(true);
@@ -558,7 +588,7 @@ export const AttendanceManagement = () => {
             style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.88rem', fontWeight: 700 }}
           >
             <Plus size={16} />
-            <span>جلسة جديدة للفصل</span>
+            <span>فتح جلسة حضور جديدة</span>
           </button>
 
           <button
@@ -1115,7 +1145,7 @@ export const AttendanceManagement = () => {
           <div className="glass-card" style={{ width: '100%', maxWidth: '480px', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main)' }}>
-                إنشاء جلسة حضور جديدة للفصل
+                فتح جلسة حضور جديدة
               </h3>
               <button onClick={() => setIsSessionModalOpen(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
                 <X size={20} />
@@ -1124,48 +1154,139 @@ export const AttendanceManagement = () => {
 
             <form onSubmit={handleCreateSession} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div>
-                <label className="form-label">الفصل المستهدف*</label>
-                <select
-                  className="form-input"
-                  value={sessionFormData.class_id}
-                  onChange={(e) => setSessionFormData({ ...sessionFormData, class_id: e.target.value })}
-                  required
-                >
-                  <option value="">— اختر الفصل —</option>
-                  {classesList.map(c => (
-                    <option key={c.class_id} value={c.class_id}>{c.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
                 <label className="form-label">تاريخ الجلسة*</label>
                 <input
                   type="date"
                   className="form-input"
                   value={sessionFormData.session_date}
-                  onChange={(e) => setSessionFormData({ ...sessionFormData, session_date: e.target.value })}
+                  onChange={(e) => {
+                    const newDate = e.target.value;
+                    setSessionFormData({
+                      ...sessionFormData,
+                      session_date: newDate,
+                      title: formatArabicSessionTitle(newDate)
+                    });
+                  }}
                   required
                 />
               </div>
 
               <div>
-                <label className="form-label">عنوان الجلسة (اختياري)</label>
+                <label className="form-label">اسم وعنوان الجلسة*</label>
                 <input
                   type="text"
                   className="form-input"
-                  placeholder="مثال: قداس الأحد والمدارس"
+                  placeholder="مثال: جلسة حضور يوم السبت 29 سبتمبر 2026"
                   value={sessionFormData.title}
                   onChange={(e) => setSessionFormData({ ...sessionFormData, title: e.target.value })}
+                  required
                 />
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.25rem' }}>
+                  يتم تسمية الجلسة تلقائياً باليوم والتاريخ، ويمكنك تعديلها كما تشاء.
+                </span>
+              </div>
+
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                  <label className="form-label" style={{ margin: 0 }}>
+                    الفصول المستهدفة للجلسة* ({sessionFormData.selected_class_ids.length} محدد)
+                  </label>
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <button
+                      type="button"
+                      onClick={() => setSessionFormData({
+                        ...sessionFormData,
+                        selected_class_ids: classesList.map(c => c.class_id)
+                      })}
+                      style={{ background: 'none', border: 'none', color: '#38bdf8', fontSize: '0.78rem', cursor: 'pointer', fontWeight: 600, padding: 0 }}
+                    >
+                      تحديد الكل
+                    </button>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>|</span>
+                    <button
+                      type="button"
+                      onClick={() => setSessionFormData({
+                        ...sessionFormData,
+                        selected_class_ids: []
+                      })}
+                      style={{ background: 'none', border: 'none', color: '#f87171', fontSize: '0.78rem', cursor: 'pointer', fontWeight: 600, padding: 0 }}
+                    >
+                      إلغاء التحديد
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{
+                  maxHeight: '170px',
+                  overflowY: 'auto',
+                  border: '1px solid var(--border)',
+                  borderRadius: '8px',
+                  padding: '0.5rem',
+                  background: 'rgba(15, 23, 42, 0.4)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.35rem'
+                }}>
+                  {classesList.map(c => {
+                    const isChecked = sessionFormData.selected_class_ids.includes(c.class_id);
+                    return (
+                      <label
+                        key={c.class_id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.6rem',
+                          padding: '0.4rem 0.6rem',
+                          borderRadius: '6px',
+                          background: isChecked ? 'rgba(56, 189, 248, 0.12)' : 'transparent',
+                          cursor: 'pointer',
+                          fontSize: '0.85rem',
+                          color: isChecked ? '#38bdf8' : 'var(--text-main)',
+                          userSelect: 'none',
+                          transition: 'background 0.15s ease'
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) => {
+                            const current = sessionFormData.selected_class_ids;
+                            const next = e.target.checked
+                              ? [...current, c.class_id]
+                              : current.filter(id => id !== c.class_id);
+                            setSessionFormData({ ...sessionFormData, selected_class_ids: next });
+                          }}
+                          style={{ accentColor: '#38bdf8', width: '16px', height: '16px', cursor: 'pointer' }}
+                        />
+                        <span style={{ fontWeight: isChecked ? 700 : 500 }}>{c.name}</span>
+                        {c.stage && (
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginRight: 'auto' }}>
+                            ({c.stage})
+                          </span>
+                        )}
+                      </label>
+                    );
+                  })}
+                  {classesList.length === 0 && (
+                    <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem', padding: '0.5rem' }}>
+                      لا توجد فصول متاحة
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
                 <button type="button" onClick={() => setIsSessionModalOpen(false)} className="btn btn-secondary">
                   إلغاء
                 </button>
-                <button type="submit" disabled={sessionFormLoading} className="btn btn-primary">
-                  {sessionFormLoading ? 'جاري الإنشاء...' : 'بدء الجلسة'}
+                <button
+                  type="submit"
+                  disabled={sessionFormLoading || sessionFormData.selected_class_ids.length === 0}
+                  className="btn btn-primary"
+                >
+                  {sessionFormLoading
+                    ? 'جاري بدء الجلسات...'
+                    : `فتح الجلسة لـ (${sessionFormData.selected_class_ids.length}) ${sessionFormData.selected_class_ids.length === 1 ? 'فصل' : 'فصول'}`}
                 </button>
               </div>
             </form>

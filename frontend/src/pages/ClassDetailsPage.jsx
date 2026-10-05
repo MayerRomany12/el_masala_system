@@ -264,7 +264,7 @@ export const ClassDetailsPage = () => {
               </span>
             </div>
             <p style={{ margin: '0.3rem 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-              المرحلة: <strong style={{ color: 'var(--text-main)' }}>{classData.stage || 'عام'}</strong> | النوع: <strong style={{ color: 'var(--text-main)' }}>{classData.group_type === 'Summer' ? 'نشاط صيفي' : 'فصل خدمي أساسي'}</strong>
+              المرحلة: <strong style={{ color: 'var(--text-main)' }}>{classData.stage || 'عام'}</strong> | النوع: <strong style={{ color: 'var(--text-main)' }}>{classData.group_type === 'Summer' ? 'نشاط صيفي' : classData.group_type === 'General' ? 'عام' : 'مدارس أحد'}</strong>
               {classData.description && ` — ${classData.description}`}
             </p>
           </div>
@@ -276,7 +276,7 @@ export const ClassDetailsPage = () => {
               style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', color: '#34d399', borderColor: 'rgba(52, 211, 153, 0.3)' }}
             >
               <MessageSquare size={16} />
-              <span>رسالة جماعية لأولياء الأمور (WhatsApp)</span>
+              <span>رسالة جماعية لاعضاء الجروب علي واتساب</span>
             </button>
 
             <Link
@@ -797,7 +797,7 @@ export const ClassDetailsPage = () => {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#34d399', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <MessageSquare size={20} />
-                <span>رسالة لأولياء أمور أعضاء الفصل ({members.length})</span>
+                <span>رسالة جماعية لأعضاء الجروب على واتساب ({members.length})</span>
               </h3>
               <button onClick={() => setIsBroadcastModalOpen(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
                 <X size={20} />

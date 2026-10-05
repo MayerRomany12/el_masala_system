@@ -6,29 +6,16 @@ import { ArrowRight, Plus, Save, AlertCircle, CheckCircle, Layers } from 'lucide
 export const ClassFormPage = () => {
   const navigate = useNavigate();
 
-  const [seasons, setSeasons] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
   const [formData, setFormData] = useState({
     name: '',
-    group_type: 'Regular',
+    group_type: 'SundaySchool',
     stage: 'ابتدائي',
-    season_id: '',
     description: ''
   });
-
-  useEffect(() => {
-    apiClient.get('/seasons/?status=Active')
-      .then(res => {
-        const list = res?.data?.data?.items || res?.data?.items || (Array.isArray(res?.data) ? res.data : []);
-        setSeasons(list);
-      })
-      .catch(err => {
-        console.error('Error fetching seasons:', err);
-      });
-  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -46,7 +33,6 @@ export const ClassFormPage = () => {
         name: formData.name.trim(),
         group_type: formData.group_type,
         stage: formData.stage,
-        season_id: formData.season_id || null,
         description: formData.description.trim() || null
       };
 
@@ -172,14 +158,15 @@ export const ClassFormPage = () => {
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
               <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">نوع المجموعة*</label>
+                <label className="form-label">نوع الخدمة*</label>
                 <select
                   className="form-input"
                   value={formData.group_type}
                   onChange={(e) => setFormData({ ...formData, group_type: e.target.value })}
                 >
-                  <option value="Regular">فصل خدمي أساسي (مدارس الأحد)</option>
-                  <option value="Summer">مجموعة نشاط صيفي</option>
+                  <option value="SundaySchool">مدارس أحد ⛪</option>
+                  <option value="Summer">نشاط صيفي ☀️</option>
+                  <option value="General">عام 🌟</option>
                 </select>
               </div>
 
@@ -198,20 +185,6 @@ export const ClassFormPage = () => {
                   <option value="أنشطة عامة">أنشطة عامة (ألحان / كورال / كشافة)</option>
                 </select>
               </div>
-            </div>
-
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">الموسم الخدمي (اختياري)</label>
-              <select
-                className="form-input"
-                value={formData.season_id}
-                onChange={(e) => setFormData({ ...formData, season_id: e.target.value })}
-              >
-                <option value="">بدون موسم محدد (مستمر على مدار العام)</option>
-                {seasons.map(s => (
-                  <option key={s.season_id} value={s.season_id}>{s.name}</option>
-                ))}
-              </select>
             </div>
 
             <div className="form-group" style={{ marginBottom: 0 }}>

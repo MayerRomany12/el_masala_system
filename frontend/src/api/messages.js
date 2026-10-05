@@ -35,5 +35,11 @@ export const messagesApi = {
   getUnreadCount: async () => {
     const response = await apiClient.get('/messages/unread-count');
     return response.data;
+  },
+
+  // GET /messages/recipients — Get list of potential recipients (Admins, Super Admin, Servants)
+  getRecipients: async () => {
+    const response = await apiClient.get('/messages/recipients');
+    return response.data;
   }
 };

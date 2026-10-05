@@ -49,3 +49,6 @@ class MessagesService:
 
     async def get_unread_count(self, user_id: str) -> int:
         return await self.repo.get_unread_count(user_id)
+
+    async def get_recipients(self, exclude_user_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        return await self.repo.get_recipients(exclude_user_id)

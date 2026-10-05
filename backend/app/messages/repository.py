@@ -203,3 +203,20 @@ class MessagesRepository:
             MessageRecipient.is_read == False
         )
         return (await self.db.execute(query)).scalar_one()
+
+    async def get_recipients(self, exclude_user_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        query = select(User).where(User.is_active == True)
+        if exclude_user_id:
+            query = query.where(User.user_id != exclude_user_id)
+        query = query.order_by(User.role.asc(), User.full_name.asc())
+        res = await self.db.execute(query)
+        users = res.scalars().all()
+        return [
+            {
+                "user_id": u.user_id,
+                "full_name": u.full_name,
+                "role": u.role,
+                "phone": u.phone or ""
+            }
+            for u in users
+        ]

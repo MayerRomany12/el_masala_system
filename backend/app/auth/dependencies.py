@@ -27,6 +27,7 @@ ROLE_PERMISSIONS = {
         "messages:send", "messages:manage"
     ],
     RoleEnum.SERVANT: [
+        "users:read",
         "classes:read", "classes:manage",
         "members:read", "members:write",
         "events:read",

@@ -30,6 +30,8 @@ export const CommunicationHubModal = ({ isOpen, onClose, usersList = [] }) => {
   const [category, setCategory] = useState('Message'); // Message, Task, Note, Escalation
   const [priority, setPriority] = useState('Normal');   // Normal, High, Urgent
 
+  const [recipientsList, setRecipientsList] = useState([]);
+
   const fetchInbox = useCallback(async () => {
     setLoading(true);
     try {
@@ -58,12 +60,24 @@ export const CommunicationHubModal = ({ isOpen, onClose, usersList = [] }) => {
     }
   }, []);
 
+  const fetchRecipients = useCallback(async () => {
+    try {
+      const res = await messagesApi.getRecipients();
+      if (res.success) {
+        setRecipientsList(res.data?.items || []);
+      }
+    } catch (err) {
+      console.error('Error fetching recipients:', err);
+    }
+  }, []);
+
   useEffect(() => {
     if (isOpen) {
       if (activeTab === 'inbox') fetchInbox();
       if (activeTab === 'sent') fetchSent();
+      fetchRecipients();
     }
-  }, [isOpen, activeTab, fetchInbox, fetchSent]);
+  }, [isOpen, activeTab, fetchInbox, fetchSent, fetchRecipients]);
 
   const handleMarkAsRead = async (messageId, isRead) => {
     if (isRead) return;
@@ -265,12 +279,36 @@ export const CommunicationHubModal = ({ isOpen, onClose, usersList = [] }) => {
           {activeTab === 'compose' && (
             <form onSubmit={handleSendMessage} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div>
-                <label className="form-label">المستلم (Recipient)</label>
-                <select className="form-input" value={recipientId} onChange={(e) => setRecipientId(e.target.value)}>
-                  <option value="">إعلان عام للجميع (Broadcast) 📢</option>
-                  {usersList.map(u => (
-                    <option key={u.user_id} value={u.user_id}>{u.full_name} ({u.role})</option>
-                  ))}
+                <label className="form-label" style={{ fontWeight: 700 }}>المستلم (الخادم أو المسؤول المستهدف)</label>
+                <select
+                  className="form-input"
+                  value={recipientId}
+                  onChange={(e) => setRecipientId(e.target.value)}
+                  style={{ fontWeight: 600 }}
+                >
+                  <option value="">📢 إعلان عام لكافة الخدام والمسؤولين (Broadcast)</option>
+                  
+                  {/* Super Admin & Admins Group */}
+                  <optgroup label="المسؤولون والإدارة (Super Admin / Admin)">
+                    {recipientsList
+                      .filter(u => u.role === 'Super Admin' || u.role === 'Admin')
+                      .map(u => (
+                        <option key={u.user_id} value={u.user_id}>
+                          👑 {u.full_name} ({u.role === 'Super Admin' ? 'سوبر أدمن' : 'مسؤول'})
+                        </option>
+                      ))}
+                  </optgroup>
+
+                  {/* Servants Group */}
+                  <optgroup label="خدام الكنيسة (Servants)">
+                    {recipientsList
+                      .filter(u => u.role !== 'Super Admin' && u.role !== 'Admin')
+                      .map(u => (
+                        <option key={u.user_id} value={u.user_id}>
+                          ⛪ {u.full_name} (خادم)
+                        </option>
+                      ))}
+                  </optgroup>
                 </select>
               </div>
 
