@@ -76,3 +76,25 @@ export const isValidWhatsappNumber = (phoneStr) => {
   if (!phoneStr) return true;
   return isValidEgyptianMobile(phoneStr);
 };
+
+export const getGmailUrl = (email, subject = '', body = '') => {
+  if (!email) return '#';
+  const cleanEmail = String(email).trim();
+  const params = new URLSearchParams();
+  params.set('view', 'cm');
+  params.set('fs', '1');
+  params.set('to', cleanEmail);
+  if (subject) params.set('su', subject);
+  if (body) params.set('body', body);
+  return `https://mail.google.com/mail/?${params.toString()}`;
+};
+
+export const getMapsUrl = (locationUrl, fallbackArea = '') => {
+  if (locationUrl && locationUrl.trim().startsWith('http')) {
+    return locationUrl.trim();
+  }
+  const query = (locationUrl || fallbackArea || '').trim();
+  if (!query) return '#';
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query + ' أسوان')}`;
+};
+

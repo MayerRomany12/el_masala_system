@@ -139,6 +139,16 @@ class MemberService:
     async def get_distinct_areas(self) -> List[str]:
         return await self.repository.get_distinct_areas()
 
+    async def add_residential_area(self, name: str) -> str:
+        if not name or not name.strip():
+            raise BadRequestException("يرجى إدخال اسم المنطقة السكنية بشكل صحيح")
+        return await self.repository.add_residential_area(name.strip())
+
+    async def delete_residential_area(self, name: str) -> bool:
+        if not name or not name.strip():
+            raise BadRequestException("يرجى تحديد المنطقة السكنية المراد حذفها")
+        return await self.repository.delete_residential_area(name.strip())
+
     async def update_member(self, member_id: str, data: MemberUpdate) -> Dict[str, Any]:
         existing = await self.repository.get_by_member_id(member_id)
         if not existing:
@@ -149,7 +159,7 @@ class MemberService:
             return existing
 
         # Sanitize empty string fields to None
-        for key in ["date_of_birth", "group_name", "father_of_confession", "address", "notes", "secondary_phone", "member_phone", "whatsapp_phone", "email", "area", "photo_url"]:
+        for key in ["date_of_birth", "group_name", "father_of_confession", "address", "notes", "secondary_phone", "member_phone", "whatsapp_phone", "email", "area", "location_url", "photo_url"]:
             if key in update_fields and update_fields[key] is not None:
                 if isinstance(update_fields[key], str) and not update_fields[key].strip():
                     update_fields[key] = None

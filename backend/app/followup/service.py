@@ -112,3 +112,10 @@ class FollowupService:
             raise NotFoundException(f"مهمة الافتقاد برقم {task_id} غير موجودة")
 
         return await self.repo.update_task(task_id, {"status": "Escalated", "priority": "Urgent"})
+
+    async def distribute_class_tasks(self, class_id: str) -> Dict[str, Any]:
+        return await self.repo.distribute_class_tasks(class_id)
+
+    async def get_class_followup_stats(self, class_id: str) -> Dict[str, Any]:
+        return await self.repo.get_class_followup_stats(class_id)
+

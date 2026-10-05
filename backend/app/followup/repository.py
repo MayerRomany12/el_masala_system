@@ -53,7 +53,12 @@ class FollowupRepository:
             "member_stage": mem.stage,
             "member_phone": mem.phone,
             "member_whatsapp": getattr(mem, "whatsapp_phone", None) or mem.phone,
+            "member_secondary_phone": getattr(mem, "secondary_phone", None),
+            "member_child_phone": getattr(mem, "member_phone", None),
+            "member_email": getattr(mem, "email", None),
             "member_area": getattr(mem, "area", None) or "غير محدد",
+            "member_location_url": getattr(mem, "location_url", None),
+            "member_address": getattr(mem, "address", None),
             "last_absence_session_id": task.last_absence_session_id,
             "consecutive_weeks": task.consecutive_weeks,
             "assigned_servant_id": task.assigned_servant_id,
@@ -430,3 +435,144 @@ class FollowupRepository:
         )
         await self.db.flush()
         return await self.get_task_by_id(task_id)
+
+    async def distribute_class_tasks(self, class_id: str) -> Dict[str, Any]:
+        """
+        توزيع مهام الافتقاد الخاصة بأعضاء الفصل بالتساوي على الخدام النشطين المسكنين فيه (Round-Robin)
+        """
+        from app.models.class_group import ClassGroupServant, ClassGroupMember
+        from app.models.user import User
+
+        # 1. Fetch active servants in this class
+        s_query = (
+            select(User.user_id, User.full_name)
+            .join(ClassGroupServant, User.user_id == ClassGroupServant.servant_id)
+            .where(
+                ClassGroupServant.class_id == class_id,
+                ClassGroupServant.is_active == True,
+                User.is_active == True
+            )
+            .order_by(User.full_name)
+        )
+        servants = (await self.db.execute(s_query)).all()
+        if not servants:
+            raise AppException("لا يوجد خدام نشطون مسجلون في هذا الفصل لتوزيع المهام عليهم")
+
+        # 2. Fetch active members of this class
+        m_query = select(ClassGroupMember.member_id).where(
+            ClassGroupMember.class_id == class_id,
+            ClassGroupMember.is_active == True
+        )
+        class_member_ids = (await self.db.execute(m_query)).scalars().all()
+        if not class_member_ids:
+            return {"distributed_count": 0, "message": "لا يوجد مخدومين في هذا الفصل", "per_servant": {}}
+
+        # 3. Fetch pending/unassigned or pending tasks for these members
+        t_query = select(FollowupTask).where(
+            FollowupTask.member_id.in_(class_member_ids),
+            FollowupTask.status.in_(["Pending", "Escalated"])
+        ).order_by(FollowupTask.consecutive_weeks.desc())
+
+        tasks = (await self.db.execute(t_query)).scalars().all()
+        if not tasks:
+            return {"distributed_count": 0, "message": "لا توجد مهام افتقاد معلقة لهذا الفصل", "per_servant": {}}
+
+        per_servant_counts = {s[0]: {"servant_name": s[1], "count": 0} for s in servants}
+        for idx, task in enumerate(tasks):
+            assigned_servant = servants[idx % len(servants)]
+            task.assigned_servant_id = assigned_servant[0]
+            task.updated_at = datetime.now(timezone.utc)
+            per_servant_counts[assigned_servant[0]]["count"] += 1
+
+        await self.db.commit()
+
+        return {
+            "class_id": class_id,
+            "total_tasks": len(tasks),
+            "servants_count": len(servants),
+            "distribution": list(per_servant_counts.values())
+        }
+
+    async def get_class_followup_stats(self, class_id: str) -> Dict[str, Any]:
+        """
+        لوحة متابعة المشرف: إحصائيات افتقاد الفصل ومتابعة إنجاز كل خادم لمهامه
+        """
+        from app.models.class_group import ClassGroupServant, ClassGroupMember, ClassGroup
+        from app.models.user import User
+
+        # Class Info
+        c_row = (await self.db.execute(select(ClassGroup).where(ClassGroup.class_id == class_id))).scalar_one_or_none()
+        class_name = c_row.name if c_row else "الفصل"
+
+        # Servants in class
+        s_query = (
+            select(User.user_id, User.full_name, User.phone, ClassGroupServant.role)
+            .join(ClassGroupServant, User.user_id == ClassGroupServant.servant_id)
+            .where(
+                ClassGroupServant.class_id == class_id,
+                ClassGroupServant.is_active == True,
+                User.is_active == True
+            )
+            .order_by(ClassGroupServant.role.desc(), User.full_name)
+        )
+        servants = (await self.db.execute(s_query)).all()
+
+        # Members in class
+        m_query = select(ClassGroupMember.member_id).where(
+            ClassGroupMember.class_id == class_id,
+            ClassGroupMember.is_active == True
+        )
+        class_member_ids = (await self.db.execute(m_query)).scalars().all()
+
+        if not class_member_ids:
+            return {
+                "class_id": class_id,
+                "class_name": class_name,
+                "total_members": 0,
+                "total_tasks": 0,
+                "pending_tasks": 0,
+                "completed_tasks": 0,
+                "servants_progress": []
+            }
+
+        # Tasks for class members
+        t_query = select(FollowupTask).where(FollowupTask.member_id.in_(class_member_ids))
+        all_tasks = (await self.db.execute(t_query)).scalars().all()
+
+        total_tasks = len(all_tasks)
+        pending_count = sum(1 for t in all_tasks if t.status in ["Pending", "Escalated"])
+        completed_count = sum(1 for t in all_tasks if t.status == "Completed")
+
+        # Group by servant
+        servants_progress = []
+        for s_id, s_name, s_phone, s_role in servants:
+            servant_tasks = [t for t in all_tasks if t.assigned_servant_id == s_id]
+            s_pending = sum(1 for t in servant_tasks if t.status in ["Pending", "Escalated"])
+            s_completed = sum(1 for t in servant_tasks if t.status == "Completed")
+            rate = round((s_completed / len(servant_tasks) * 100), 1) if servant_tasks else 100.0
+
+            servants_progress.append({
+                "servant_id": s_id,
+                "servant_name": s_name,
+                "phone": s_phone,
+                "role": s_role,
+                "total_tasks": len(servant_tasks),
+                "pending_tasks": s_pending,
+                "completed_tasks": s_completed,
+                "completion_rate": rate
+            })
+
+        # Unassigned tasks
+        unassigned = [t for t in all_tasks if not t.assigned_servant_id and t.status in ["Pending", "Escalated"]]
+
+        return {
+            "class_id": class_id,
+            "class_name": class_name,
+            "total_members": len(class_member_ids),
+            "total_tasks": total_tasks,
+            "pending_tasks": pending_count,
+            "completed_tasks": completed_count,
+            "unassigned_pending_count": len(unassigned),
+            "servants_progress": servants_progress
+        }
+

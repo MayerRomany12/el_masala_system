@@ -120,7 +120,7 @@ export const ClassManagement = () => {
     });
   }, [classes, searchTerm, filterType, filterStage, filterSeason]);
 
-  const stageOptions = ['حضانة', 'ابتدائي', 'إعدادي', 'ثانوي', 'جامعيين وخريجين', 'أنشطة عامة'];
+  const stageOptions = ['الكل (ALL)', 'حضانة', 'ابتدائي', 'إعدادي', 'ثانوي', 'جامعيين', 'خريجين'];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', paddingBottom: '2.5rem' }}>

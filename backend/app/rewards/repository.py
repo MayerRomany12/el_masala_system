@@ -2,7 +2,7 @@ import secrets
 from typing import Optional, List, Tuple, Dict, Any
 from datetime import datetime, timezone
 
-from sqlalchemy import select, update, func, or_
+from sqlalchemy import select, update, func, or_, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 
@@ -25,11 +25,28 @@ class RewardsRepository:
         last_n_sessions: int = 8
     ) -> Tuple[float, int, int]:
         """
-        حساب نسبة حضور الطفل في آخر N جلسات مغلقة/ماضية لمرحلته
+        حساب نسبة حضور الطفل بناءً على عدد جلسات فصله التي فُتحت له
         تُرجع: (نسبة الحضور %, عدد الجلسات الحاضر بها, إجمالي الجلسات)
         """
+        from app.models.class_group import ClassGroupMember
+        # 1. Fetch active class assignments for member
+        c_res = await self.db.execute(
+            select(ClassGroupMember.class_id).where(
+                ClassGroupMember.member_id == member_id,
+                ClassGroupMember.is_active == True
+            )
+        )
+        active_class_ids = c_res.scalars().all()
+
         query = select(AttendanceSession).order_by(AttendanceSession.session_date.desc(), AttendanceSession.created_at.desc())
-        if member_stage:
+        if active_class_ids:
+            query = query.where(
+                or_(
+                    AttendanceSession.class_id.in_(active_class_ids),
+                    and_(AttendanceSession.class_id == None, AttendanceSession.stage == member_stage)
+                )
+            )
+        elif member_stage:
             stage_prefix = member_stage.split('-')[0].strip()
             query = query.where(or_(AttendanceSession.stage == "ALL", AttendanceSession.stage.ilike(f"%{stage_prefix}%")))
 

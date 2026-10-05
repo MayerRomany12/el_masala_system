@@ -10,6 +10,7 @@ from app.models.audit_log import AuditLog
 from app.models.internal_messages import InternalMessage, MessageRecipient
 from app.models.season import Season
 from app.models.class_group import ClassGroup, ClassGroupServant, ClassGroupMember
+from app.models.residential_area import ResidentialArea
 
 __all__ = [
     "User",
@@ -32,6 +33,7 @@ __all__ = [
     "Season",
     "ClassGroup",
     "ClassGroupServant",
-    "ClassGroupMember"
+    "ClassGroupMember",
+    "ResidentialArea"
 ]
 

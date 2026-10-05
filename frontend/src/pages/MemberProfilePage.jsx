@@ -4,7 +4,7 @@ import QRCode from 'qrcode';
 import { membersApi } from '../api/members';
 import { apiClient } from '../api/client';
 import { getPhotoUrl } from '../utils/photo';
-import { getWaUrl } from '../utils/phone';
+import { getWaUrl, getGmailUrl, getMapsUrl } from '../utils/phone';
 import {
   ArrowRight,
   Edit,
@@ -29,7 +29,8 @@ import {
   Flame,
   Award,
   Mail,
-  Home
+  Home,
+  ExternalLink
 } from 'lucide-react';
 
 export const MemberProfilePage = () => {
@@ -397,9 +398,21 @@ export const MemberProfilePage = () => {
               </a>
             )}
 
-            {(member.whatsapp_phone || member.phone) && (
+            {(member.member_phone) && (
               <a
-                href={getWaUrl(member.whatsapp_phone || member.phone)}
+                href={`tel:${member.member_phone}`}
+                className="btn btn-secondary"
+                style={{ fontSize: '0.84rem', gap: '0.4rem' }}
+                title="اتصال هاتفي بالمخدوم"
+              >
+                <Phone size={15} />
+                <span>اتصال بالمخدوم</span>
+              </a>
+            )}
+
+            {(member.whatsapp_phone || member.phone || member.member_phone) && (
+              <a
+                href={getWaUrl(member.whatsapp_phone || member.phone || member.member_phone)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="btn btn-secondary"
@@ -412,18 +425,56 @@ export const MemberProfilePage = () => {
                 title="محادثة واتساب"
               >
                 <MessageSquare size={15} />
-                <span>واتساب</span>
+                <span>واتساب 💬</span>
+              </a>
+            )}
+
+            {member.email && (
+              <a
+                href={getGmailUrl(member.email, `متابعة من كنيسة الشهيد مارجرجس والأنبا شنودة بالكرور`)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-secondary"
+                style={{
+                  fontSize: '0.84rem',
+                  gap: '0.4rem',
+                  color: '#f87171',
+                  borderColor: 'rgba(239, 68, 68, 0.3)'
+                }}
+                title="إرسال بريد إلكتروني عبر Gmail مباشرة"
+              >
+                <Mail size={15} />
+                <span>جيميل (Gmail) ✉️</span>
+              </a>
+            )}
+
+            {(member.location_url || member.area) && (
+              <a
+                href={getMapsUrl(member.location_url, member.area)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-secondary"
+                style={{
+                  fontSize: '0.84rem',
+                  gap: '0.4rem',
+                  color: '#38bdf8',
+                  borderColor: 'rgba(56, 189, 248, 0.3)'
+                }}
+                title="فتح موقع السكن على Google Maps مباشرة"
+              >
+                <MapPin size={15} />
+                <span>Google Maps 🗺️</span>
               </a>
             )}
 
             <button
               onClick={downloadPureQR}
               className="btn btn-secondary"
-              style={{ fontSize: '0.84rem', gap: '0.4rem', color: '#38bdf8', borderColor: 'rgba(56, 189, 248, 0.4)' }}
+              style={{ fontSize: '0.84rem', gap: '0.4rem', color: '#c084fc', borderColor: 'rgba(192, 132, 252, 0.4)' }}
               title="تحميل رمز الـ QR منفصلاً كصورة PNG نقية بدون كارت"
             >
               <Download size={15} />
-              <span>تحميل رمز الـ QR (PNG) 📷</span>
+              <span>تحميل QR (PNG) 📷</span>
             </button>
           </div>
         </div>
@@ -561,20 +612,63 @@ export const MemberProfilePage = () => {
               </div>
 
               {member.email && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.5rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.5rem' }}>
                   <span style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                     <Mail size={15} /> البريد / Gmail:
                   </span>
-                  <span style={{ fontWeight: 600, fontFamily: 'monospace', color: '#60a5fa' }}>{member.email}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span style={{ fontWeight: 600, fontFamily: 'monospace', color: '#60a5fa', dir: 'ltr' }}>{member.email}</span>
+                    <a
+                      href={getGmailUrl(member.email, `متابعة من كنيسة الشهيد مارجرجس والأنبا شنودة`)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn-icon"
+                      style={{ padding: '3px 6px', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '6px', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '3px' }}
+                      title="فتح Gmail مباشرة"
+                    >
+                      <Mail size={12} />
+                      <span>Gmail</span>
+                    </a>
+                  </div>
                 </div>
               )}
 
               {member.area && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.5rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.5rem' }}>
                   <span style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                     <MapPin size={15} /> المنطقة السكنية:
                   </span>
-                  <span style={{ fontWeight: 700, color: '#c084fc' }}>{member.area}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span style={{ fontWeight: 700, color: '#c084fc' }}>{member.area}</span>
+                    <a
+                      href={getMapsUrl(member.location_url, member.area)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn-icon"
+                      style={{ padding: '3px 6px', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.3)', borderRadius: '6px', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '3px' }}
+                      title="عرض المنطقة على Google Maps"
+                    >
+                      <MapPin size={12} />
+                      <span>خرائط</span>
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {member.location_url && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.5rem' }}>
+                  <span style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <MapPin size={15} color="#38bdf8" /> موقع Google Maps:
+                  </span>
+                  <a
+                    href={getMapsUrl(member.location_url, member.area)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: '#38bdf8', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px', textDecoration: 'underline', fontSize: '0.84rem' }}
+                  >
+                    <span>فتح الموقع 🗺️</span>
+                    <ExternalLink size={12} />
+                  </a>
                 </div>
               )}
 
@@ -619,35 +713,64 @@ export const MemberProfilePage = () => {
               fontWeight: 700
             }}>
               <Phone size={16} />
-              <span>أرقام الهواتف والتواصل</span>
+              <span>أرقام الهواتف والتواصل المباشر</span>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.9rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.5rem' }}>
                 <span style={{ color: 'var(--text-muted)' }}>هاتف ولي الأمر:</span>
-                <span style={{ fontWeight: 700, fontFamily: 'monospace', dir: 'ltr' }}>{member.phone}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <span style={{ fontWeight: 700, fontFamily: 'monospace', dir: 'ltr' }}>{member.phone}</span>
+                  <a href={`tel:${member.phone}`} className="btn-icon" style={{ padding: '4px', color: '#38bdf8' }} title="اتصال هاتفي">
+                    <Phone size={14} />
+                  </a>
+                  <a href={getWaUrl(member.phone)} target="_blank" rel="noopener noreferrer" className="btn-icon" style={{ padding: '4px', color: '#22c55e' }} title="محادثة واتساب">
+                    <MessageSquare size={14} />
+                  </a>
+                </div>
               </div>
 
               {member.secondary_phone && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.5rem' }}>
                   <span style={{ color: 'var(--text-muted)' }}>هاتف إضافي:</span>
-                  <span style={{ fontWeight: 600, fontFamily: 'monospace', dir: 'ltr' }}>{member.secondary_phone}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span style={{ fontWeight: 600, fontFamily: 'monospace', dir: 'ltr' }}>{member.secondary_phone}</span>
+                    <a href={`tel:${member.secondary_phone}`} className="btn-icon" style={{ padding: '4px', color: '#38bdf8' }} title="اتصال هاتفي">
+                      <Phone size={14} />
+                    </a>
+                    <a href={getWaUrl(member.secondary_phone)} target="_blank" rel="noopener noreferrer" className="btn-icon" style={{ padding: '4px', color: '#22c55e' }} title="محادثة واتساب">
+                      <MessageSquare size={14} />
+                    </a>
+                  </div>
                 </div>
               )}
 
               {member.member_phone && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.5rem' }}>
-                  <span style={{ color: 'var(--text-muted)' }}>هاتف الطفل:</span>
-                  <span style={{ fontWeight: 600, fontFamily: 'monospace', dir: 'ltr' }}>{member.member_phone}</span>
+                  <span style={{ color: 'var(--text-muted)' }}>هاتف المخدوم نفسه:</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span style={{ fontWeight: 600, fontFamily: 'monospace', dir: 'ltr' }}>{member.member_phone}</span>
+                    <a href={`tel:${member.member_phone}`} className="btn-icon" style={{ padding: '4px', color: '#38bdf8' }} title="اتصال هاتفي">
+                      <Phone size={14} />
+                    </a>
+                    <a href={getWaUrl(member.member_phone)} target="_blank" rel="noopener noreferrer" className="btn-icon" style={{ padding: '4px', color: '#22c55e' }} title="محادثة واتساب">
+                      <MessageSquare size={14} />
+                    </a>
+                  </div>
                 </div>
               )}
 
               {member.whatsapp_phone && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: 'var(--text-muted)' }}>واتساب:</span>
-                  <span style={{ fontWeight: 700, color: 'var(--color-success)', fontFamily: 'monospace', dir: 'ltr' }}>
-                    {member.whatsapp_phone}
-                  </span>
+                  <span style={{ color: 'var(--text-muted)' }}>واتساب مخصص:</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span style={{ fontWeight: 700, color: 'var(--color-success)', fontFamily: 'monospace', dir: 'ltr' }}>
+                      {member.whatsapp_phone}
+                    </span>
+                    <a href={getWaUrl(member.whatsapp_phone)} target="_blank" rel="noopener noreferrer" className="btn-icon" style={{ padding: '4px', color: '#22c55e' }} title="محادثة واتساب">
+                      <MessageSquare size={14} />
+                    </a>
+                  </div>
                 </div>
               )}
             </div>

@@ -24,6 +24,7 @@ class MemberBase(BaseModel):
     whatsapp_phone: Optional[str] = Field(default=None, description="رقم واتساب المتابعة")
     email: Optional[str] = Field(default=None, description="البريد الإلكتروني (Gmail)")
     area: Optional[str] = Field(default=None, description="المنطقة السكنية للافتقاد")
+    location_url: Optional[str] = Field(default=None, description="رابط خرائط جوجل Google Maps")
     father_of_confession: Optional[str] = Field(default=None, description="اسم أب الاعتراف")
     address: Optional[str] = Field(default=None, description="عنوان السكن")
     notes: Optional[str] = Field(default=None, description="ملاحظات خادمة أو صحية")
@@ -48,6 +49,7 @@ class MemberUpdate(BaseModel):
     whatsapp_phone: Optional[str] = None
     email: Optional[str] = None
     area: Optional[str] = None
+    location_url: Optional[str] = None
     father_of_confession: Optional[str] = None
     address: Optional[str] = None
     notes: Optional[str] = None
@@ -97,3 +99,8 @@ class ScanResponse(BaseModel):
     date_of_birth: Optional[str] = None
     status: str
     card_issued_at: Optional[datetime] = None
+
+
+class ResidentialAreaCreate(BaseModel):
+    name: str = Field(..., min_length=2, max_length=100, description="اسم المنطقة السكنية")
+

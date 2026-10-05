@@ -55,5 +55,16 @@ export const membersApi = {
   getDistinctAreas: async () => {
     const response = await apiClient.get('/members/areas/list');
     return response.data;
+  },
+
+  addArea: async (name) => {
+    const response = await apiClient.post('/members/areas', { name });
+    return response.data;
+  },
+
+  deleteArea: async (name) => {
+    const response = await apiClient.delete(`/members/areas/${encodeURIComponent(name)}`);
+    return response.data;
   }
 };
+

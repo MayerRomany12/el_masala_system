@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { apiClient } from '../api/client';
 import { followupApi } from '../api/followup';
-import { getWaUrl } from '../utils/phone';
+import { getWaUrl, getGmailUrl, getMapsUrl } from '../utils/phone';
 import { WhatsAppButton } from '../components/WhatsAppButton';
 import {
   HeartHandshake,
@@ -27,7 +27,9 @@ import {
   MapPin,
   Printer,
   Layers,
-  Calendar
+  Calendar,
+  Mail,
+  Users
 } from 'lucide-react';
 
 export const FollowupManagement = () => {
@@ -55,6 +57,10 @@ export const FollowupManagement = () => {
     completedCount: 0
   });
 
+  // Class Supervisor Follow-Up Tracking & Distribution
+  const [classStats, setClassStats] = useState(null);
+  const [distributing, setDistributing] = useState(false);
+
   // Detector State
   const [detecting, setDetecting] = useState(false);
   const [detectMessage, setDetectMessage] = useState('');
@@ -81,6 +87,53 @@ export const FollowupManagement = () => {
       })
       .catch(() => setClassesList([]));
   }, []);
+
+  // Fetch Class Follow-up Stats (for Supervisor Overview)
+  const fetchClassStats = useCallback(async (classId) => {
+    if (!classId) {
+      setClassStats(null);
+      return;
+    }
+    try {
+      const res = await followupApi.getClassFollowupStats(classId);
+      if (res.success) {
+        setClassStats(res.data);
+      }
+    } catch (err) {
+      console.error('Error fetching class followup stats:', err);
+      setClassStats(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (selectedClassId) {
+      fetchClassStats(selectedClassId);
+    } else {
+      setClassStats(null);
+    }
+  }, [selectedClassId, fetchClassStats]);
+
+  // Distribute class tasks evenly among active servants (Round-Robin)
+  const handleDistributeTasks = async () => {
+    if (!selectedClassId) return;
+    const confirmMsg = 'هل تريد توزيع جميع مهام الافتقاد المعلقة لهذا الفصل بالتساوي على خدام الفصل النشطين؟';
+    if (!window.confirm(confirmMsg)) return;
+
+    setDistributing(true);
+    try {
+      const res = await followupApi.distributeClassTasks(selectedClassId);
+      if (res.success) {
+        alert(res.message || 'تم توزيع مهام الافتقاد بنجاح');
+        if (viewMode === 'list') fetchTasks();
+        else fetchTasksByArea();
+        fetchClassStats(selectedClassId);
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || 'تعذر توزيع المهام على الخدام');
+    } finally {
+      setDistributing(false);
+    }
+  };
 
   // Fetch Followup Tasks (List View)
   const fetchTasks = useCallback(async () => {
@@ -129,7 +182,7 @@ export const FollowupManagement = () => {
         status: selectedStatus || undefined
       });
       if (res.success) {
-        setTasksByArea(res.data || []);
+        setTasksByArea(res.data?.areas || res.data || []);
       }
     } catch (err) {
       console.error('Error fetching tasks by area:', err);
@@ -480,6 +533,152 @@ export const FollowupManagement = () => {
         </div>
       )}
 
+      {/* Class Supervisor Follow-Up Card */}
+      {selectedClassId && classStats && (
+        <div className="glass-card animate-fade-in" style={{ padding: '1.25rem', border: '1px solid rgba(56, 189, 248, 0.3)', background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.85) 0%, rgba(30, 41, 59, 0.85) 100%)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.85rem', marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Users size={22} />
+              </div>
+              <div>
+                <h2 style={{ fontSize: '1.2rem', fontWeight: 800, margin: 0, color: 'var(--text-main)' }}>
+                  لوحة إشراف افتقاد الفصل: {classStats.class_name}
+                </h2>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  متابعة إنجاز الخدام للمهام الموكلة وتوزيع حالات الغياب بالتساوي (Round-Robin)
+                </span>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: '0.5rem', fontSize: '0.82rem' }}>
+                <span className="badge" style={{ background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8' }}>
+                  المهام: {classStats.total_tasks}
+                </span>
+                <span className="badge" style={{ background: 'rgba(251, 191, 36, 0.15)', color: '#fbbf24' }}>
+                  معلقة: {classStats.pending_tasks}
+                </span>
+                <span className="badge" style={{ background: 'rgba(52, 211, 153, 0.15)', color: '#34d399' }}>
+                  مكتملة: {classStats.completed_tasks}
+                </span>
+              </div>
+
+              <button
+                onClick={handleDistributeTasks}
+                disabled={distributing || classStats.pending_tasks === 0}
+                className="btn btn-primary"
+                style={{
+                  fontSize: '0.84rem',
+                  padding: '0.5rem 1rem',
+                  background: 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)',
+                  boxShadow: '0 4px 14px rgba(14, 165, 233, 0.35)',
+                  fontWeight: 700,
+                  gap: '0.5rem'
+                }}
+                title={classStats.pending_tasks === 0 ? 'لا توجد مهام معلقة للتوزيع' : 'توزيع المهام المعلقة بالتساوي على خدام الفصل'}
+              >
+                <Sparkles size={16} />
+                <span>{distributing ? 'جاري التوزيع...' : '⚡ توزيع مهام الافتقاد بالتساوي على الخدام'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Servants breakdown */}
+          <div>
+            <h3 style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <UserCheck size={16} style={{ color: '#38bdf8' }} />
+              <span>موقف إنجاز خدام الفصل ({classStats.servants?.length || 0} خادم نشط):</span>
+            </h3>
+
+            {(!classStats.servants || classStats.servants.length === 0) ? (
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', padding: '0.75rem', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', textAlign: 'center' }}>
+                لا يوجد خدام مسجلين بهذا الفصل حالياً. يرجى إضافة خدام للفصل أولاً لتوزيع المهام.
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.75rem' }}>
+                {classStats.servants.map((srv) => {
+                  const cleanPhone = srv.servant_phone ? srv.servant_phone.replace(/\s+/g, '') : '';
+                  const rate = srv.assigned_tasks > 0 ? Math.round((srv.completed_tasks / srv.assigned_tasks) * 100) : 0;
+                  return (
+                    <div
+                      key={srv.servant_id}
+                      style={{
+                        padding: '0.85rem 1rem',
+                        borderRadius: '10px',
+                        background: 'rgba(0, 0, 0, 0.25)',
+                        border: '1px solid rgba(255, 255, 255, 0.06)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.5rem'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.85rem', fontWeight: 800 }}>
+                            {srv.servant_name?.charAt(0) || 'خ'}
+                          </div>
+                          <div>
+                            <strong style={{ fontSize: '0.9rem', color: 'var(--text-main)', display: 'block' }}>{srv.servant_name}</strong>
+                            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{srv.servant_role || 'خادم'}</span>
+                          </div>
+                        </div>
+
+                        {cleanPhone && (
+                          <div style={{ display: 'flex', gap: '0.35rem' }}>
+                            <a
+                              href={`tel:${cleanPhone}`}
+                              className="btn btn-secondary"
+                              style={{ padding: '0.2rem 0.45rem', fontSize: '0.72rem', color: '#34d399' }}
+                              title="اتصال هاتفي بالخادم"
+                            >
+                              <Phone size={12} />
+                            </a>
+                            <a
+                              href={getWaUrl(cleanPhone, `سلام ونعمة يا ${srv.servant_name}، بخصوص متابعة وافتقاد مخدومي فصل ${classStats.class_name}`)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="btn btn-secondary"
+                              style={{ padding: '0.2rem 0.45rem', fontSize: '0.72rem', color: '#25D366' }}
+                              title="واتساب مباشر مع الخادم"
+                            >
+                              <MessageSquare size={12} />
+                            </a>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Progress bar and stats */}
+                      <div style={{ marginTop: '0.2rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '0.3rem' }}>
+                          <span style={{ color: 'var(--text-muted)' }}>
+                            المسند إليه: <strong style={{ color: 'var(--text-main)' }}>{srv.assigned_tasks}</strong>
+                            {' '}(معلق: <span style={{ color: '#fbbf24' }}>{srv.pending_tasks}</span> | تم: <span style={{ color: '#34d399' }}>{srv.completed_tasks}</span>)
+                          </span>
+                          <span style={{ fontWeight: 800, color: rate === 100 && srv.assigned_tasks > 0 ? '#34d399' : '#38bdf8' }}>
+                            {rate}%
+                          </span>
+                        </div>
+                        <div style={{ width: '100%', height: '6px', background: 'rgba(255, 255, 255, 0.08)', borderRadius: '3px', overflow: 'hidden' }}>
+                          <div
+                            style={{
+                              width: `${rate}%`,
+                              height: '100%',
+                              background: rate === 100 ? '#10b981' : rate > 50 ? '#38bdf8' : '#f59e0b',
+                              transition: 'width 0.3s ease'
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* 4. VIEW A: List Table View */}
       {viewMode === 'list' && (
         <div className="glass-card" style={{ padding: '1.25rem' }}>
@@ -525,25 +724,57 @@ export const FollowupManagement = () => {
 
                         <td style={{ fontWeight: 700, color: 'var(--text-main)' }}>
                           <div>{t.member_name}</div>
-                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>({t.member_id})</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '2px' }}>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>({t.member_id})</span>
+                            {t.assigned_servant_name && (
+                              <span style={{ fontSize: '0.72rem', color: '#38bdf8', background: 'rgba(56, 189, 248, 0.1)', padding: '1px 6px', borderRadius: '4px' }}>
+                                الخادم: {t.assigned_servant_name}
+                              </span>
+                            )}
+                          </div>
                         </td>
 
                         <td>
-                          {t.member_area ? (
-                            <span style={{
-                              fontSize: '0.75rem',
-                              padding: '2px 6px',
-                              background: 'rgba(168, 85, 247, 0.12)',
-                              color: '#c084fc',
-                              borderRadius: '4px',
-                              border: '1px solid rgba(168, 85, 247, 0.3)',
-                              fontWeight: 700
-                            }}>
-                              {t.member_area}
-                            </span>
-                          ) : (
-                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>—</span>
-                          )}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+                            {t.member_area ? (
+                              <span style={{
+                                fontSize: '0.75rem',
+                                padding: '2px 6px',
+                                background: 'rgba(168, 85, 247, 0.12)',
+                                color: '#c084fc',
+                                borderRadius: '4px',
+                                border: '1px solid rgba(168, 85, 247, 0.3)',
+                                fontWeight: 700
+                              }}>
+                                {t.member_area}
+                              </span>
+                            ) : (
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>—</span>
+                            )}
+                            {getMapsUrl(t.member_location_url, t.member_area) && (
+                              <a
+                                href={getMapsUrl(t.member_location_url, t.member_area)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{
+                                  fontSize: '0.72rem',
+                                  padding: '2px 5px',
+                                  background: 'rgba(56, 189, 248, 0.12)',
+                                  color: '#38bdf8',
+                                  borderRadius: '4px',
+                                  border: '1px solid rgba(56, 189, 248, 0.3)',
+                                  textDecoration: 'none',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '2px'
+                                }}
+                                title="فتح على Google Maps"
+                              >
+                                <MapPin size={11} />
+                                <span>الخريطة</span>
+                              </a>
+                            )}
+                          </div>
                         </td>
 
                         <td style={{ fontSize: '0.82rem' }}>{t.member_stage}</td>
@@ -566,29 +797,43 @@ export const FollowupManagement = () => {
                           </span>
                         </td>
 
-                        {/* Direct Call & WhatsApp buttons */}
+                        {/* Direct Call, WhatsApp & Gmail buttons */}
                         <td>
-                          {cleanPhone ? (
-                            <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                          <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                            {cleanPhone ? (
+                              <>
+                                <a
+                                  href={`tel:${cleanPhone}`}
+                                  className="btn btn-secondary"
+                                  style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#34d399' }}
+                                  title="اتصال هاتفي مباشر"
+                                >
+                                  <Phone size={13} />
+                                </a>
+                                <WhatsAppButton
+                                  phone={cleanPhone}
+                                  memberName={t.member_name}
+                                  memberId={t.member_id}
+                                  template="absence"
+                                  variant="icon"
+                                />
+                              </>
+                            ) : (
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>لا يوجد هاتف</span>
+                            )}
+                            {t.member_email && (
                               <a
-                                href={`tel:${cleanPhone}`}
+                                href={getGmailUrl(t.member_email, `افتقاد واطمئنان - كنيسة المسلة`, `سلام ونعمة يا ${t.member_name}، بنطمن عليك واشتقنا لوجودك معانا في الكنيسة.`)}
+                                target="_blank"
+                                rel="noopener noreferrer"
                                 className="btn btn-secondary"
-                                style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#34d399' }}
-                                title="اتصال هاتفي مباشر"
+                                style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#ea4335' }}
+                                title={`إرسال إيميل Gmail إلى: ${t.member_email}`}
                               >
-                                <Phone size={13} />
+                                <Mail size={13} />
                               </a>
-                              <WhatsAppButton
-                                phone={cleanPhone}
-                                memberName={t.member_name}
-                                memberId={t.member_id}
-                                template="absence"
-                                variant="icon"
-                              />
-                            </div>
-                          ) : (
-                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>لا يوجد هاتف</span>
-                          )}
+                            )}
+                          </div>
                         </td>
 
                         <td>
@@ -718,7 +963,7 @@ export const FollowupManagement = () => {
 
                       {/* Contact & Actions */}
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '0.65rem', borderTop: '1px solid rgba(255,255,255,0.06)', flexWrap: 'wrap', gap: '0.5rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                           {t.member_phone && (
                             <a
                               href={`tel:${t.member_phone}`}
@@ -737,6 +982,30 @@ export const FollowupManagement = () => {
                               template="absence"
                               variant="icon"
                             />
+                          )}
+                          {t.member_email && (
+                            <a
+                              href={getGmailUrl(t.member_email, `افتقاد واطمئنان - كنيسة المسلة`, `سلام ونعمة يا ${t.member_name}، بنطمن عليك واشتقنا لوجودك معانا.`)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="btn btn-secondary"
+                              style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#ea4335' }}
+                              title="إرسال Gmail"
+                            >
+                              <Mail size={13} />
+                            </a>
+                          )}
+                          {getMapsUrl(t.member_location_url, t.member_address || grp.area) && (
+                            <a
+                              href={getMapsUrl(t.member_location_url, t.member_address || grp.area)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="btn btn-secondary"
+                              style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#38bdf8' }}
+                              title="فتح على Google Maps"
+                            >
+                              <MapPin size={13} />
+                            </a>
                           )}
                         </div>
 

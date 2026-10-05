@@ -13,8 +13,9 @@ CANONICAL_STAGES: Dict[str, str] = {
     "PREPARATORY_2": "إعدادي - الصف الثاني",
     "PREPARATORY_3": "إعدادي - الصف الثالث",
     "SECONDARY": "ثانوي",
-    "UNIVERSITY": "جامعة وخريجين",
-    "ALL": "جميع المراحل"
+    "UNIVERSITY": "جامعيين",
+    "GRADUATES": "خريجين",
+    "ALL": "الكل (ALL)"
 }
 
 

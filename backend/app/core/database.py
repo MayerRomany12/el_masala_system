@@ -34,7 +34,7 @@ async def init_db():
     """Create all tables on startup and apply missing column migrations."""
     # Import all models so SQLAlchemy registers them
     from app.models import user, member, event, attendance, followup, rewards, setting, birthday, internal_messages, audit_log  # noqa
-    from app.models import class_group  # noqa
+    from app.models import class_group, residential_area  # noqa
     from sqlalchemy import text, select
 
     async with engine.begin() as conn:
@@ -70,7 +70,8 @@ async def init_db():
             await conn.execute(text("ALTER TABLE members ADD COLUMN IF NOT EXISTS member_phone VARCHAR(30);"))
             await conn.execute(text("ALTER TABLE members ADD COLUMN IF NOT EXISTS email VARCHAR(200);"))
             await conn.execute(text("ALTER TABLE members ADD COLUMN IF NOT EXISTS area VARCHAR(100);"))
-            logger.info("تم التحقق من إضافة أعمدة secondary_phone, member_phone, email, area لجدول members بنجاح")
+            await conn.execute(text("ALTER TABLE members ADD COLUMN IF NOT EXISTS location_url TEXT;"))
+            logger.info("تم التحقق من إضافة أعمدة secondary_phone, member_phone, email, area, location_url لجدول members بنجاح")
         except Exception as e:
             logger.exception(f"فشل تطبيق التحديث الهيكلي لجدول members: {e}")
             raise e
@@ -180,6 +181,28 @@ async def init_db():
                 ))
                 logger.info(f"Seeded default class: [{slug}] {name}")
         # ─────────────────────────────────────────────────────────────────────────────
+
+        # ─── Seed Default Residential Areas (Aswan) ───
+        from app.models.residential_area import ResidentialArea
+        DEFAULT_AREAS = [
+            "أبو الريش", "أحمد ماهر", "أطلس", "أبطال التحرير", "البركة",
+            "الجداوي", "الجميلي", "الحصايا", "الحكروب", "الحدادين",
+            "الرضوان", "الرحاب (كيما)", "السيدة نفيسة", "الشلاّل", "الشونة",
+            "الشواربي", "الشيخ هارون", "الشيخ صالح", "الشيخ علي المغربي", "الشيخ الكيلاني",
+            "الصداقة الجديدة", "عباس فريد", "العقاد", "المنشية الجديدة", "المحمودية",
+            "المقاولون العرب", "حوض السويقة", "خالد بن الوليد", "خور عواضة", "زاوية كوكة",
+            "سعد زغلول (السوق السياحي)", "سور كيما", "صلاح الدين (الشارع الجديد)",
+            "عمارات الصفا", "عمارات المهندسين وقادة المستقبل", "غرب أسوان الجديدة",
+            "غرب سهيل", "كسر الحجر", "كورنيش النيل", "مدينة ناصر", "ميدان المحطة"
+        ]
+        for a_name in DEFAULT_AREAS:
+            existing_a = await session.execute(
+                select(ResidentialArea).where(ResidentialArea.name == a_name)
+            )
+            if not existing_a.scalar_one_or_none():
+                session.add(ResidentialArea(name=a_name))
+        logger.info("Residential areas verified/seeded successfully.")
+        # ───────────────────────────────────────────────
 
         # Ensure Initial Super Admin User exists & credentials match config
         from app.models.user import User

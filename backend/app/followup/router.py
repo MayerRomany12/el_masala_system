@@ -143,3 +143,34 @@ async def escalate_task(
     service = FollowupService(db)
     escalated = await service.escalate_task(task_id)
     return success_response(data=escalated, message="تم تصعيد مهمة الافتقاد لأمين الخدمة")
+
+
+@router.post("/classes/{class_id}/distribute", response_model=dict)
+async def distribute_class_followup_tasks(
+    class_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_permission("followup:write"))
+):
+    allowed_class_ids = await get_servant_class_ids(current_user, db)
+    if allowed_class_ids is not None and class_id not in allowed_class_ids:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="ليس لديك صلاحية لتوزيع مهام افتقاد هذا الفصل")
+
+    service = FollowupService(db)
+    result = await service.distribute_class_tasks(class_id)
+    return success_response(data=result, message=f"تم توزيع مهام الافتقاد على خدام الفصل بنجاح")
+
+
+@router.get("/classes/{class_id}/stats", response_model=dict)
+async def get_class_followup_stats(
+    class_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_permission("followup:read"))
+):
+    allowed_class_ids = await get_servant_class_ids(current_user, db)
+    if allowed_class_ids is not None and class_id not in allowed_class_ids:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="ليس لديك صلاحية لعرض إحصائيات افتقاد هذا الفصل")
+
+    service = FollowupService(db)
+    result = await service.get_class_followup_stats(class_id)
+    return success_response(data=result, message="تم جلب إحصائيات متابعة افتقاد الفصل بنجاح")
+

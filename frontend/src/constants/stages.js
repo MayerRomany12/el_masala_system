@@ -1,6 +1,6 @@
 // Canonical Stage Codes & Dynamic Arabic Mappings
 export const STAGE_OPTIONS = [
-  { code: 'ALL', label: 'جميع المراحل الخدمية ⛪' },
+  { code: 'ALL', label: 'الكل (ALL)' },
   { code: 'NURSERY', label: 'حضانة (KG1 & KG2)' },
   { code: 'PRIMARY_1', label: 'ابتدائي - الصف الأول' },
   { code: 'PRIMARY_2', label: 'ابتدائي - الصف الثاني' },
@@ -12,7 +12,8 @@ export const STAGE_OPTIONS = [
   { code: 'PREPARATORY_2', label: 'إعدادي - الصف الثاني' },
   { code: 'PREPARATORY_3', label: 'إعدادي - الصف الثالث' },
   { code: 'SECONDARY', label: 'ثانوي' },
-  { code: 'UNIVERSITY', label: 'جامعة وخريجين' }
+  { code: 'UNIVERSITY', label: 'جامعيين' },
+  { code: 'GRADUATES', label: 'خريجين' }
 ];
 
 export const getStageLabel = (stageCodeOrName) => {

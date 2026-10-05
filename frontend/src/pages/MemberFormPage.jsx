@@ -18,7 +18,9 @@ import {
   Calendar,
   Heart,
   CheckCircle,
-  Mail
+  Mail,
+  Plus,
+  Trash2
 } from 'lucide-react';
 
 export const MemberFormPage = () => {
@@ -33,6 +35,12 @@ export const MemberFormPage = () => {
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
+  // Residential Areas Custom/Modal Management
+  const [isAreaModalOpen, setIsAreaModalOpen] = useState(false);
+  const [newAreaInput, setNewAreaInput] = useState('');
+  const [areaOpLoading, setAreaOpLoading] = useState(false);
+  const [isCustomArea, setIsCustomArea] = useState(false);
+
   const [formData, setFormData] = useState({
     full_name: '',
     gender: 'ذكر',
@@ -41,6 +49,7 @@ export const MemberFormPage = () => {
     group_name: '',
     email: '',
     area: '',
+    location_url: '',
     phone: '',
     secondary_phone: '',
     member_phone: '',
@@ -57,6 +66,55 @@ export const MemberFormPage = () => {
   const [croppedPhotoData, setCroppedPhotoData] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
 
+  const loadAreas = async () => {
+    try {
+      const res = await membersApi.getDistinctAreas();
+      const areas = res?.data || res || [];
+      setAreasList(areas);
+      return areas;
+    } catch (err) {
+      console.error('Error fetching areas:', err);
+      return [];
+    }
+  };
+
+  const handleAddArea = async () => {
+    if (!newAreaInput.trim()) return;
+    setAreaOpLoading(true);
+    try {
+      await membersApi.addArea(newAreaInput.trim());
+      const res = await membersApi.getDistinctAreas();
+      const updated = res?.data || res || [];
+      setAreasList(updated);
+      setFormData(prev => ({ ...prev, area: newAreaInput.trim() }));
+      setNewAreaInput('');
+      setIsCustomArea(false);
+    } catch (err) {
+      alert(err.response?.data?.message || 'تعذر إضافة المنطقة');
+    } finally {
+      setAreaOpLoading(false);
+    }
+  };
+
+  const handleDeleteArea = async (areaName) => {
+    if (!window.confirm(`هل أنت متأكد من حذف منطقة "${areaName}" من القائمة؟`)) return;
+    setAreaOpLoading(true);
+    try {
+      await membersApi.deleteArea(areaName);
+      const res = await membersApi.getDistinctAreas();
+      const updated = res?.data || res || [];
+      setAreasList(updated);
+      if (formData.area === areaName) {
+        setFormData(prev => ({ ...prev, area: '' }));
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || 'تعذر حذف المنطقة');
+    } finally {
+      setAreaOpLoading(false);
+    }
+  };
+
+
   // Load available classes & areas
   useEffect(() => {
     apiClient.get('/classes?limit=200')
@@ -71,14 +129,7 @@ export const MemberFormPage = () => {
         console.error('Error fetching classes:', err);
       });
 
-    membersApi.getDistinctAreas()
-      .then(res => {
-        const areas = res?.data || res || [];
-        setAreasList(areas);
-      })
-      .catch(err => {
-        console.error('Error fetching areas:', err);
-      });
+    loadAreas();
   }, [isEditMode]);
 
   // Load member data if in edit mode
@@ -89,6 +140,7 @@ export const MemberFormPage = () => {
     membersApi.getMemberById(id)
       .then(res => {
         const member = res.data || res;
+        const currentArea = member.area || '';
         setFormData({
           full_name: member.full_name || '',
           gender: member.gender || 'ذكر',
@@ -96,7 +148,8 @@ export const MemberFormPage = () => {
           class_id: member.active_class_id || member.class_id || '',
           group_name: member.group_name || '',
           email: member.email || '',
-          area: member.area || '',
+          area: currentArea,
+          location_url: member.location_url || '',
           phone: member.phone || '',
           secondary_phone: member.secondary_phone || '',
           member_phone: member.member_phone || '',
@@ -162,7 +215,7 @@ export const MemberFormPage = () => {
     }
 
     if (formData.member_phone && !isValidEgyptianMobile(formData.member_phone)) {
-      setError('رقم الطفل المخدوم غير صالح. يرجى إدخال رقم محمول مصري مكون من 11 رقم يبدأ بـ (010 أو 011 أو 012 أو 015)');
+      setError('رقم المخدوم غير صالح. يرجى إدخال رقم محمول مصري مكون من 11 رقم يبدأ بـ (010 أو 011 أو 012 أو 015)');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
@@ -184,6 +237,7 @@ export const MemberFormPage = () => {
       full_name: formData.full_name.trim(),
       email: formData.email?.trim() || null,
       area: formData.area?.trim() || null,
+      location_url: formData.location_url?.trim() || null,
       date_of_birth: formData.date_of_birth || null,
       group_name: formData.group_name?.trim() || null,
       father_of_confession: formData.father_of_confession?.trim() || null,
@@ -193,9 +247,7 @@ export const MemberFormPage = () => {
       phone: normalizePhone(formData.phone),
       secondary_phone: formData.secondary_phone ? normalizePhone(formData.secondary_phone) : null,
       member_phone: formData.member_phone ? normalizePhone(formData.member_phone) : null,
-      whatsapp_phone: formData.whatsapp_phone
-        ? normalizePhone(formData.whatsapp_phone)
-        : (formData.member_phone ? normalizePhone(formData.member_phone) : normalizePhone(formData.phone))
+      whatsapp_phone: formData.member_phone ? normalizePhone(formData.member_phone) : normalizePhone(formData.phone)
     };
 
     try {
@@ -519,7 +571,7 @@ export const MemberFormPage = () => {
             <span>أرقام الهواتف والتواصل</span>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem' }}>
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label className="form-label">تليفون ولي الأمر الرئيسي*</label>
               <input
@@ -548,7 +600,7 @@ export const MemberFormPage = () => {
             </div>
 
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">رقم الطفل نفسه (اختياري)</label>
+              <label className="form-label">رقم المخدوم نفسه (اختياري)</label>
               <input
                 type="tel"
                 className="form-input"
@@ -559,23 +611,10 @@ export const MemberFormPage = () => {
                 style={{ textAlign: 'right' }}
               />
             </div>
-
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">رقم الواتساب (اختياري)</label>
-              <input
-                type="tel"
-                className="form-input"
-                value={formData.whatsapp_phone}
-                onChange={(e) => setFormData({ ...formData, whatsapp_phone: e.target.value })}
-                placeholder="إن ترك فارغاً سيتم استخدام رقم ولي الأمر"
-                dir="ltr"
-                style={{ textAlign: 'right' }}
-              />
-            </div>
           </div>
         </div>
 
-        {/* 3. Address, Area & Health Notes */}
+        {/* 3. Address, Area, Location & Health Notes */}
         <div className="glass-card">
           <div style={{
             display: 'flex',
@@ -594,20 +633,86 @@ export const MemberFormPage = () => {
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem' }}>
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">المنطقة السكنية (لتقسيم الافتقاد الجغرافي)</label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                <label className="form-label" style={{ marginBottom: 0 }}>المنطقة السكنية (لتقسيم الافتقاد)*</label>
+                <button
+                  type="button"
+                  onClick={() => setIsAreaModalOpen(true)}
+                  className="btn btn-secondary"
+                  style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', gap: '3px' }}
+                  title="إدارة وإضافة وحذف المناطق السكنية"
+                >
+                  ⚙️ إدارة قائمة المناطق
+                </button>
+              </div>
+
+              {!isCustomArea ? (
+                <select
+                  className="form-input"
+                  value={formData.area}
+                  onChange={(e) => {
+                    if (e.target.value === '__OTHER__') {
+                      setIsCustomArea(true);
+                      setFormData({ ...formData, area: '' });
+                    } else {
+                      setFormData({ ...formData, area: e.target.value });
+                    }
+                  }}
+                >
+                  <option value="">-- اختر المنطقة السكنية من القائمة --</option>
+                  {areasList.map((a) => (
+                    <option key={a} value={a}>{a}</option>
+                  ))}
+                  <option value="__OTHER__">➕ منطقة أخرى (كتابة يدوي)...</option>
+                </select>
+              ) : (
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={formData.area}
+                    onChange={(e) => setFormData({ ...formData, area: e.target.value })}
+                    placeholder="اكتب اسم المنطقة هنا..."
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCustomArea(false);
+                      setFormData({ ...formData, area: '' });
+                    }}
+                    className="btn btn-secondary"
+                    style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
+                  >
+                    إلغاء
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                <label className="form-label" style={{ marginBottom: 0 }}>موقع السكن على Google Maps (اختياري)</label>
+                {formData.location_url && (
+                  <a
+                    href={formData.location_url.startsWith('http') ? formData.location_url : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(formData.location_url)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ fontSize: '0.78rem', color: '#38bdf8', textDecoration: 'underline' }}
+                  >
+                    🗺️ فتح على الخريطة
+                  </a>
+                )}
+              </div>
               <input
-                type="text"
-                list="areas-datalist"
+                type="url"
                 className="form-input"
-                value={formData.area}
-                onChange={(e) => setFormData({ ...formData, area: e.target.value })}
-                placeholder="مثال: الكرور، عزبة شنودة، الشيخ هارون..."
+                value={formData.location_url}
+                onChange={(e) => setFormData({ ...formData, location_url: e.target.value })}
+                placeholder="https://maps.app.goo.gl/... أو إحداثيات المكان"
+                dir="ltr"
+                style={{ textAlign: 'right' }}
               />
-              <datalist id="areas-datalist">
-                {areasList.map((a) => (
-                  <option key={a} value={a} />
-                ))}
-              </datalist>
             </div>
 
             <div className="form-group" style={{ marginBottom: 0 }}>
@@ -617,7 +722,7 @@ export const MemberFormPage = () => {
                 className="form-input"
                 value={formData.address}
                 onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                placeholder="الشارع، رقم العمارة، علامة مميزة..."
+                placeholder="الشارع، رقم العمارة، الشقة، علامة مميزة..."
               />
             </div>
           </div>
@@ -661,6 +766,94 @@ export const MemberFormPage = () => {
           </button>
         </div>
       </form>
+
+      {/* Residential Areas Management Modal */}
+      {isAreaModalOpen && (
+        <div className="modal-overlay" style={{ zIndex: 1100 }}>
+          <div className="modal-container glass-card" style={{ maxWidth: '560px', width: '95%', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
+            <div className="modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <MapPin size={20} color="var(--color-primary-light)" />
+                <h3 style={{ margin: 0, fontSize: '1.15rem' }}>إدارة قائمة المناطق السكنية</h3>
+              </div>
+              <button onClick={() => setIsAreaModalOpen(false)} className="btn-icon">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="modal-body" style={{ overflowY: 'auto', flex: 1, padding: '1rem' }}>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem', lineHeight: 1.6 }}>
+                يمكن للمسؤولين إضافة مناطق سكنية جديدة لتظهر لجميع الخدام في القائمة المنسدلة، أو حذف أي منطقة لم تعد مستخدمة.
+              </p>
+
+              {/* Add New Area Input */}
+              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem' }}>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={newAreaInput}
+                  onChange={(e) => setNewAreaInput(e.target.value)}
+                  placeholder="اسم المنطقة السكنية الجديدة..."
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddArea(); } }}
+                />
+                <button
+                  type="button"
+                  onClick={handleAddArea}
+                  disabled={areaOpLoading || !newAreaInput.trim()}
+                  className="btn btn-primary"
+                  style={{ whiteSpace: 'nowrap', gap: '4px' }}
+                >
+                  <Plus size={16} />
+                  <span>إضافة</span>
+                </button>
+              </div>
+
+              {/* List of current areas */}
+              <div style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.5rem', color: 'var(--text-muted)' }}>
+                المناطق المسجلة بالنظام ({areasList.length}):
+              </div>
+
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', maxHeight: '300px', overflowY: 'auto', padding: '0.5rem', border: '1px solid var(--border-subtle)', borderRadius: '8px' }}>
+                {areasList.map((areaName) => (
+                  <span
+                    key={areaName}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      background: 'rgba(255, 255, 255, 0.06)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      padding: '0.3rem 0.65rem',
+                      borderRadius: '20px',
+                      fontSize: '0.82rem'
+                    }}
+                  >
+                    <span>{areaName}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteArea(areaName)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#f87171', display: 'flex', padding: 0 }}
+                      title={`حذف منطقة ${areaName}`}
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', padding: '0.75rem 1rem' }}>
+              <button
+                type="button"
+                onClick={() => setIsAreaModalOpen(false)}
+                className="btn btn-secondary"
+              >
+                إغلاق
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -19,6 +19,7 @@ class Member(Base):
     whatsapp_phone       = Column(String(30),  nullable=True)
     email                = Column(String(200), nullable=True)
     area                 = Column(String(100), nullable=True, index=True)
+    location_url         = Column(Text, nullable=True)
     father_of_confession = Column(String(200), nullable=True)
     address              = Column(Text, nullable=True)
     notes                = Column(Text, nullable=True)

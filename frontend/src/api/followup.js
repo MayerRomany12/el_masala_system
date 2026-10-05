@@ -53,5 +53,18 @@ export const followupApi = {
   getTasksByArea: async (params = {}) => {
     const response = await apiClient.get('/followup/tasks/by-area', { params });
     return response.data;
+  },
+
+  // POST /followup/classes/{classId}/distribute
+  distributeClassTasks: async (classId) => {
+    const response = await apiClient.post(`/followup/classes/${classId}/distribute`);
+    return response.data;
+  },
+
+  // GET /followup/classes/{classId}/stats
+  getClassFollowupStats: async (classId) => {
+    const response = await apiClient.get(`/followup/classes/${classId}/stats`);
+    return response.data;
   }
 };
+

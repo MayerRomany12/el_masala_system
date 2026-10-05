@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { messagesApi } from '../api/messages';
+import { getWaUrl, getGmailUrl } from '../utils/phone';
 import {
   MessageSquare,
   Send,
@@ -12,7 +13,11 @@ import {
   Inbox,
   SendHorizontal,
   PlusCircle,
-  MailCheck
+  MailCheck,
+  Users,
+  Phone,
+  Mail,
+  Search
 } from 'lucide-react';
 
 export const CommunicationHubModal = ({ isOpen, onClose, usersList = [] }) => {
@@ -31,6 +36,7 @@ export const CommunicationHubModal = ({ isOpen, onClose, usersList = [] }) => {
   const [priority, setPriority] = useState('Normal');   // Normal, High, Urgent
 
   const [recipientsList, setRecipientsList] = useState([]);
+  const [directorySearch, setDirectorySearch] = useState('');
 
   const fetchInbox = useCallback(async () => {
     setLoading(true);
@@ -147,7 +153,7 @@ export const CommunicationHubModal = ({ isOpen, onClose, usersList = [] }) => {
         </div>
 
         {/* Navigation Tabs */}
-        <div style={{ display: 'flex', gap: '0.5rem', padding: '0.75rem 1.5rem', background: 'rgba(0,0,0,0.3)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', padding: '0.75rem 1.5rem', background: 'rgba(0,0,0,0.3)', borderBottom: '1px solid rgba(255,255,255,0.08)', flexWrap: 'wrap' }}>
           <button
             onClick={() => setActiveTab('inbox')}
             className={`btn ${activeTab === 'inbox' ? 'btn-primary' : 'btn-secondary'}`}
@@ -170,7 +176,15 @@ export const CommunicationHubModal = ({ isOpen, onClose, usersList = [] }) => {
             style={{ fontSize: '0.85rem', gap: '0.4rem', background: activeTab === 'compose' ? 'linear-gradient(135deg, #facc15 0%, #0284c7 100%)' : undefined, color: activeTab === 'compose' ? '#0f172a' : undefined, fontWeight: 800 }}
           >
             <PlusCircle size={16} />
-            <span>إرسال رسالة / تكليف مهمة ✍️</span>
+            <span>إرسال رسالة / تكليف ✍️</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('directory')}
+            className={`btn ${activeTab === 'directory' ? 'btn-primary' : 'btn-secondary'}`}
+            style={{ fontSize: '0.85rem', gap: '0.4rem' }}
+          >
+            <Users size={16} />
+            <span>دليل الخدام والإدارة 👥</span>
           </button>
         </div>
 
@@ -310,6 +324,58 @@ export const CommunicationHubModal = ({ isOpen, onClose, usersList = [] }) => {
                       ))}
                   </optgroup>
                 </select>
+
+                {recipientId && (() => {
+                  const target = recipientsList.find(u => u.user_id === recipientId);
+                  if (!target) return null;
+                  const cleanPhone = target.phone ? target.phone.replace(/\s+/g, '') : '';
+                  return (
+                    <div style={{ marginTop: '0.5rem', padding: '0.5rem 0.75rem', background: 'rgba(56, 189, 248, 0.1)', border: '1px solid rgba(56, 189, 248, 0.25)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+                      <span style={{ fontSize: '0.8rem', color: '#7dd3fc' }}>
+                        تواصل خارجي مباشر مع <strong>{target.full_name}</strong>:
+                      </span>
+                      <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                        {cleanPhone && (
+                          <>
+                            <a
+                              href={`tel:${cleanPhone}`}
+                              className="btn btn-secondary"
+                              style={{ padding: '0.2rem 0.5rem', fontSize: '0.72rem', color: '#34d399' }}
+                              title="اتصال هاتفي"
+                            >
+                              <Phone size={12} />
+                              <span>اتصال</span>
+                            </a>
+                            <a
+                              href={getWaUrl(cleanPhone, `سلام ونعمة يا ${target.full_name}، بخصوص الخدمة بكنيسة المسلة`)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="btn btn-secondary"
+                              style={{ padding: '0.2rem 0.5rem', fontSize: '0.72rem', color: '#25D366' }}
+                              title="محادثة واتساب"
+                            >
+                              <MessageSquare size={12} />
+                              <span>واتساب</span>
+                            </a>
+                          </>
+                        )}
+                        {target.email && (
+                          <a
+                            href={getGmailUrl(target.email, `متابعة وتنسيق خدمي - كنيسة المسلة`, `سلام ونعمة يا ${target.full_name}،\n\nتحية طيبة وبعد...`)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn btn-secondary"
+                            style={{ padding: '0.2rem 0.5rem', fontSize: '0.72rem', color: '#ea4335' }}
+                            title="إرسال Gmail"
+                          >
+                            <Mail size={12} />
+                            <span>Gmail</span>
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
@@ -364,6 +430,143 @@ export const CommunicationHubModal = ({ isOpen, onClose, usersList = [] }) => {
                 </button>
               </div>
             </form>
+          )}
+
+          {/* DIRECTORY TAB */}
+          {activeTab === 'directory' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {/* Search bar */}
+              <div style={{ position: 'relative' }}>
+                <Search size={16} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                <input
+                  type="text"
+                  className="form-input"
+                  style={{ paddingRight: '2.5rem' }}
+                  placeholder="بحث في دليل الخدام والمسؤولين بالاسم، الدور، أو رقم الهاتف..."
+                  value={directorySearch}
+                  onChange={(e) => setDirectorySearch(e.target.value)}
+                />
+              </div>
+
+              {/* List of Servants & Admins */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.75rem' }}>
+                {recipientsList
+                  .filter(u => {
+                    if (!directorySearch) return true;
+                    const q = directorySearch.toLowerCase();
+                    return (
+                      (u.full_name && u.full_name.toLowerCase().includes(q)) ||
+                      (u.role && u.role.toLowerCase().includes(q)) ||
+                      (u.phone && u.phone.includes(q)) ||
+                      (u.email && u.email.toLowerCase().includes(q))
+                    );
+                  })
+                  .map(u => {
+                    const cleanPhone = u.phone ? u.phone.replace(/\s+/g, '') : '';
+                    const isLeader = u.role === 'Super Admin' || u.role === 'Admin';
+                    return (
+                      <div
+                        key={u.user_id}
+                        style={{
+                          padding: '0.85rem 1rem',
+                          borderRadius: '10px',
+                          background: isLeader ? 'rgba(212, 175, 55, 0.06)' : 'rgba(0,0,0,0.25)',
+                          border: isLeader ? '1px solid rgba(212, 175, 55, 0.3)' : '1px solid rgba(255,255,255,0.06)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.6rem'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <div style={{
+                              width: '34px',
+                              height: '34px',
+                              borderRadius: '50%',
+                              background: isLeader ? 'rgba(212, 175, 55, 0.2)' : 'rgba(56, 189, 248, 0.15)',
+                              color: isLeader ? '#facc15' : '#38bdf8',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontWeight: 800,
+                              fontSize: '0.9rem'
+                            }}>
+                              {u.full_name?.charAt(0) || 'خ'}
+                            </div>
+                            <div>
+                              <strong style={{ fontSize: '0.92rem', color: 'var(--text-main)', display: 'block' }}>
+                                {u.full_name}
+                              </strong>
+                              <span style={{ fontSize: '0.72rem', color: isLeader ? '#facc15' : 'var(--text-muted)' }}>
+                                {u.role === 'Super Admin' ? '👑 سوبر أدمن' : u.role === 'Admin' ? '⭐ مسؤول' : '⛪ خادم كنسي'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Phone & Email labels */}
+                        <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                          {cleanPhone && <div>📞 <span dir="ltr">{cleanPhone}</span></div>}
+                          {u.email && <div>✉️ <span dir="ltr">{u.email}</span></div>}
+                        </div>
+
+                        {/* Direct action buttons */}
+                        <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', flexWrap: 'wrap', paddingTop: '0.4rem', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                          {cleanPhone && (
+                            <a
+                              href={`tel:${cleanPhone}`}
+                              className="btn btn-secondary"
+                              style={{ padding: '0.2rem 0.5rem', fontSize: '0.72rem', color: '#34d399' }}
+                              title="اتصال هاتفي"
+                            >
+                              <Phone size={12} />
+                              <span>اتصال</span>
+                            </a>
+                          )}
+                          {cleanPhone && (
+                            <a
+                              href={getWaUrl(cleanPhone, `سلام ونعمة يا ${u.full_name}، بخصوص الخدمة بكنيسة المسلة`)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="btn btn-secondary"
+                              style={{ padding: '0.2rem 0.5rem', fontSize: '0.72rem', color: '#25D366' }}
+                              title="محادثة واتساب"
+                            >
+                              <MessageSquare size={12} />
+                              <span>واتساب</span>
+                            </a>
+                          )}
+                          {u.email && (
+                            <a
+                              href={getGmailUrl(u.email, `متابعة وتنسيق خدمي - كنيسة المسلة`, `سلام ونعمة يا ${u.full_name}،\n\nتحية طيبة وبعد...`)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="btn btn-secondary"
+                              style={{ padding: '0.2rem 0.5rem', fontSize: '0.72rem', color: '#ea4335' }}
+                              title="إرسال Gmail"
+                            >
+                              <Mail size={12} />
+                              <span>Gmail</span>
+                            </a>
+                          )}
+                          <button
+                            onClick={() => {
+                              setRecipientId(u.user_id);
+                              setActiveTab('compose');
+                            }}
+                            className="btn btn-secondary"
+                            style={{ padding: '0.2rem 0.5rem', fontSize: '0.72rem', color: '#38bdf8' }}
+                            title="إرسال رسالة أو تكليف مهمة داخل النظام"
+                          >
+                            <SendHorizontal size={12} />
+                            <span>رسالة داخلية</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
           )}
 
         </div>

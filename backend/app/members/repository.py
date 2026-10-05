@@ -2,7 +2,7 @@ import secrets
 from typing import Optional, List, Tuple, Dict, Any
 from datetime import datetime, timezone
 
-from sqlalchemy import select, update, func, or_, String, exists
+from sqlalchemy import select, update, func, or_, and_, String, exists
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 
@@ -25,6 +25,7 @@ def _row_to_dict(row: Member) -> Dict[str, Any]:
         "whatsapp_phone": row.whatsapp_phone,
         "email": getattr(row, "email", None),
         "area": getattr(row, "area", None),
+        "location_url": getattr(row, "location_url", None),
         "father_of_confession": row.father_of_confession,
         "address": row.address,
         "notes": row.notes,
@@ -292,10 +293,35 @@ class MemberRepository:
         }
 
     async def get_distinct_areas(self) -> List[str]:
-        res = await self.db.execute(
-            select(Member.area).where(Member.area != None, Member.area != "").distinct().order_by(Member.area)
+        from app.models.residential_area import ResidentialArea
+        res_table = await self.db.execute(select(ResidentialArea.name).order_by(ResidentialArea.name))
+        table_areas = set(res_table.scalars().all())
+
+        res_mem = await self.db.execute(
+            select(Member.area).where(Member.area != None, Member.area != "").distinct()
         )
-        return [r for r in res.scalars().all() if r]
+        mem_areas = set(res_mem.scalars().all())
+
+        all_areas = sorted(list(table_areas | mem_areas))
+        return [a for a in all_areas if a]
+
+    async def add_residential_area(self, name: str) -> str:
+        from app.models.residential_area import ResidentialArea
+        clean_name = name.strip()
+        existing = await self.db.execute(select(ResidentialArea).where(ResidentialArea.name == clean_name))
+        if not existing.scalar_one_or_none():
+            new_area = ResidentialArea(name=clean_name)
+            self.db.add(new_area)
+            await self.db.commit()
+        return clean_name
+
+    async def delete_residential_area(self, name: str) -> bool:
+        from app.models.residential_area import ResidentialArea
+        from sqlalchemy import delete
+        clean_name = name.strip()
+        await self.db.execute(delete(ResidentialArea).where(ResidentialArea.name == clean_name))
+        await self.db.commit()
+        return True
 
     async def get_member_attendance_history(self, member_id: str) -> Dict[str, Any]:
         """

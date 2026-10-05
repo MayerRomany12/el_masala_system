@@ -216,7 +216,8 @@ class MessagesRepository:
                 "user_id": u.user_id,
                 "full_name": u.full_name,
                 "role": u.role,
-                "phone": u.phone or ""
+                "phone": u.phone or "",
+                "email": getattr(u, "email", None) or ""
             }
             for u in users
         ]

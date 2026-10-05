@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { apiClient } from '../api/client';
 import { birthdaysApi } from '../api/birthdays';
-import { getWaUrl } from '../utils/phone';
+import { getWaUrl, getGmailUrl } from '../utils/phone';
 import { getPhotoUrl } from '../utils/photo';
+import { STAGE_OPTIONS } from '../constants/stages';
 import {
   Gift,
   Cake,
@@ -19,24 +20,9 @@ import {
   Sparkles,
   FileText,
   Send,
-  PartyPopper
+  PartyPopper,
+  Mail
 } from 'lucide-react';
-
-const STAGE_OPTIONS = [
-  'ALL',
-  'حضانة (KG1 & KG2)',
-  'ابتدائي - الصف الأول',
-  'ابتدائي - الصف الثاني',
-  'ابتدائي - الصف الثالث',
-  'ابتدائي - الصف الرابع',
-  'ابتدائي - الصف الخامس',
-  'ابتدائي - الصف السادس',
-  'إعدادي - الصف الأول',
-  'إعدادي - الصف الثاني',
-  'إعدادي - الصف الثالث',
-  'ثانوي',
-  'جامعة وخريجين'
-];
 
 const MONTH_OPTIONS = [
   { value: '', label: 'جميع الأشهُر (1 - 12)' },
@@ -349,7 +335,7 @@ export const BirthdayManagement = () => {
             onChange={(e) => setSelectedStage(e.target.value)}
           >
             {STAGE_OPTIONS.map((stg) => (
-              <option key={stg} value={stg === 'ALL' ? '' : stg}>{stg}</option>
+              <option key={stg.code} value={stg.code === 'ALL' ? '' : stg.label}>{stg.label}</option>
             ))}
           </select>
 
@@ -482,7 +468,7 @@ export const BirthdayManagement = () => {
                       </td>
 
                       <td style={{ textAlign: 'center' }}>
-                        <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
+                        <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center', flexWrap: 'wrap' }}>
                           <button
                             disabled={!targetPhone}
                             onClick={() => {
@@ -491,7 +477,7 @@ export const BirthdayManagement = () => {
                               const name = m.full_name;
                               const stage = m.stage;
                               const ageStr = m.age !== null && m.age !== undefined ? ` الـ ${m.age}` : '';
-                              setWaMessageText(`🎉🎂 كل سنة وانت طيب يا ${name}! 🎂🎉\n\nأسرة ${stage} بكنيسة مارجرجس والأنبا شنودة بالكرور تهنئك بعيد ميلادك${ageStr} سنة ✨\n\nربنا يبارك حياتك وتفضل دايماً منور الكنيسة والخدمة ✝️❤️`);
+                              setWaMessageText(`🎉🎂 كل سنة وانت طيب يا ${name}! 🎂🎉\n\nأسرة ${stage} بكنيسة المسلة تهنئك بعيد ميلادك${ageStr} سنة ✨\n\nربنا يبارك حياتك وتفضل دايماً منور الكنيسة والخدمة ✝️❤️`);
                             }}
                             className="btn btn-secondary"
                             style={{
@@ -507,6 +493,33 @@ export const BirthdayManagement = () => {
                             <MessageSquare size={14} />
                             <span>تهنئة واتساب 📲</span>
                           </button>
+
+                          {m.email && (
+                            <a
+                              href={getGmailUrl(
+                                m.email,
+                                `🎂 كل سنة وانت طيب يا ${m.full_name} - تهنئة عيد ميلاد من كنيسة المسلة`,
+                                `🎉🎂 كل سنة وانت طيب يا ${m.full_name}! 🎂🎉\n\nأسرة ${m.stage || 'الخدمة'} بكنيسة المسلة تهنئك بعيد ميلادك المبارك ✨\n\nربنا يبارك حياتك وتفضل دايماً منور الكنيسة والخدمة ✝️❤️`
+                              )}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="btn btn-secondary"
+                              style={{
+                                padding: '0.25rem 0.55rem',
+                                fontSize: '0.78rem',
+                                color: '#ea4335',
+                                borderColor: 'rgba(234, 67, 53, 0.3)',
+                                textDecoration: 'none',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '3px'
+                              }}
+                              title={`إرسال تهنئة عبر Gmail إلى ${m.email}`}
+                            >
+                              <Mail size={14} />
+                              <span>Gmail ✉️</span>
+                            </a>
+                          )}
 
                           {!isDelivered && (
                             <button

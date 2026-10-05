@@ -6,7 +6,7 @@ from PIL import Image
 
 from app.core.database import get_db
 from app.auth.dependencies import get_current_user, require_permission, get_servant_class_ids
-from app.members.schemas import MemberCreate, MemberUpdate, MemberStatusUpdate, CardPayload, PhotoDataPayload
+from app.members.schemas import MemberCreate, MemberUpdate, MemberStatusUpdate, CardPayload, PhotoDataPayload, ResidentialAreaCreate
 from app.members.service import MemberService
 from app.shared.response import success_response
 from app.core.errors import BadRequestException
@@ -51,6 +51,29 @@ async def get_distinct_areas(
     service = MemberService(db)
     areas = await service.get_distinct_areas()
     return success_response(data=areas, message="تم جلب قائمة المناطق المسجلة")
+
+
+@router.post("/areas", response_model=dict, status_code=status.HTTP_201_CREATED)
+async def add_residential_area(
+    area_in: ResidentialAreaCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_permission("members:write"))
+):
+    service = MemberService(db)
+    added = await service.add_residential_area(area_in.name)
+    return success_response(data={"name": added}, message=f"تم إضافة المنطقة '{added}' بنجاح")
+
+
+@router.delete("/areas/{area_name}", response_model=dict)
+async def delete_residential_area(
+    area_name: str,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_permission("members:write"))
+):
+    service = MemberService(db)
+    await service.delete_residential_area(area_name)
+    return success_response(data={"name": area_name}, message=f"تم حذف المنطقة '{area_name}' بنجاح")
+
 
 
 @router.post("/scan", response_model=dict)
