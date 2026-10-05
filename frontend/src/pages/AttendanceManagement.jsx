@@ -60,8 +60,8 @@ export const AttendanceManagement = () => {
   const [filterTab, setFilterTab] = useState('ALL'); // 'ALL' | 'PRESENT' | 'ABSENT'
   const [togglingMemberId, setTogglingMemberId] = useState(null);
 
-  // QR Camera Modal & Scanner State
-  const [isScannerModalOpen, setIsScannerModalOpen] = useState(false);
+  // QR Camera & Scanner State
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
   const [scanFeedback, setScanFeedback] = useState(null);
   const [recentScanResult, setRecentScanResult] = useState(null);
@@ -128,7 +128,7 @@ export const AttendanceManagement = () => {
   // 1. Fetch Assigned Classes
   const fetchClasses = useCallback(async () => {
     try {
-      const res = await apiClient.get('/classes/?status=Active&limit=100');
+      const res = await apiClient.get('/classes?limit=200');
       const items = res?.data?.data?.items || res?.data?.items || [];
       setClassesList(items);
       if (items.length > 0 && !selectedClassId) {
@@ -264,6 +264,21 @@ export const AttendanceManagement = () => {
   };
 
   // 6. Camera QR Scanning
+  const handleToggleScanner = async () => {
+    if (cameraActive || isScannerOpen) {
+      await stopCamera();
+    } else {
+      if (!selectedSession) {
+        alert('يرجى اختيار جلسة حضور مفتوحة أولاً لبدء المسح بالكاميرا');
+        return;
+      }
+      setIsScannerOpen(true);
+      setTimeout(() => {
+        startCamera();
+      }, 250);
+    }
+  };
+
   const startCamera = async () => {
     setScanFeedback(null);
     setRecentScanResult(null);
@@ -346,23 +361,27 @@ export const AttendanceManagement = () => {
       );
       setCameraActive(true);
     } catch (err) {
-      alert('تعذر فتح الكاميرا، يرجى التأكد من صلاحية المتصفح.');
+      console.error('Camera error:', err);
+      alert('تعذر فتح الكاميرا، يرجى التأكد من صلاحية الوصول للكاميرا في المتصفح.');
       setCameraActive(false);
+      setIsScannerOpen(false);
     }
   };
 
   const stopCamera = async () => {
     if (cooldownIntervalRef.current) clearInterval(cooldownIntervalRef.current);
-    if (html5QrcodeRef.current && cameraActive) {
+    if (html5QrcodeRef.current) {
       try {
-        await html5QrcodeRef.current.stop();
+        if (html5QrcodeRef.current.isScanning) {
+          await html5QrcodeRef.current.stop();
+        }
         await html5QrcodeRef.current.clear();
       } catch (e) {
         // ignore
       }
     }
     setCameraActive(false);
-    setIsScannerModalOpen(false);
+    setIsScannerOpen(false);
   };
 
   // 7. Print Official Attendance Sheet
@@ -543,15 +562,25 @@ export const AttendanceManagement = () => {
           </button>
 
           <button
-            onClick={() => {
-              setIsScannerModalOpen(true);
-              setTimeout(() => startCamera(), 300);
+            onClick={handleToggleScanner}
+            className={`btn ${cameraActive ? 'btn-danger' : 'btn-primary'}`}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              fontSize: '0.88rem',
+              fontWeight: 800,
+              background: cameraActive
+                ? 'linear-gradient(135deg, #ef4444, #dc2626)'
+                : 'linear-gradient(135deg, #0284c7, #0369a1)',
+              boxShadow: cameraActive
+                ? '0 0 15px rgba(239, 68, 68, 0.45)'
+                : '0 4px 14px rgba(2, 132, 199, 0.4)',
+              color: '#ffffff'
             }}
-            className="btn btn-secondary"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.88rem', color: '#38bdf8', borderColor: 'rgba(56, 189, 248, 0.3)' }}
           >
-            <Camera size={16} />
-            <span>مسح كروت QR (اختياري)</span>
+            <Camera size={17} />
+            <span>{cameraActive ? 'إيقاف كاميرا الـ QR ⏹️' : 'تشغيل كاميرا الـ QR للتحضير اللحظي 📷'}</span>
           </button>
 
           <button
@@ -691,7 +720,145 @@ export const AttendanceManagement = () => {
         )}
       </div>
 
-      {/* 3. Numbered Class Attendance Sheet */}
+      {/* 3. Live Embedded QR Scanner Hub (Front & Center) */}
+      {isScannerOpen && (
+        <div className="glass-card animate-scale-in" style={{
+          padding: '1.25rem',
+          border: '2px solid #38bdf8',
+          background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(30, 41, 59, 0.96))',
+          boxShadow: '0 10px 30px rgba(56, 189, 248, 0.25)',
+          borderRadius: '16px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: '50%',
+                background: 'rgba(56, 189, 248, 0.2)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: '#38bdf8'
+              }}>
+                <Camera size={22} />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#38bdf8' }}>
+                  بوابة التحضير الفوري عبر كاميرا الـ QR
+                </h3>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  وجه كود المخدوم أو كارت الخدمة أمام الكاميرا — يتم تسجيل الحضور بصوت فوري وتحديث الكشف بالأسفل
+                </span>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <span className={`badge ${cameraActive ? 'badge-success' : 'badge-warning'}`} style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}>
+                {cameraActive ? '🟢 الكاميرا تستقبل الكروت الآن' : '⏳ جاري فتح عدسة الكاميرا...'}
+              </span>
+              <button
+                type="button"
+                onClick={stopCamera}
+                className="btn btn-secondary"
+                style={{ fontSize: '0.82rem', padding: '0.4rem 0.8rem', color: '#f87171', borderColor: 'rgba(239, 68, 68, 0.35)' }}
+              >
+                <X size={15} />
+                <span>إيقاف الكاميرا</span>
+              </button>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(290px, 1fr))', gap: '1.25rem', alignItems: 'center' }}>
+            {/* Viewfinder Frame */}
+            <div style={{
+              position: 'relative',
+              width: '100%',
+              maxWidth: '380px',
+              margin: '0 auto',
+              borderRadius: '12px',
+              overflow: 'hidden',
+              background: '#020617',
+              border: '2px solid rgba(56, 189, 248, 0.5)',
+              boxShadow: '0 8px 24px rgba(0, 0, 0, 0.6)'
+            }}>
+              <div id={scannerContainerId} style={{ width: '100%', minHeight: '280px' }} />
+            </div>
+
+            {/* Live Feedback Panel */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              {recentScanResult ? (
+                <div className="animate-scale-in" style={{
+                  padding: '1.25rem',
+                  borderRadius: '12px',
+                  background: recentScanResult.status === 'success' ? 'rgba(34, 197, 94, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                  border: `2px solid ${recentScanResult.status === 'success' ? '#22c55e' : '#f59e0b'}`,
+                  textAlign: 'center',
+                  boxShadow: recentScanResult.status === 'success' ? '0 0 25px rgba(34, 197, 94, 0.3)' : 'none'
+                }}>
+                  <div style={{ fontSize: '1.8rem', marginBottom: '0.2rem' }}>
+                    {recentScanResult.status === 'success' ? '✅' : '⚠️'}
+                  </div>
+                  <div style={{
+                    fontWeight: 800,
+                    fontSize: '1.1rem',
+                    color: recentScanResult.status === 'success' ? '#86efac' : '#fde047',
+                    marginBottom: '0.25rem'
+                  }}>
+                    {recentScanResult.title}
+                  </div>
+                  <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#ffffff', marginBottom: '0.5rem' }}>
+                    {recentScanResult.name}
+                  </div>
+                  <div style={{ fontSize: '0.82rem', color: '#94a3b8' }}>
+                    {cooldownSeconds > 0 ? `جاهز للمسح التالي بعد ${cooldownSeconds} ثانية...` : 'جاهز لمسح كارت مخدوم آخر 📷'}
+                  </div>
+                </div>
+              ) : (
+                <div style={{
+                  padding: '1.5rem',
+                  borderRadius: '12px',
+                  background: 'rgba(255, 255, 255, 0.03)',
+                  border: '1px dashed var(--border-subtle)',
+                  textAlign: 'center',
+                  color: 'var(--text-muted)'
+                }}>
+                  <QrCode size={40} style={{ color: '#38bdf8', opacity: 0.8, marginBottom: '0.5rem' }} />
+                  <div style={{ fontWeight: 700, color: 'var(--text-main)', fontSize: '1rem', marginBottom: '0.35rem' }}>
+                    جاهز لمسح الكروت تلقائياً
+                  </div>
+                  <p style={{ margin: 0, fontSize: '0.84rem', lineHeight: '1.5' }}>
+                    ضع كود الـ QR الخاص بالتلميذ أمام الكاميرا — سيتم التعرف عليه فوراً وتسجيله كـ "حاضر" في الجدول أدناه
+                  </p>
+                </div>
+              )}
+
+              {/* Instant Mini Stats */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div style={{
+                  padding: '0.75rem',
+                  background: 'rgba(34, 197, 94, 0.1)',
+                  border: '1px solid rgba(34, 197, 94, 0.25)',
+                  borderRadius: '10px',
+                  textAlign: 'center'
+                }}>
+                  <span style={{ display: 'block', fontSize: '0.75rem', color: '#86efac' }}>حاضر الآن</span>
+                  <strong style={{ fontSize: '1.4rem', color: '#86efac', fontWeight: 800 }}>{sheetStats.present_count}</strong>
+                </div>
+
+                <div style={{
+                  padding: '0.75rem',
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid rgba(239, 68, 68, 0.25)',
+                  borderRadius: '10px',
+                  textAlign: 'center'
+                }}>
+                  <span style={{ display: 'block', fontSize: '0.75rem', color: '#fca5a5' }}>غائب الآن</span>
+                  <strong style={{ fontSize: '1.4rem', color: '#fca5a5', fontWeight: 800 }}>{sheetStats.absent_count}</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 4. Numbered Class Attendance Sheet */}
       <div className="glass-card" style={{ padding: '1.25rem' }}>
         
         {/* Controls: Search & Tabs */}
@@ -927,55 +1094,7 @@ export const AttendanceManagement = () => {
         </div>
       </div>
 
-      {/* 4. Optional QR Scanner Modal */}
-      {isScannerModalOpen && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.85)',
-          zIndex: 9999,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '1rem',
-          backdropFilter: 'blur(4px)'
-        }}>
-          <div className="glass-card" style={{ width: '100%', maxWidth: '440px', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Camera size={20} />
-                <span>مسح كروت QR بالكاميرا</span>
-              </h3>
-              <button onClick={stopCamera} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
-                <X size={20} />
-              </button>
-            </div>
 
-            <div style={{ width: '100%', minHeight: '260px', borderRadius: '12px', overflow: 'hidden', background: '#0f172a', border: '2px dashed #38bdf8' }} id={scannerContainerId} />
-
-            {recentScanResult && (
-              <div style={{
-                padding: '0.6rem 0.8rem',
-                borderRadius: '8px',
-                textAlign: 'center',
-                background: recentScanResult.status === 'success' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(245, 158, 11, 0.2)',
-                color: recentScanResult.status === 'success' ? '#86efac' : '#fbbf24',
-                fontWeight: 700,
-                fontSize: '0.85rem'
-              }}>
-                {recentScanResult.title} - {recentScanResult.name}
-              </div>
-            )}
-
-            <button onClick={stopCamera} className="btn btn-secondary" style={{ width: '100%', justifyContent: 'center' }}>
-              إغلاق العارض والعودة للكشف
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* 5. New Session Modal */}
       {isSessionModalOpen && (

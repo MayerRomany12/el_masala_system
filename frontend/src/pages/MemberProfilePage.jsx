@@ -116,6 +116,34 @@ export const MemberProfilePage = () => {
     }
   };
 
+  const downloadPureQR = () => {
+    if (!member) return;
+    const canvas = document.createElement('canvas');
+    const qrSize = 512;
+    canvas.width = qrSize;
+    canvas.height = qrSize;
+    const qrValue = member.qr_token || member.member_id;
+
+    QRCode.toCanvas(canvas, qrValue, {
+      width: qrSize,
+      margin: 2,
+      color: {
+        dark: '#000000',
+        light: '#ffffff'
+      }
+    }, (err) => {
+      if (err) {
+        alert('تعذر إنشاء صورة الـ QR');
+        return;
+      }
+      const safeName = (member.full_name || 'member').replace(/\s+/g, '_');
+      const link = document.createElement('a');
+      link.download = `QR_${safeName}_${member.member_id}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    });
+  };
+
   const downloadQRCard = () => {
     if (!member) return;
     const canvas = document.createElement('canvas');
@@ -389,12 +417,13 @@ export const MemberProfilePage = () => {
             )}
 
             <button
-              onClick={downloadQRCard}
+              onClick={downloadPureQR}
               className="btn btn-secondary"
-              style={{ fontSize: '0.84rem', gap: '0.4rem' }}
+              style={{ fontSize: '0.84rem', gap: '0.4rem', color: '#38bdf8', borderColor: 'rgba(56, 189, 248, 0.4)' }}
+              title="تحميل رمز الـ QR منفصلاً كصورة PNG نقية بدون كارت"
             >
               <Download size={15} />
-              <span>بطاقة الـ QR 🎴</span>
+              <span>تحميل رمز الـ QR (PNG) 📷</span>
             </button>
           </div>
         </div>
@@ -746,9 +775,56 @@ export const MemberProfilePage = () => {
             </div>
           </div>
 
-          {/* QR Code Canvas (Hidden from main layout, used for card download) */}
-          <div style={{ display: 'none' }}>
-            <canvas ref={qrCanvasRef} />
+          {/* Standalone QR Code Display & Download */}
+          <div className="glass-card" style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem', padding: '1.25rem' }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              width: '100%',
+              paddingBottom: '0.5rem',
+              borderBottom: '1px solid var(--border-subtle)',
+              color: '#38bdf8',
+              fontSize: '0.92rem',
+              fontWeight: 700
+            }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <QrCode size={17} />
+                <span>رمز الـ QR المخصص للحضور</span>
+              </span>
+            </div>
+
+            <div style={{
+              background: '#ffffff',
+              padding: '12px',
+              borderRadius: '12px',
+              display: 'inline-flex',
+              boxShadow: '0 4px 15px rgba(0,0,0,0.25)'
+            }}>
+              <canvas ref={qrCanvasRef} style={{ width: '160px', height: '160px', display: 'block' }} />
+            </div>
+
+            <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+              كود مشفر لمسح حضور وغياب التلميذ بالكاميرا
+            </p>
+
+            <button
+              type="button"
+              onClick={downloadPureQR}
+              className="btn btn-primary"
+              style={{
+                width: '100%',
+                fontSize: '0.85rem',
+                fontWeight: 700,
+                justifyContent: 'center',
+                gap: '6px',
+                padding: '0.55rem',
+                background: 'linear-gradient(135deg, #0284c7, #0369a1)'
+              }}
+            >
+              <Download size={15} />
+              <span>تحميل رمز الـ QR منفصلاً (PNG)</span>
+            </button>
           </div>
         </div>
 

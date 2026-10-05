@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { apiClient } from '../api/client';
 import {
   FolderKanban,
@@ -12,11 +13,13 @@ import {
   Sun,
   AlertCircle,
   CheckCircle,
-  Layers
+  Layers,
+  Trash2
 } from 'lucide-react';
 
 export const ClassManagement = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   // ─── Data State ──────────────────────────────────────────────────────────
   const [classes, setClasses] = useState([]);
@@ -68,6 +71,19 @@ export const ClassManagement = () => {
       console.error('Error fetching seasons:', err);
     }
   }, []);
+
+  const handleDeleteClass = async (cls) => {
+    if (!window.confirm(`هل أنت متأكد من حذف فصل "${cls.name}" (${cls.class_id}) نهائياً؟`)) {
+      return;
+    }
+    try {
+      await apiClient.delete(`/classes/${cls.class_id}`);
+      notifySuccess(`تم حذف فصل "${cls.name}" بنجاح`);
+      fetchClasses(true);
+    } catch (err) {
+      notifyError(err.response?.data?.detail || err.response?.data?.message || 'فشل حذف الفصل');
+    }
+  };
 
   useEffect(() => {
     fetchClasses();
@@ -395,13 +411,29 @@ export const ClassManagement = () => {
                   </div>
 
                   {/* Actions */}
-                  <button
-                    className="btn btn-primary"
-                    style={{ width: '100%', padding: '0.5rem', fontSize: '0.85rem', justifyContent: 'center' }}
-                    onClick={() => navigate(`/classes/${cls.class_id}`)}
-                  >
-                    عرض التفاصيل والأعضاء 📋
-                  </button>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button
+                      className="btn btn-primary"
+                      style={{ flex: 1, padding: '0.5rem', fontSize: '0.85rem', justifyContent: 'center' }}
+                      onClick={() => navigate(`/classes/${cls.class_id}`)}
+                    >
+                      عرض التفاصيل والأعضاء 📋
+                    </button>
+
+                    {(user?.role === 'Super Admin' || user?.role === 'Admin') && (
+                      <button
+                        className="btn btn-secondary"
+                        style={{ padding: '0.5rem 0.65rem', color: '#f87171', borderColor: 'rgba(239, 68, 68, 0.35)' }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteClass(cls);
+                        }}
+                        title="حذف الفصل نهائياً"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             );

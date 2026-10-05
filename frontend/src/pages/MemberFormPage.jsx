@@ -59,7 +59,7 @@ export const MemberFormPage = () => {
 
   // Load available classes & areas
   useEffect(() => {
-    apiClient.get('/classes/?status=Active&limit=100')
+    apiClient.get('/classes?limit=200')
       .then(res => {
         const data = res?.data?.data?.items || res?.data?.items || [];
         setClasses(data);
@@ -446,7 +446,7 @@ export const MemberFormPage = () => {
                 <option value="">— اختر الفصل الخدمي —</option>
                 {classes.map((cls) => (
                   <option key={cls.class_id} value={cls.class_id}>
-                    {cls.name} ({cls.group_type === 'Standard' ? 'أساسي' : cls.group_type})
+                    {cls.name} {cls.stage ? `— (${cls.stage})` : ''}
                   </option>
                 ))}
               </select>

@@ -153,11 +153,31 @@ const CreatedMemberQRModal = ({ member, onClose }) => {
   };
 
   const downloadPureQR = () => {
-    if (!qrCanvasRef.current) return;
-    const link = document.createElement('a');
-    link.download = `QR_${member.member_id}.png`;
-    link.href = qrCanvasRef.current.toDataURL('image/png');
-    link.click();
+    if (!member) return;
+    const canvas = document.createElement('canvas');
+    const qrSize = 512;
+    canvas.width = qrSize;
+    canvas.height = qrSize;
+    const qrValue = member.qr_token || member.member_id;
+
+    QRCode.toCanvas(canvas, qrValue, {
+      width: qrSize,
+      margin: 2,
+      color: {
+        dark: '#000000',
+        light: '#ffffff'
+      }
+    }, (err) => {
+      if (err) {
+        alert('تعذر إنشاء صورة الـ QR');
+        return;
+      }
+      const safeName = (member.full_name || 'member').replace(/\s+/g, '_');
+      const link = document.createElement('a');
+      link.download = `QR_${safeName}_${member.member_id}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    });
   };
 
   return (
@@ -293,21 +313,30 @@ const CreatedMemberQRModal = ({ member, onClose }) => {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           <button
-            onClick={downloadQRCard}
+            onClick={downloadPureQR}
             className="btn btn-primary"
-            style={{ width: '100%', padding: '0.75rem', fontSize: '0.95rem', justifyContent: 'center', gap: '8px' }}
+            style={{
+              width: '100%',
+              padding: '0.75rem',
+              fontSize: '0.95rem',
+              fontWeight: 800,
+              justifyContent: 'center',
+              gap: '8px',
+              background: 'linear-gradient(135deg, #0284c7, #0369a1)',
+              boxShadow: '0 4px 14px rgba(2, 132, 199, 0.4)'
+            }}
           >
             <Download size={18} />
-            <span>تحميل بطاقة الـ QR كاملة (PNG) 🖼️</span>
+            <span>تحميل رمز الـ QR منفصلاً (صورة PNG نقية) 📥</span>
           </button>
 
           <button
-            onClick={downloadPureQR}
+            onClick={downloadQRCard}
             className="btn btn-secondary"
-            style={{ width: '100%', padding: '0.6rem', fontSize: '0.85rem', justifyContent: 'center', gap: '8px' }}
+            style={{ width: '100%', padding: '0.6rem', fontSize: '0.85rem', justifyContent: 'center', gap: '8px', color: 'var(--text-muted)' }}
           >
             <QrCode size={16} />
-            <span>تحميل رمز الـ QR فقط (صورة PNG)</span>
+            <span>تحميل في كارت مطبوع كامل (اختياري)</span>
           </button>
 
           <button
@@ -315,7 +344,7 @@ const CreatedMemberQRModal = ({ member, onClose }) => {
             className="btn btn-secondary"
             style={{ width: '100%', padding: '0.6rem', fontSize: '0.9rem', justifyContent: 'center', marginTop: '0.25rem' }}
           >
-            إغلاق ومتابعة التسجيل
+            إغلاق ومتابعة
           </button>
         </div>
       </div>
@@ -358,7 +387,7 @@ export const MemberManagement = () => {
 
   // جلب الفصول والمناطق الديناميكية من API
   useEffect(() => {
-    apiClient.get('/classes/?status=Active&limit=100')
+    apiClient.get('/classes?limit=200')
       .then(res => {
         const data = res?.data?.data?.items || res?.data?.items || [];
         setClasses(data);

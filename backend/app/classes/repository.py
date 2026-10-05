@@ -1,7 +1,7 @@
 import secrets
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone
-from sqlalchemy import select, update, func, and_
+from sqlalchemy import select, update, func, and_, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 
@@ -379,6 +379,23 @@ class ClassRepository:
                 "left_at": cgm.left_at
             })
         return members
+
+    async def delete_class_group(self, class_id: str) -> bool:
+        cg = await self.db.scalar(select(ClassGroup).where(ClassGroup.class_id == class_id))
+        if not cg:
+            raise NotFoundException("الفصل أو المجموعة غير موجودة")
+
+        # Clean up associations
+        await self.db.execute(text("DELETE FROM class_group_members WHERE class_id = :cid").bindparams(cid=class_id))
+        await self.db.execute(text("DELETE FROM class_group_servants WHERE class_id = :cid").bindparams(cid=class_id))
+        try:
+            await self.db.execute(text("DELETE FROM event_target_classes WHERE class_id = :cid").bindparams(cid=class_id))
+        except Exception:
+            pass
+
+        await self.db.delete(cg)
+        await self.db.flush()
+        return True
 
     def _row_to_dict(self, cg: ClassGroup) -> Dict[str, Any]:
         status_val = getattr(cg, "status", "Active")

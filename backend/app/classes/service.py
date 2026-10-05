@@ -51,6 +51,9 @@ class ClassService:
         update_dict = data.model_dump(exclude_unset=True)
         return await self.repo.update_class_group(class_id, update_dict)
 
+    async def delete_class_group(self, class_id: str) -> bool:
+        return await self.repo.delete_class_group(class_id)
+
     # Servant Management
     async def assign_servant(self, class_id: str, data: AssignServantRequest) -> Dict[str, Any]:
         existing = await self.repo.get_by_id(class_id)

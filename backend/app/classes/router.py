@@ -80,6 +80,17 @@ async def update_class_group(
     return success_response(data=class_group, message="تم تحديث بيانات الفصل بنجاح")
 
 
+@router.delete("/{class_id}", response_model=dict)
+async def delete_class_group(
+    class_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_permission("classes:manage"))
+):
+    service = ClassService(db)
+    await service.delete_class_group(class_id)
+    return success_response(data=None, message="تم حذف الفصل بنجاح")
+
+
 # Servants Management
 @router.get("/{class_id}/servants", response_model=dict)
 async def list_class_servants(
