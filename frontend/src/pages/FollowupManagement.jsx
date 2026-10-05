@@ -80,7 +80,7 @@ export const FollowupManagement = () => {
 
   // Load classes
   useEffect(() => {
-    apiClient.get('/classes/?status=Active&limit=100')
+    apiClient.get('/classes?status=Active&limit=100')
       .then(res => {
         const items = res?.data?.data?.items || res?.data?.items || [];
         setClassesList(items);
@@ -355,7 +355,7 @@ export const FollowupManagement = () => {
   };
 
   return (
-    <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', paddingBottom: '3rem' }}>
+    <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', paddingBottom: '3rem', minWidth: 0, maxWidth: '100%', overflowX: 'hidden' }}>
       
       {/* 1. Header Toolbar */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
@@ -394,7 +394,7 @@ export const FollowupManagement = () => {
       )}
 
       {/* 2. Top Summary Metric Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(160px, 100%), 1fr))', gap: '0.75rem' }}>
         <div className="glass-card" style={{ padding: '1.1rem 1.25rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'rgba(244, 63, 94, 0.15)', color: '#f43f5e', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <HeartHandshake size={24} />
@@ -596,7 +596,7 @@ export const FollowupManagement = () => {
                 لا يوجد خدام مسجلين بهذا الفصل حالياً. يرجى إضافة خدام للفصل أولاً لتوزيع المهام.
               </div>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.75rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(280px, 100%), 1fr))', gap: '0.75rem' }}>
                 {classStats.servants.map((srv) => {
                   const cleanPhone = srv.servant_phone ? srv.servant_phone.replace(/\s+/g, '') : '';
                   const rate = srv.assigned_tasks > 0 ? Math.round((srv.completed_tasks / srv.assigned_tasks) * 100) : 0;
@@ -679,210 +679,407 @@ export const FollowupManagement = () => {
         </div>
       )}
 
-      {/* 4. VIEW A: List Table View */}
+      {/* 4. VIEW A: List Table & Mobile Cards View */}
       {viewMode === 'list' && (
-        <div className="glass-card" style={{ padding: '1.25rem' }}>
-          <div className="table-container">
-            <table className="custom-table">
-              <thead>
-                <tr>
-                  <th>رمز المهمة</th>
-                  <th>اسم الطفل الغائب</th>
-                  <th>المنطقة السكنية</th>
-                  <th>المرحلة</th>
-                  <th>عدد أسابيع الغياب</th>
-                  <th>الأولوية</th>
-                  <th>الاتصال بالوالدين</th>
-                  <th>الحالة</th>
-                  <th style={{ textAlign: 'center' }}>إجراءات الافتقاد</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan={9} style={{ textAlign: 'center', padding: '2rem' }}>جاري تحميل قائمة الافتقاد...</td>
-                  </tr>
-                ) : tasks.length === 0 ? (
-                  <tr>
-                    <td colSpan={9} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
-                      لا توجد مهام افتقاد مطابقة للفلاتر الحالية. اضغط على "تشغيل كاشف الغائبين" للتحقق التلقائي.
-                    </td>
-                  </tr>
-                ) : (
-                  tasks.map((t) => {
-                    const isUrgent = t.priority === 'Urgent' || t.status === 'Escalated';
-                    const isHigh = t.priority === 'High';
-                    const cleanPhone = t.member_phone ? t.member_phone.replace(/\s+/g, '') : '';
-
-                    return (
-                      <tr key={t.task_id} style={{ opacity: t.status === 'Completed' ? 0.75 : 1 }}>
-                        <td>
-                          <span style={{ fontFamily: 'monospace', fontWeight: 800, color: '#38bdf8' }}>
-                            {t.task_id}
-                          </span>
-                        </td>
-
-                        <td style={{ fontWeight: 700, color: 'var(--text-main)' }}>
-                          <div>{t.member_name}</div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '2px' }}>
-                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>({t.member_id})</span>
-                            {t.assigned_servant_name && (
-                              <span style={{ fontSize: '0.72rem', color: '#38bdf8', background: 'rgba(56, 189, 248, 0.1)', padding: '1px 6px', borderRadius: '4px' }}>
-                                الخادم: {t.assigned_servant_name}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-
-                        <td>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
-                            {t.member_area ? (
-                              <span style={{
-                                fontSize: '0.75rem',
-                                padding: '2px 6px',
-                                background: 'rgba(168, 85, 247, 0.12)',
-                                color: '#c084fc',
-                                borderRadius: '4px',
-                                border: '1px solid rgba(168, 85, 247, 0.3)',
-                                fontWeight: 700
-                              }}>
-                                {t.member_area}
-                              </span>
-                            ) : (
-                              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>—</span>
-                            )}
-                            {getMapsUrl(t.member_location_url, t.member_area) && (
-                              <a
-                                href={getMapsUrl(t.member_location_url, t.member_area)}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                style={{
-                                  fontSize: '0.72rem',
-                                  padding: '2px 5px',
-                                  background: 'rgba(56, 189, 248, 0.12)',
-                                  color: '#38bdf8',
-                                  borderRadius: '4px',
-                                  border: '1px solid rgba(56, 189, 248, 0.3)',
-                                  textDecoration: 'none',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '2px'
-                                }}
-                                title="فتح على Google Maps"
-                              >
-                                <MapPin size={11} />
-                                <span>الخريطة</span>
-                              </a>
-                            )}
-                          </div>
-                        </td>
-
-                        <td style={{ fontSize: '0.82rem' }}>{t.member_stage}</td>
-
-                        <td>
-                          <span className="badge" style={{ background: 'rgba(239, 68, 68, 0.12)', color: '#f87171', fontWeight: 800 }}>
-                            غائب {t.consecutive_weeks} أسابيع ⚠️
-                          </span>
-                        </td>
-
-                        <td>
-                          <span
-                            className="badge"
-                            style={{
-                              background: isUrgent ? 'rgba(239, 68, 68, 0.2)' : isHigh ? 'rgba(251, 191, 36, 0.2)' : 'rgba(56, 189, 248, 0.15)',
-                              color: isUrgent ? '#ef4444' : isHigh ? '#fbbf24' : '#38bdf8'
-                            }}
-                          >
-                            {isUrgent ? 'عاجل 🔴' : isHigh ? 'عالي 🟡' : 'عادي 🔵'}
-                          </span>
-                        </td>
-
-                        {/* Direct Call, WhatsApp & Gmail buttons */}
-                        <td>
-                          <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                            {cleanPhone ? (
-                              <>
-                                <a
-                                  href={`tel:${cleanPhone}`}
-                                  className="btn btn-secondary"
-                                  style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#34d399' }}
-                                  title="اتصال هاتفي مباشر"
-                                >
-                                  <Phone size={13} />
-                                </a>
-                                <WhatsAppButton
-                                  phone={cleanPhone}
-                                  memberName={t.member_name}
-                                  memberId={t.member_id}
-                                  template="absence"
-                                  variant="icon"
-                                />
-                              </>
-                            ) : (
-                              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>لا يوجد هاتف</span>
-                            )}
-                            {t.member_email && (
-                              <a
-                                href={getGmailUrl(t.member_email, `افتقاد واطمئنان - كنيسة المسلة`, `سلام ونعمة يا ${t.member_name}، بنطمن عليك واشتقنا لوجودك معانا في الكنيسة.`)}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="btn btn-secondary"
-                                style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#ea4335' }}
-                                title={`إرسال إيميل Gmail إلى: ${t.member_email}`}
-                              >
-                                <Mail size={13} />
-                              </a>
-                            )}
-                          </div>
-                        </td>
-
-                        <td>
-                          <span className={`badge ${t.status === 'Completed' ? 'badge-success' : t.status === 'Escalated' ? 'badge-danger' : 'badge-warning'}`}>
-                            {t.status === 'Completed' ? 'تم الافتقاد ✓' : t.status === 'Escalated' ? 'متصاعد لأمين الخدمة' : 'قيد المتابعة'}
-                          </span>
-                        </td>
-
-                        {/* Actions */}
-                        <td style={{ textAlign: 'center' }}>
-                          <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
-                            <button
-                              onClick={() => { setActiveLogTask(t); setLogFormData({ contact_method: 'Phone', outcome: 'Promised', notes: '' }); }}
-                              className="btn btn-primary"
-                              style={{ padding: '0.25rem 0.6rem', fontSize: '0.78rem' }}
-                              title="تسجيل نتيجة الافتقاد"
-                            >
-                              <span>توثيق 📝</span>
-                            </button>
-
-                            <button
-                              onClick={() => handleOpenHistory(t)}
-                              className="btn btn-secondary"
-                              style={{ padding: '0.25rem 0.5rem', fontSize: '0.78rem' }}
-                              title="سجل الافتقادات السابقة"
-                            >
-                              <span>السجل 📋</span>
-                            </button>
-
-                            {t.status !== 'Escalated' && t.status !== 'Completed' && (
-                              <button
-                                onClick={() => handleEscalateTask(t.task_id)}
-                                className="btn btn-secondary"
-                                style={{ padding: '0.25rem 0.5rem', fontSize: '0.78rem', color: '#f87171' }}
-                                title="تصعيد لأمين الخدمة"
-                              >
-                                <span>تصعيد ⚡</span>
-                              </button>
-                            )}
-                          </div>
+        <>
+          {/* Desktop Table View */}
+          <div className="followup-desktop-view">
+            <div className="glass-card" style={{ padding: 0, overflow: 'hidden', minWidth: 0, maxWidth: '100%' }}>
+              <div className="table-container" style={{ width: '100%', maxWidth: '100%', overflowX: 'auto' }}>
+                <table className="custom-table">
+                  <thead>
+                    <tr>
+                      <th>رمز المهمة</th>
+                      <th>اسم الطفل الغائب</th>
+                      <th>المنطقة السكنية</th>
+                      <th>المرحلة</th>
+                      <th>عدد أسابيع الغياب</th>
+                      <th>الأولوية</th>
+                      <th>الاتصال بالوالدين</th>
+                      <th>الحالة</th>
+                      <th style={{ textAlign: 'center' }}>إجراءات الافتقاد</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loading ? (
+                      <tr>
+                        <td colSpan={9} style={{ textAlign: 'center', padding: '2rem' }}>جاري تحميل قائمة الافتقاد...</td>
+                      </tr>
+                    ) : tasks.length === 0 ? (
+                      <tr>
+                        <td colSpan={9} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                          لا توجد مهام افتقاد مطابقة للفلاتر الحالية. اضغط على "تشغيل كاشف الغائبين" للتحقق التلقائي.
                         </td>
                       </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+                    ) : (
+                      tasks.map((t) => {
+                        const isUrgent = t.priority === 'Urgent' || t.status === 'Escalated';
+                        const isHigh = t.priority === 'High';
+                        const cleanPhone = t.member_phone ? t.member_phone.replace(/\s+/g, '') : '';
+                        const mapLink = getMapsUrl(t.member_location_url, t.member_area);
+
+                        return (
+                          <tr key={t.task_id} style={{ opacity: t.status === 'Completed' ? 0.75 : 1 }}>
+                            <td>
+                              <span style={{ fontFamily: 'monospace', fontWeight: 800, color: '#38bdf8' }}>
+                                {t.task_id}
+                              </span>
+                            </td>
+
+                            <td style={{ fontWeight: 700, color: 'var(--text-main)' }}>
+                              <div>{t.member_name}</div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '2px' }}>
+                                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>({t.member_id})</span>
+                                {t.assigned_servant_name && (
+                                  <span style={{ fontSize: '0.72rem', color: '#38bdf8', background: 'rgba(56, 189, 248, 0.1)', padding: '1px 6px', borderRadius: '4px' }}>
+                                    الخادم: {t.assigned_servant_name}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+
+                            <td>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+                                {t.member_area ? (
+                                  <span style={{
+                                    fontSize: '0.75rem',
+                                    padding: '2px 6px',
+                                    background: 'rgba(168, 85, 247, 0.12)',
+                                    color: '#c084fc',
+                                    borderRadius: '4px',
+                                    border: '1px solid rgba(168, 85, 247, 0.3)',
+                                    fontWeight: 700
+                                  }}>
+                                    {t.member_area}
+                                  </span>
+                                ) : (
+                                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>—</span>
+                                )}
+                                {mapLink && (
+                                  <a
+                                    href={mapLink}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{
+                                      fontSize: '0.72rem',
+                                      padding: '2px 5px',
+                                      background: 'rgba(56, 189, 248, 0.12)',
+                                      color: '#38bdf8',
+                                      borderRadius: '4px',
+                                      border: '1px solid rgba(56, 189, 248, 0.3)',
+                                      textDecoration: 'none',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '2px'
+                                    }}
+                                    title="فتح على Google Maps"
+                                  >
+                                    <MapPin size={11} />
+                                    <span>الخريطة</span>
+                                  </a>
+                                )}
+                              </div>
+                            </td>
+
+                            <td style={{ fontSize: '0.82rem' }}>{t.member_stage}</td>
+
+                            <td>
+                              <span className="badge" style={{ background: 'rgba(239, 68, 68, 0.12)', color: '#f87171', fontWeight: 800 }}>
+                                غائب {t.consecutive_weeks} أسابيع ⚠️
+                              </span>
+                            </td>
+
+                            <td>
+                              <span
+                                className="badge"
+                                style={{
+                                  background: isUrgent ? 'rgba(239, 68, 68, 0.2)' : isHigh ? 'rgba(251, 191, 36, 0.2)' : 'rgba(56, 189, 248, 0.15)',
+                                  color: isUrgent ? '#ef4444' : isHigh ? '#fbbf24' : '#38bdf8'
+                                }}
+                              >
+                                {isUrgent ? 'عاجل 🔴' : isHigh ? 'عالي 🟡' : 'عادي 🔵'}
+                              </span>
+                            </td>
+
+                            {/* Direct Call, WhatsApp & Gmail buttons */}
+                            <td>
+                              <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                                {cleanPhone ? (
+                                  <>
+                                    <a
+                                      href={`tel:${cleanPhone}`}
+                                      className="btn btn-secondary"
+                                      style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#34d399' }}
+                                      title="اتصال هاتفي مباشر"
+                                    >
+                                      <Phone size={13} />
+                                    </a>
+                                    <WhatsAppButton
+                                      phone={cleanPhone}
+                                      memberName={t.member_name}
+                                      memberId={t.member_id}
+                                      template="absence"
+                                      variant="icon"
+                                    />
+                                  </>
+                                ) : (
+                                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>لا يوجد هاتف</span>
+                                )}
+                                {t.member_email && (
+                                  <a
+                                    href={getGmailUrl(t.member_email, `افتقاد واطمئنان - كنيسة المسلة`, `سلام ونعمة يا ${t.member_name}، بنطمن عليك واشتقنا لوجودك معانا في الكنيسة.`)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="btn btn-secondary"
+                                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#ea4335' }}
+                                    title={`إرسال إيميل Gmail إلى: ${t.member_email}`}
+                                  >
+                                    <Mail size={13} />
+                                  </a>
+                                )}
+                              </div>
+                            </td>
+
+                            <td>
+                              <span className={`badge ${t.status === 'Completed' ? 'badge-success' : t.status === 'Escalated' ? 'badge-danger' : 'badge-warning'}`}>
+                                {t.status === 'Completed' ? 'تم الافتقاد ✓' : t.status === 'Escalated' ? 'متصاعد لأمين الخدمة' : 'قيد المتابعة'}
+                              </span>
+                            </td>
+
+                            {/* Actions */}
+                            <td style={{ textAlign: 'center' }}>
+                              <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
+                                <button
+                                  onClick={() => { setActiveLogTask(t); setLogFormData({ contact_method: 'Phone', outcome: 'Promised', notes: '' }); }}
+                                  className="btn btn-primary"
+                                  style={{ padding: '0.25rem 0.6rem', fontSize: '0.78rem' }}
+                                  title="تسجيل نتيجة الافتقاد"
+                                >
+                                  <span>توثيق 📝</span>
+                                </button>
+
+                                <button
+                                  onClick={() => handleOpenHistory(t)}
+                                  className="btn btn-secondary"
+                                  style={{ padding: '0.25rem 0.5rem', fontSize: '0.78rem' }}
+                                  title="سجل الافتقادات السابقة"
+                                >
+                                  <span>السجل 📋</span>
+                                </button>
+
+                                {t.status !== 'Escalated' && t.status !== 'Completed' && (
+                                  <button
+                                    onClick={() => handleEscalateTask(t.task_id)}
+                                    className="btn btn-secondary"
+                                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.78rem', color: '#f87171' }}
+                                    title="تصعيد لأمين الخدمة"
+                                  >
+                                    <span>تصعيد ⚡</span>
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
-        </div>
+
+          {/* Mobile Cards List View */}
+          <div className="followup-mobile-view">
+            {loading ? (
+              <div className="glass-card" style={{ textAlign: 'center', padding: '2.5rem 1rem', color: 'var(--text-muted)' }}>
+                جاري تحميل قائمة الافتقاد...
+              </div>
+            ) : tasks.length === 0 ? (
+              <div className="glass-card" style={{ textAlign: 'center', padding: '2.5rem 1rem', color: 'var(--text-muted)' }}>
+                لا توجد مهام افتقاد مطابقة للفلاتر الحالية. اضغط على "تشغيل كاشف الغائبين" للتحقق التلقائي.
+              </div>
+            ) : (
+              tasks.map((t) => {
+                const isUrgent = t.priority === 'Urgent' || t.status === 'Escalated';
+                const isHigh = t.priority === 'High';
+                const cleanPhone = t.member_phone ? t.member_phone.replace(/\s+/g, '') : '';
+                const mapLink = getMapsUrl(t.member_location_url, t.member_area);
+
+                return (
+                  <div
+                    key={t.task_id}
+                    className="glass-card"
+                    style={{
+                      padding: '1rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.75rem',
+                      opacity: t.status === 'Completed' ? 0.75 : 1,
+                      borderRight: isUrgent ? '4px solid #ef4444' : isHigh ? '4px solid #fbbf24' : '4px solid #38bdf8'
+                    }}
+                  >
+                    {/* Top Row: Name, Stage & Status Badge */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: '1.05rem', color: 'var(--text-main)' }}>
+                          {t.member_name}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '2px', flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                            ({t.member_id})
+                          </span>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                            • {t.member_stage}
+                          </span>
+                          {t.assigned_servant_name && (
+                            <span style={{ fontSize: '0.72rem', color: '#38bdf8', background: 'rgba(56, 189, 248, 0.1)', padding: '1px 6px', borderRadius: '4px' }}>
+                              الخادم: {t.assigned_servant_name}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <span className={`badge ${t.status === 'Completed' ? 'badge-success' : t.status === 'Escalated' ? 'badge-danger' : 'badge-warning'}`} style={{ fontSize: '0.75rem', flexShrink: 0 }}>
+                        {t.status === 'Completed' ? 'تم الافتقاد ✓' : t.status === 'Escalated' ? 'متصاعد لأمين الخدمة' : 'قيد المتابعة'}
+                      </span>
+                    </div>
+
+                    {/* Middle Row: Absence duration & Priority & Area */}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', alignItems: 'center' }}>
+                      <span className="badge" style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', fontWeight: 800, fontSize: '0.75rem' }}>
+                        غائب {t.consecutive_weeks} أسابيع ⚠️
+                      </span>
+
+                      <span
+                        className="badge"
+                        style={{
+                          background: isUrgent ? 'rgba(239, 68, 68, 0.2)' : isHigh ? 'rgba(251, 191, 36, 0.2)' : 'rgba(56, 189, 248, 0.15)',
+                          color: isUrgent ? '#ef4444' : isHigh ? '#fbbf24' : '#38bdf8',
+                          fontSize: '0.75rem'
+                        }}
+                      >
+                        {isUrgent ? 'عاجل 🔴' : isHigh ? 'عالي 🟡' : 'عادي 🔵'}
+                      </span>
+
+                      {t.member_area && (
+                        <span style={{
+                          fontSize: '0.75rem',
+                          padding: '2px 8px',
+                          background: 'rgba(168, 85, 247, 0.12)',
+                          color: '#c084fc',
+                          borderRadius: '4px',
+                          border: '1px solid rgba(168, 85, 247, 0.3)',
+                          fontWeight: 700
+                        }}>
+                          📍 {t.member_area}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Direct Contact Bar (Call, WhatsApp, Maps, Gmail) */}
+                    <div style={{
+                      display: 'flex',
+                      gap: '0.5rem',
+                      alignItems: 'center',
+                      background: 'rgba(255, 255, 255, 0.03)',
+                      padding: '0.5rem',
+                      borderRadius: '8px',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap'
+                    }}>
+                      <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                        {cleanPhone ? (
+                          <>
+                            <a
+                              href={`tel:${cleanPhone}`}
+                              className="btn btn-secondary"
+                              style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', color: '#34d399', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                              title="اتصال هاتفي مباشر"
+                            >
+                              <Phone size={14} />
+                              <span>اتصال</span>
+                            </a>
+                            <WhatsAppButton
+                              phone={cleanPhone}
+                              memberName={t.member_name}
+                              memberId={t.member_id}
+                              template="absence"
+                              variant="icon"
+                            />
+                          </>
+                        ) : (
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>لا يوجد هاتف</span>
+                        )}
+
+                        {mapLink && (
+                          <a
+                            href={mapLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn btn-secondary"
+                            style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', color: '#38bdf8', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                            title="فتح على Google Maps"
+                          >
+                            <MapPin size={14} />
+                            <span>الموقع</span>
+                          </a>
+                        )}
+
+                        {t.member_email && (
+                          <a
+                            href={getGmailUrl(t.member_email, `افتقاد واطمئنان - كنيسة المسلة`, `سلام ونعمة يا ${t.member_name}، بنطمن عليك واشتقنا لوجودك معانا في الكنيسة.`)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn btn-secondary"
+                            style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', color: '#ea4335', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                            title={`إرسال إيميل: ${t.member_email}`}
+                          >
+                            <Mail size={14} />
+                            <span>إيميل</span>
+                          </a>
+                        )}
+                      </div>
+
+                      <span style={{ fontFamily: 'monospace', fontSize: '0.72rem', color: '#38bdf8' }}>
+                        {t.task_id}
+                      </span>
+                    </div>
+
+                    {/* Bottom Actions Row */}
+                    <div style={{ display: 'grid', gridTemplateColumns: t.status !== 'Escalated' && t.status !== 'Completed' ? '1fr 1fr 1fr' : '1fr 1fr', gap: '0.4rem', marginTop: '0.25rem' }}>
+                      <button
+                        onClick={() => { setActiveLogTask(t); setLogFormData({ contact_method: 'Phone', outcome: 'Promised', notes: '' }); }}
+                        className="btn btn-primary"
+                        style={{ padding: '0.45rem 0.5rem', fontSize: '0.82rem', justifyContent: 'center' }}
+                      >
+                        توثيق 📝
+                      </button>
+
+                      <button
+                        onClick={() => handleOpenHistory(t)}
+                        className="btn btn-secondary"
+                        style={{ padding: '0.45rem 0.5rem', fontSize: '0.82rem', justifyContent: 'center' }}
+                      >
+                        السجل 📋
+                      </button>
+
+                      {t.status !== 'Escalated' && t.status !== 'Completed' && (
+                        <button
+                          onClick={() => handleEscalateTask(t.task_id)}
+                          className="btn btn-secondary"
+                          style={{ padding: '0.45rem 0.5rem', fontSize: '0.82rem', color: '#f87171', justifyContent: 'center' }}
+                        >
+                          تصعيد ⚡
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </>
       )}
 
       {/* 4. VIEW B: Area Grouped View (تقسيم الافتقاد حسب المناطق السكنية) */}
@@ -926,7 +1123,7 @@ export const FollowupManagement = () => {
                 </div>
 
                 {/* Area Children Cards Grid */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(280px, 100%), 1fr))', gap: '1rem' }}>
                   {grp.tasks.map((t) => (
                     <div
                       key={t.task_id}

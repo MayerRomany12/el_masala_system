@@ -78,10 +78,31 @@ export const ClassManagement = () => {
     }
     try {
       await apiClient.delete(`/classes/${cls.class_id}`);
-      notifySuccess(`تم حذف فصل "${cls.name}" بنجاح`);
+      notifySuccess(`تم حذف فصل "${cls.name}" بنجاح ولن يعود مجدداً`);
       fetchClasses(true);
     } catch (err) {
       notifyError(err.response?.data?.detail || err.response?.data?.message || 'فشل حذف الفصل');
+    }
+  };
+
+  const handleWipeAllClassesAndAttendance = async () => {
+    const confirm1 = window.confirm('⚠️ تحذير شديد الأهمية:\n\nهل تريد مسح جميع الفصول وجلسات وسجلات الحضور السابقة نهائياً للبدء على نظافة؟\n\nلن تعود الفصول المحذوفة مجدداً بعد هذا الإجراء.');
+    if (!confirm1) return;
+    const confirm2 = window.prompt('للتأكيد النهائي، اكتب كلمة "نظافة" في المربع أدناه:');
+    if (confirm2 !== 'نظافة') {
+      alert('تم إلغاء عملية المسح.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await apiClient.post('/classes/wipe-clean');
+      notifySuccess(res.data?.message || 'تم مسح الفصول وجلسات الحضور بنجاح');
+      fetchClasses(true);
+    } catch (err) {
+      notifyError(err.response?.data?.detail || err.response?.data?.message || 'فشلت عملية مسح البيانات');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -136,6 +157,18 @@ export const ClassManagement = () => {
         </div>
 
         <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+          {(user?.role === 'Super Admin' || user?.role === 'Admin') && (
+            <button
+              className="btn btn-secondary"
+              onClick={handleWipeAllClassesAndAttendance}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', color: '#fca5a5', borderColor: 'rgba(239, 68, 68, 0.3)' }}
+              title="مسح كافة الفصول القديمة وجلسات الحضور للبدء على نظافة تامة"
+            >
+              <Trash2 size={15} />
+              <span>مسح الفصول والحضور (بدء على نظافة) 🧹</span>
+            </button>
+          )}
+
           <button
             className="btn btn-secondary"
             onClick={() => fetchClasses(true)}

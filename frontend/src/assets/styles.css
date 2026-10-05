@@ -757,3 +757,22 @@ select.form-control option {
     display: flex;
   }
 }
+
+/* Followup Responsive Views */
+.followup-desktop-view {
+  display: block;
+}
+.followup-mobile-view {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .followup-desktop-view {
+    display: none !important;
+  }
+  .followup-mobile-view {
+    display: flex !important;
+    flex-direction: column;
+    gap: 0.85rem;
+  }
+}

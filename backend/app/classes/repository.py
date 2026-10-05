@@ -410,6 +410,50 @@ class ClassRepository:
         await self.db.flush()
         return True
 
+    async def wipe_all_classes_and_attendance(self) -> Dict[str, Any]:
+        """
+        مسح جميع الفصول وجلسات وسجلات الحضور السابقة للبدء على نظافة تامة
+        """
+        from app.models.setting import SystemSetting
+        # 1. Clean attendance
+        await self.db.execute(text("DELETE FROM attendance_records"))
+        await self.db.execute(text("DELETE FROM attendance_session_servants"))
+        await self.db.execute(text("DELETE FROM attendance_sessions"))
+
+        # 2. Clean followup
+        await self.db.execute(text("DELETE FROM followup_logs"))
+        await self.db.execute(text("DELETE FROM followup_tasks"))
+
+        # 3. Clean classes associations
+        await self.db.execute(text("DELETE FROM class_group_members"))
+        await self.db.execute(text("DELETE FROM class_group_servants"))
+        try:
+            await self.db.execute(text("DELETE FROM event_target_classes"))
+        except Exception:
+            pass
+
+        # 4. Clean class groups
+        await self.db.execute(text("DELETE FROM class_groups"))
+
+        # 5. Ensure classes_seeded_once is set so nothing gets auto-re-seeded
+        q_seeded = await self.db.execute(
+            select(SystemSetting).where(SystemSetting.key == "classes_seeded_once")
+        )
+        existing_s = q_seeded.scalar_one_or_none()
+        if existing_s:
+            existing_s.value = "true"
+        else:
+            self.db.add(SystemSetting(
+                key="classes_seeded_once",
+                value="true",
+                description="تم عمل التهيئة الأولى للفصول - يمنع إعادة زرع الفصول المحذوفة"
+            ))
+
+        await self.db.commit()
+        return {
+            "message": "تم مسح جميع الفصول وجلسات الحضور السابقة بنجاح. يمكنك الآن إضافة فصولك الجديدة على نظافة تامة ولن تعود الفصول المحذوفة مجدداً."
+        }
+
     def _row_to_dict(self, cg: ClassGroup) -> Dict[str, Any]:
         status_val = getattr(cg, "status", "Active")
         return {

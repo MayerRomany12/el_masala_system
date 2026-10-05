@@ -91,6 +91,16 @@ async def delete_class_group(
     return success_response(data=None, message="تم حذف الفصل بنجاح")
 
 
+@router.post("/wipe-clean", response_model=dict)
+async def wipe_all_classes_and_attendance(
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_permission("classes:manage"))
+):
+    service = ClassService(db)
+    result = await service.wipe_all_classes_and_attendance()
+    return success_response(data=result, message=result["message"])
+
+
 # Servants Management
 @router.get("/{class_id}/servants", response_model=dict)
 async def list_class_servants(

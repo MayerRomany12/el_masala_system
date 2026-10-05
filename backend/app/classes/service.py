@@ -54,6 +54,9 @@ class ClassService:
     async def delete_class_group(self, class_id: str) -> bool:
         return await self.repo.delete_class_group(class_id)
 
+    async def wipe_all_classes_and_attendance(self) -> Dict[str, Any]:
+        return await self.repo.wipe_all_classes_and_attendance()
+
     # Servant Management
     async def assign_servant(self, class_id: str, data: AssignServantRequest) -> Dict[str, Any]:
         existing = await self.repo.get_by_id(class_id)

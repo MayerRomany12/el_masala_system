@@ -150,36 +150,53 @@ async def init_db():
             elif key == "church_name" and ("مارجرجس" not in (existing_s.value or "")):
                 existing_s.value = val
 
-        # ─── Seed 13 Default ClassGroups (slug = stable identity, name = editable) ───
+        # ─── Seed Default ClassGroups (Only on VERY FIRST DB initialization) ───
         from app.models.class_group import ClassGroup
-        DEFAULT_CLASSES = [
-            ("CLS-KG",           "KG",               "حضانة"),
-            ("CLS-PRI-12",       "PRIMARY_1_2",       "أولى وتانية ابتدائي"),
-            ("CLS-PRI-34",       "PRIMARY_3_4",       "تالتة ورابعة ابتدائي"),
-            ("CLS-PRI-56",       "PRIMARY_5_6",       "خامسة وسادسة ابتدائي"),
-            ("CLS-PREP-1",       "PREP_1",            "أولى إعدادي"),
-            ("CLS-PREP-2",       "PREP_2",            "تانية إعدادي"),
-            ("CLS-PREP-3",       "PREP_3",            "تالتة إعدادي"),
-            ("CLS-SEC-1",        "SECONDARY_1",       "أولى ثانوي"),
-            ("CLS-SEC-2",        "SECONDARY_2",       "تانية ثانوي"),
-            ("CLS-SEC-3",        "SECONDARY_3",       "تالتة ثانوي"),
-            ("CLS-UNI",          "UNIVERSITY_GRADS",  "جامعيين وخريجين"),
-            ("CLS-DEACONS",      "DEACONS_HYMNS",     "حصة ألحان الشمامسة"),
-            ("CLS-LITURGY",      "DIVINE_LITURGY",    "قداس إلهي"),
-        ]
-        for class_id, slug, name in DEFAULT_CLASSES:
-            existing = await session.execute(
-                select(ClassGroup).where(ClassGroup.slug == slug)
-            )
-            if not existing.scalar_one_or_none():
-                session.add(ClassGroup(
-                    class_id=class_id,
-                    slug=slug,
-                    name=name,
-                    group_type="Standard",
-                    status="Active",
-                ))
-                logger.info(f"Seeded default class: [{slug}] {name}")
+        q_classes_seeded = await session.execute(
+            select(setting.SystemSetting).where(setting.SystemSetting.key == "classes_seeded_once")
+        )
+        classes_already_seeded = q_classes_seeded.scalar_one_or_none()
+
+        if not classes_already_seeded:
+            # Check if there are any existing classes
+            q_any = await session.execute(select(func.count()).select_from(ClassGroup))
+            existing_classes_count = q_any.scalar_one()
+
+            if existing_classes_count == 0:
+                DEFAULT_CLASSES = [
+                    ("CLS-KG",           "KG",               "حضانة"),
+                    ("CLS-PRI-12",       "PRIMARY_1_2",       "أولى وتانية ابتدائي"),
+                    ("CLS-PRI-34",       "PRIMARY_3_4",       "تالتة ورابعة ابتدائي"),
+                    ("CLS-PRI-56",       "PRIMARY_5_6",       "خامسة وسادسة ابتدائي"),
+                    ("CLS-PREP-1",       "PREP_1",            "أولى إعدادي"),
+                    ("CLS-PREP-2",       "PREP_2",            "تانية إعدادي"),
+                    ("CLS-PREP-3",       "PREP_3",            "تالتة إعدادي"),
+                    ("CLS-SEC-1",        "SECONDARY_1",       "أولى ثانوي"),
+                    ("CLS-SEC-2",        "SECONDARY_2",       "تانية ثانوي"),
+                    ("CLS-SEC-3",        "SECONDARY_3",       "تالتة ثانوي"),
+                    ("CLS-UNI",          "UNIVERSITY",        "جامعيين"),
+                    ("CLS-GRADS",        "GRADUATES",         "خريجين"),
+                    ("CLS-DEACONS",      "DEACONS_HYMNS",     "حصة ألحان الشمامسة"),
+                    ("CLS-LITURGY",      "DIVINE_LITURGY",    "قداس إلهي"),
+                ]
+                for class_id, slug, name in DEFAULT_CLASSES:
+                    session.add(ClassGroup(
+                        class_id=class_id,
+                        slug=slug,
+                        name=name,
+                        group_type="Standard",
+                        status="Active",
+                    ))
+                logger.info("Seeded initial default classes on first database setup.")
+
+            # Record that the one-time initial seed is done
+            session.add(setting.SystemSetting(
+                key="classes_seeded_once",
+                value="true",
+                description="تم عمل التهيئة الأولى للفصول - يمنع إعادة زرع الفصول المحذوفة"
+            ))
+        else:
+            logger.info("Default classes initial seeding already done previously. Skipping to preserve deletions.")
         # ─────────────────────────────────────────────────────────────────────────────
 
         # ─── Seed Default Residential Areas (Aswan) ───

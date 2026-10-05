@@ -93,8 +93,9 @@ export const getMapsUrl = (locationUrl, fallbackArea = '') => {
   if (locationUrl && locationUrl.trim().startsWith('http')) {
     return locationUrl.trim();
   }
-  const query = (locationUrl || fallbackArea || '').trim();
-  if (!query) return '#';
+  const cleanArea = (fallbackArea || '').replace('غير محدد', '').trim();
+  const query = (locationUrl || cleanArea).trim();
+  if (!query) return null;
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query + ' أسوان')}`;
 };
 
