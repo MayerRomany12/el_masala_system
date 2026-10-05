@@ -14,7 +14,9 @@ import {
   AlertCircle,
   CheckCircle,
   Layers,
-  Trash2
+  Trash2,
+  Edit3,
+  X
 } from 'lucide-react';
 
 export const ClassManagement = () => {
@@ -103,6 +105,57 @@ export const ClassManagement = () => {
       notifyError(err.response?.data?.detail || err.response?.data?.message || 'فشلت عملية مسح البيانات');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // ─── Edit Class State & Handlers ──────────────────────────────────────────
+  const [editingClass, setEditingClass] = useState(null);
+  const [editForm, setEditForm] = useState({
+    name: '',
+    stage: '',
+    group_type: 'Regular',
+    season_id: '',
+    educational_year: '',
+    description: ''
+  });
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const handleOpenEdit = (cls) => {
+    setEditingClass(cls);
+    setEditForm({
+      name: cls.name || '',
+      stage: cls.stage || '',
+      group_type: cls.group_type || 'Regular',
+      season_id: cls.season_id || '',
+      educational_year: cls.educational_year || '',
+      description: cls.description || ''
+    });
+  };
+
+  const handleSaveEdit = async (e) => {
+    e.preventDefault();
+    if (!editForm.name.trim()) {
+      notifyError('يرجى كتابة اسم الفصل');
+      return;
+    }
+    setSavingEdit(true);
+    try {
+      const payload = {
+        name: editForm.name.trim(),
+        stage: editForm.stage || null,
+        group_type: editForm.group_type,
+        season_id: editForm.season_id || null,
+        educational_year: editForm.educational_year || null,
+        description: editForm.description || null
+      };
+      await apiClient.put(`/classes/${editingClass.class_id}`, payload);
+      notifySuccess(`تم تحديث اسم وبيانات فصل "${editForm.name}" بنجاح ✨`);
+      setEditingClass(null);
+      fetchClasses(true);
+    } catch (err) {
+      notifyError(err.response?.data?.detail || err.response?.data?.message || 'فشل تحديث بيانات الفصل');
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -463,13 +516,25 @@ export const ClassManagement = () => {
                   </div>
 
                   {/* Actions */}
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', gap: '0.45rem', alignItems: 'center' }}>
                     <button
                       className="btn btn-primary"
                       style={{ flex: 1, padding: '0.5rem', fontSize: '0.85rem', justifyContent: 'center' }}
                       onClick={() => navigate(`/classes/${cls.class_id}`)}
                     >
                       عرض التفاصيل والأعضاء 📋
+                    </button>
+
+                    <button
+                      className="btn btn-secondary"
+                      style={{ padding: '0.5rem 0.65rem', color: 'var(--color-primary-light)', borderColor: 'rgba(56, 189, 248, 0.35)' }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenEdit(cls);
+                      }}
+                      title="تعديل اسم وبيانات الفصل ✏️"
+                    >
+                      <Edit3 size={15} />
                     </button>
 
                     {(user?.role === 'Super Admin' || user?.role === 'Admin') && (
@@ -490,6 +555,121 @@ export const ClassManagement = () => {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* ─── Edit Class Modal ──────────────────────────────────────────────── */}
+      {editingClass && (
+        <div className="modal-backdrop" onClick={() => setEditingClass(null)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '520px' }}>
+            <div className="modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Edit3 size={20} style={{ color: 'var(--color-gold)' }} />
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800 }}>تعديل اسم وبيانات الفصل</h3>
+              </div>
+              <button className="btn-icon" onClick={() => setEditingClass(null)}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEdit}>
+              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div style={{ background: 'rgba(56, 189, 248, 0.08)', padding: '0.65rem 0.85rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(56, 189, 248, 0.2)', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                  كود الفصل: <strong style={{ color: 'var(--color-primary-light)', fontFamily: 'monospace' }}>{editingClass.class_id}</strong>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label" style={{ fontWeight: 700 }}>
+                    اسم الفصل أو المجموعة <span style={{ color: 'var(--color-danger)' }}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    className="form-input"
+                    value={editForm.name}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="مثال: فصل أولي وثانية ابتدائي بنين"
+                  />
+                </div>
+
+                <div className="form-row-2">
+                  <div className="form-group">
+                    <label className="form-label">المرحلة الدراسية</label>
+                    <select
+                      className="form-input"
+                      value={editForm.stage}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, stage: e.target.value }))}
+                    >
+                      <option value="">عام (بدون مرحلة محددة)</option>
+                      <option value="حضانة">حضانة</option>
+                      <option value="ابتدائي">ابتدائي</option>
+                      <option value="إعدادي">إعدادي</option>
+                      <option value="ثانوي">ثانوي</option>
+                      <option value="جامعيين">جامعيين</option>
+                      <option value="خريجين">خريجين</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">نوع الخدمة</label>
+                    <select
+                      className="form-input"
+                      value={editForm.group_type}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, group_type: e.target.value }))}
+                    >
+                      <option value="Regular">⛪ مدارس أحد (أساسي)</option>
+                      <option value="Summer">☀️ نشاط صيفي</option>
+                      <option value="General">🌟 عام</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">الموسم الخدمي</label>
+                  <select
+                    className="form-input"
+                    value={editForm.season_id}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, season_id: e.target.value }))}
+                  >
+                    <option value="">بدون موسم محدد</option>
+                    {seasons.map(s => (
+                      <option key={s.season_id} value={s.season_id}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">الوصف أو الملاحظات</label>
+                  <textarea
+                    className="form-input"
+                    rows={2}
+                    value={editForm.description}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, description: e.target.value }))}
+                    placeholder="وصف مختصر لطبيعة الفصل أو ميعاد ومكان الانعقاد..."
+                  />
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setEditingClass(null)}
+                  disabled={savingEdit}
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={savingEdit}
+                  style={{ gap: '0.4rem', fontWeight: 700 }}
+                >
+                  {savingEdit ? 'جاري الحفظ...' : 'حفظ التعديلات ✨'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

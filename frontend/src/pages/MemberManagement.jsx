@@ -672,9 +672,10 @@ export const MemberManagement = () => {
         </div>
       )}
 
-      {/* 4. Members Table */}
+      {/* 4. Members Table & Mobile Card List */}
       <div className="glass-card" style={{ padding: 0, overflow: 'hidden' }}>
-        <div className="table-container">
+        {/* Desktop Table View */}
+        <div className="members-desktop-view table-container">
           <table className="custom-table">
             <thead>
               <tr>
@@ -897,6 +898,200 @@ export const MemberManagement = () => {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile View: High-Performance Cards */}
+        <div className="members-mobile-view" style={{ display: 'none', flexDirection: 'column' }}>
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)' }}>
+              جاري تحميل بيانات المخدومين...
+            </div>
+          ) : members.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)' }}>
+              لا يوجد مخدومين يطابقون خيارات البحث الحالية.
+            </div>
+          ) : (
+            members.map((member) => (
+              <div
+                key={member.member_id}
+                style={{
+                  padding: '1rem',
+                  borderBottom: '1px solid var(--border-subtle)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.75rem'
+                }}
+              >
+                {/* Header: Photo, Name, ID, Status */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.6rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                    <div style={{
+                      width: '42px',
+                      height: '42px',
+                      borderRadius: '50%',
+                      background: '#334155',
+                      border: '1.5px solid #38bdf8',
+                      overflow: 'hidden',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0
+                    }}>
+                      {member.photo_url ? (
+                        <img src={getPhotoUrl(member.photo_url)} alt={member.full_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ) : (
+                        <span style={{ fontSize: '1.05rem', color: '#38bdf8', fontWeight: 'bold' }}>{member.full_name.charAt(0)}</span>
+                      )}
+                    </div>
+                    <div>
+                      <Link
+                        to={`/members/${member.member_id}`}
+                        style={{ fontWeight: 800, color: 'var(--text-main)', fontSize: '0.98rem', textDecoration: 'none' }}
+                      >
+                        {member.full_name}
+                      </Link>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '2px', flexWrap: 'wrap' }}>
+                        <span style={{
+                          fontFamily: 'monospace',
+                          fontSize: '0.76rem',
+                          fontWeight: 700,
+                          color: '#38bdf8',
+                          background: 'rgba(56, 189, 248, 0.1)',
+                          padding: '1px 5px',
+                          borderRadius: '4px'
+                        }}>
+                          {member.member_id}
+                        </span>
+                        {member.area && (
+                          <span style={{ fontSize: '0.7rem', padding: '1px 6px', background: 'rgba(168, 85, 247, 0.15)', color: '#c084fc', borderRadius: '4px', fontWeight: 600 }}>
+                            {member.area}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    {member.is_archived ? (
+                      <span className="badge badge-danger">مؤرشف</span>
+                    ) : (
+                      getStatusBadge(member.status)
+                    )}
+                  </div>
+                </div>
+
+                {/* Stage and Classes */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap', fontSize: '0.8rem' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>المرحلة / الفصل:</span>
+                  {member.active_classes && member.active_classes.length > 0 ? (
+                    member.active_classes.map((ac) => (
+                      <span
+                        key={ac.class_id}
+                        className="badge"
+                        style={{
+                          fontSize: '0.75rem',
+                          padding: '0.15rem 0.45rem',
+                          background: ac.group_type === 'Summer' ? 'rgba(245, 158, 11, 0.18)' : 'rgba(122, 8, 29, 0.25)',
+                          color: ac.group_type === 'Summer' ? '#fbbf24' : 'var(--color-gold-light)',
+                          border: ac.group_type === 'Summer' ? '1px solid rgba(245, 158, 11, 0.35)' : '1px solid rgba(212, 175, 55, 0.35)'
+                        }}
+                      >
+                        {ac.class_name}
+                      </span>
+                    ))
+                  ) : (
+                    <strong style={{ color: 'var(--text-main)' }}>{member.stage || 'عام'} {member.group_name ? `• ${member.group_name}` : ''}</strong>
+                  )}
+                </div>
+
+                {/* Direct Contact Row */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '0.5rem',
+                  padding: '0.5rem 0.75rem',
+                  background: 'var(--bg-secondary)',
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid var(--border-subtle)'
+                }}>
+                  <a
+                    href={`tel:${member.phone}`}
+                    style={{ color: '#38bdf8', textDecoration: 'none', fontWeight: 700, fontSize: '0.88rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                  >
+                    <Phone size={14} />
+                    <span dir="ltr">{member.phone}</span>
+                  </a>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <WhatsAppButton
+                      phone={member.whatsapp_phone || member.phone}
+                      memberName={member.full_name}
+                      memberId={member.member_id}
+                      template="card"
+                      variant="button"
+                    />
+                  </div>
+                </div>
+
+                {/* Mobile Actions Toolbar */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.4rem', paddingTop: '0.2rem' }}>
+                  <button
+                    onClick={() => navigate(`/members/${member.member_id}`)}
+                    className="btn btn-secondary"
+                    style={{ padding: '0.45rem', fontSize: '0.78rem', justifyContent: 'center', gap: '4px' }}
+                    title="عرض الملف الكامل"
+                  >
+                    <Eye size={14} />
+                    <span>الملف</span>
+                  </button>
+
+                  <button
+                    onClick={() => handlePrintMember(member.member_id)}
+                    className="btn btn-secondary"
+                    style={{ padding: '0.45rem', fontSize: '0.78rem', justifyContent: 'center', gap: '4px', color: '#60a5fa' }}
+                    title="طباعة الاستمارة الشاملة"
+                  >
+                    <Printer size={14} />
+                    <span>طباعة</span>
+                  </button>
+
+                  <button
+                    onClick={async () => {
+                      try {
+                        const cardRes = await membersApi.getMemberCard(member.member_id);
+                        if (cardRes && cardRes.data) {
+                          setCreatedMember(cardRes.data);
+                        } else {
+                          setCreatedMember(member);
+                        }
+                      } catch (e) {
+                        setCreatedMember(member);
+                      }
+                    }}
+                    className="btn btn-secondary"
+                    style={{ padding: '0.45rem', fontSize: '0.78rem', justifyContent: 'center', gap: '4px', color: '#38bdf8' }}
+                    title="كارت QR"
+                  >
+                    <QrCode size={14} />
+                    <span>QR</span>
+                  </button>
+
+                  {hasPermission('members:write') && (
+                    <button
+                      onClick={() => handleOpenEdit(member)}
+                      className="btn btn-secondary"
+                      style={{ padding: '0.45rem', fontSize: '0.78rem', justifyContent: 'center', gap: '4px' }}
+                      title="تعديل البيانات"
+                    >
+                      <Edit size={14} />
+                      <span>تعديل</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
 

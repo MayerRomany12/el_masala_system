@@ -247,7 +247,9 @@ export const MemberFormPage = () => {
       phone: normalizePhone(formData.phone),
       secondary_phone: formData.secondary_phone ? normalizePhone(formData.secondary_phone) : null,
       member_phone: formData.member_phone ? normalizePhone(formData.member_phone) : null,
-      whatsapp_phone: formData.member_phone ? normalizePhone(formData.member_phone) : normalizePhone(formData.phone)
+      whatsapp_phone: (formData.whatsapp_phone && formData.whatsapp_phone.trim() && normalizePhone(formData.whatsapp_phone) !== normalizePhone(formData.phone))
+        ? normalizePhone(formData.whatsapp_phone)
+        : null
     };
 
     try {

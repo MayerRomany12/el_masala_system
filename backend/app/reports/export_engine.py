@@ -218,6 +218,17 @@ def generate_member_profile_html(
         </tr>
         '''
 
+    phone_val = member.get("phone") or ""
+    wa_val = member.get("whatsapp_phone") or ""
+    phone_digits = "".join(filter(str.isdigit, phone_val))
+    wa_digits = "".join(filter(str.isdigit, wa_val))
+
+    if wa_val and wa_digits and wa_digits != phone_digits:
+        phone_html = f'''<div><strong>رقم ولي الأمر:</strong> {phone_val or "—"}</div>
+                <div><strong>رقم واتساب إضافي:</strong> {wa_val}</div>'''
+    else:
+        phone_html = f'''<div><strong>رقم ولي الأمر والواتساب:</strong> {phone_val or "—"}</div>'''
+
     html_content = f'''<!DOCTYPE html>
 <html dir="rtl" lang="ar">
 <head>
@@ -268,8 +279,7 @@ def generate_member_profile_html(
             <div class="grid-2">
                 <div><strong>الفصول الخدمية:</strong> {classes_str}</div>
                 <div><strong>المنطقة السكنية:</strong> {member.get("area") or "غير محدد"}</div>
-                <div><strong>رقم ولي الأمر:</strong> {member.get("phone") or "—"}</div>
-                <div><strong>رقم الواتساب:</strong> {member.get("whatsapp_phone") or "—"}</div>
+                {phone_html}
                 <div><strong>البريد الإلكتروني:</strong> {member.get("email") or "—"}</div>
                 <div><strong>أب الاعتراف:</strong> {member.get("father_of_confession") or "—"}</div>
                 <div><strong>تاريخ الميلاد:</strong> {str(member.get("date_of_birth") or "—")}</div>

@@ -4,7 +4,7 @@ import QRCode from 'qrcode';
 import { membersApi } from '../api/members';
 import { apiClient } from '../api/client';
 import { getPhotoUrl } from '../utils/photo';
-import { getWaUrl, getGmailUrl, getMapsUrl } from '../utils/phone';
+import { getWaUrl, getGmailUrl, getMapsUrl, getWaDigits } from '../utils/phone';
 import {
   ArrowRight,
   Edit,
@@ -718,7 +718,11 @@ export const MemberProfilePage = () => {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.9rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.5rem' }}>
-                <span style={{ color: 'var(--text-muted)' }}>هاتف ولي الأمر:</span>
+                <span style={{ color: 'var(--text-muted)' }}>
+                  {(!member.whatsapp_phone || getWaDigits(member.whatsapp_phone) === getWaDigits(member.phone))
+                    ? 'هاتف وواتساب ولي الأمر:'
+                    : 'هاتف ولي الأمر:'}
+                </span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   <span style={{ fontWeight: 700, fontFamily: 'monospace', dir: 'ltr' }}>{member.phone}</span>
                   <a href={`tel:${member.phone}`} className="btn-icon" style={{ padding: '4px', color: '#38bdf8' }} title="اتصال هاتفي">
@@ -730,7 +734,7 @@ export const MemberProfilePage = () => {
                 </div>
               </div>
 
-              {member.secondary_phone && (
+              {member.secondary_phone && getWaDigits(member.secondary_phone) !== getWaDigits(member.phone) && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.5rem' }}>
                   <span style={{ color: 'var(--text-muted)' }}>هاتف إضافي:</span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -745,7 +749,7 @@ export const MemberProfilePage = () => {
                 </div>
               )}
 
-              {member.member_phone && (
+              {member.member_phone && getWaDigits(member.member_phone) !== getWaDigits(member.phone) && getWaDigits(member.member_phone) !== getWaDigits(member.secondary_phone) && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.5rem' }}>
                   <span style={{ color: 'var(--text-muted)' }}>هاتف المخدوم نفسه:</span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -760,9 +764,13 @@ export const MemberProfilePage = () => {
                 </div>
               )}
 
-              {member.whatsapp_phone && (
+              {member.whatsapp_phone &&
+                getWaDigits(member.whatsapp_phone) &&
+                getWaDigits(member.whatsapp_phone) !== getWaDigits(member.phone) &&
+                getWaDigits(member.whatsapp_phone) !== getWaDigits(member.secondary_phone) &&
+                getWaDigits(member.whatsapp_phone) !== getWaDigits(member.member_phone) && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: 'var(--text-muted)' }}>واتساب مخصص:</span>
+                  <span style={{ color: 'var(--text-muted)' }}>واتساب مخصص آخر:</span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                     <span style={{ fontWeight: 700, color: 'var(--color-success)', fontFamily: 'monospace', dir: 'ltr' }}>
                       {member.whatsapp_phone}

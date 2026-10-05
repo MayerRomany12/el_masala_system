@@ -19,7 +19,8 @@ import {
   X,
   FileSpreadsheet,
   Copy,
-  Check
+  Check,
+  Edit3
 } from 'lucide-react';
 
 export const ClassDetailsPage = () => {
@@ -55,6 +56,59 @@ export const ClassDetailsPage = () => {
   const [selectedServantId, setSelectedServantId] = useState('');
   const [servantRoleTitle, setServantRoleTitle] = useState('خادم الفصل');
   const [addingServant, setAddingServant] = useState(false);
+
+  // Edit Class Modal state
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editForm, setEditForm] = useState({
+    name: '',
+    stage: '',
+    group_type: 'Regular',
+    season_id: '',
+    educational_year: '',
+    description: ''
+  });
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const handleOpenEdit = () => {
+    if (!classData) return;
+    setEditForm({
+      name: classData.name || '',
+      stage: classData.stage || '',
+      group_type: classData.group_type || 'Regular',
+      season_id: classData.season_id || '',
+      educational_year: classData.educational_year || '',
+      description: classData.description || ''
+    });
+    setIsEditModalOpen(true);
+  };
+
+  const handleSaveEdit = async (e) => {
+    e.preventDefault();
+    if (!editForm.name.trim()) {
+      alert('يرجى كتابة اسم الفصل');
+      return;
+    }
+    setSavingEdit(true);
+    try {
+      const payload = {
+        name: editForm.name.trim(),
+        stage: editForm.stage || null,
+        group_type: editForm.group_type,
+        season_id: editForm.season_id || null,
+        educational_year: editForm.educational_year || null,
+        description: editForm.description || null
+      };
+      const res = await apiClient.put(`/classes/${id}`, payload);
+      const updated = res.data?.data || res.data;
+      setClassData(prev => ({ ...prev, ...updated }));
+      setIsEditModalOpen(false);
+      alert('تم تحديث اسم وبيانات الفصل بنجاح ✨');
+    } catch (err) {
+      alert(err.response?.data?.detail || err.response?.data?.message || 'فشل تحديث بيانات الفصل');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
 
   const fetchClassDetails = useCallback(async () => {
     setLoading(true);
@@ -271,6 +325,16 @@ export const ClassDetailsPage = () => {
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
             <button
+              onClick={handleOpenEdit}
+              className="btn btn-secondary"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}
+              title="تعديل اسم وبيانات الفصل"
+            >
+              <Edit3 size={16} />
+              <span>تعديل الفصل ✏️</span>
+            </button>
+
+            <button
               onClick={() => setIsBroadcastModalOpen(true)}
               className="btn btn-secondary"
               style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', color: '#34d399', borderColor: 'rgba(52, 211, 153, 0.3)' }}
@@ -417,121 +481,226 @@ export const ClassDetailsPage = () => {
               </button>
             </div>
           ) : (
-            <div className="table-container">
-              <table className="custom-table" style={{ width: '100%' }}>
-                <thead>
-                  <tr>
-                    <th>المخدوم</th>
-                    <th>كود ID</th>
-                    <th>المنطقة</th>
-                    <th>الهاتف والواتساب</th>
-                    <th>المجموعة</th>
-                    <th style={{ textAlign: 'left' }}>إجراءات</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredMembers.map((m) => {
-                    const memberId = m.member_id || m.id;
-                    return (
-                      <tr key={memberId}>
-                        <td>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                            <div style={{
-                              width: '32px', height: '32px', borderRadius: '50%',
-                              background: 'var(--bg-secondary)', overflow: 'hidden',
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              fontWeight: 700, fontSize: '0.8rem', color: 'var(--color-gold)', flexShrink: 0
-                            }}>
-                              {m.photo_url ? (
-                                <img src={getPhotoUrl(m.photo_url)} alt={m.full_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                              ) : (
-                                m.full_name?.charAt(0)
+            <>
+              {/* Desktop Table View */}
+              <div className="class-members-desktop-view table-container">
+                <table className="custom-table" style={{ width: '100%' }}>
+                  <thead>
+                    <tr>
+                      <th>المخدوم</th>
+                      <th>كود ID</th>
+                      <th>المنطقة</th>
+                      <th>الهاتف والواتساب</th>
+                      <th>المجموعة</th>
+                      <th style={{ textAlign: 'left' }}>إجراءات</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredMembers.map((m) => {
+                      const memberId = m.member_id || m.id;
+                      return (
+                        <tr key={memberId}>
+                          <td>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                              <div style={{
+                                width: '32px', height: '32px', borderRadius: '50%',
+                                background: 'var(--bg-secondary)', overflow: 'hidden',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                fontWeight: 700, fontSize: '0.8rem', color: 'var(--color-gold)', flexShrink: 0
+                              }}>
+                                {m.photo_url ? (
+                                  <img src={getPhotoUrl(m.photo_url)} alt={m.full_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                ) : (
+                                  m.full_name?.charAt(0)
+                                )}
+                              </div>
+                              <div>
+                                <Link
+                                  to={`/members/${memberId}`}
+                                  style={{ fontWeight: 700, color: 'var(--text-main)', textDecoration: 'none' }}
+                                  className="hover:underline"
+                                >
+                                  {m.full_name}
+                                </Link>
+                              </div>
+                            </div>
+                          </td>
+                          <td>
+                            <span style={{ fontFamily: 'monospace', fontSize: '0.8rem', color: 'var(--color-primary-light)' }}>
+                              {memberId}
+                            </span>
+                          </td>
+                          <td>
+                            {m.area ? (
+                              <span style={{
+                                fontSize: '0.75rem',
+                                padding: '2px 6px',
+                                background: 'rgba(168, 85, 247, 0.12)',
+                                color: '#c084fc',
+                                borderRadius: '4px',
+                                border: '1px solid rgba(168, 85, 247, 0.3)',
+                                fontWeight: 700
+                              }}>
+                                {m.area}
+                              </span>
+                            ) : (
+                              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>—</span>
+                            )}
+                          </td>
+                          <td>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <span style={{ fontFamily: 'monospace', fontSize: '0.82rem', dir: 'ltr' }}>{m.phone}</span>
+                              {m.phone && (
+                                <a
+                                  href={getWaUrl(m.whatsapp_phone || m.phone)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  title="واتساب"
+                                  style={{ color: 'var(--color-success)' }}
+                                >
+                                  <MessageSquare size={14} />
+                                </a>
                               )}
                             </div>
-                            <div>
-                              <Link
-                                to={`/members/${memberId}`}
-                                style={{ fontWeight: 700, color: 'var(--text-main)', textDecoration: 'none' }}
-                                className="hover:underline"
-                              >
-                                {m.full_name}
-                              </Link>
-                            </div>
-                          </div>
-                        </td>
-                        <td>
-                          <span style={{ fontFamily: 'monospace', fontSize: '0.8rem', color: 'var(--color-primary-light)' }}>
-                            {memberId}
-                          </span>
-                        </td>
-                        <td>
-                          {m.area ? (
-                            <span style={{
-                              fontSize: '0.75rem',
-                              padding: '2px 6px',
-                              background: 'rgba(168, 85, 247, 0.12)',
-                              color: '#c084fc',
-                              borderRadius: '4px',
-                              border: '1px solid rgba(168, 85, 247, 0.3)',
-                              fontWeight: 700
-                            }}>
-                              {m.area}
+                          </td>
+                          <td>
+                            <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                              {m.group_name || '—'}
                             </span>
-                          ) : (
-                            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>—</span>
-                          )}
-                        </td>
-                        <td>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <span style={{ fontFamily: 'monospace', fontSize: '0.82rem', dir: 'ltr' }}>{m.phone}</span>
-                            {m.phone && (
-                              <a
-                                href={getWaUrl(m.whatsapp_phone || m.phone)}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                title="واتساب"
-                                style={{ color: 'var(--color-success)' }}
+                          </td>
+                          <td style={{ textAlign: 'left' }}>
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                              <button
+                                onClick={() => {
+                                  setTransferTarget(m);
+                                  setTargetClassId('');
+                                }}
+                                className="btn btn-secondary"
+                                style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem', gap: '0.3rem' }}
+                                title="نقل لفصل آخر"
                               >
-                                <MessageSquare size={14} />
-                              </a>
+                                <ArrowRightLeft size={13} />
+                                <span>نقل</span>
+                              </button>
+                              <button
+                                onClick={() => handleRemoveMember(memberId, m.full_name)}
+                                className="btn btn-secondary"
+                                style={{ padding: '0.3rem 0.5rem', color: 'var(--color-danger)', borderColor: 'rgba(239, 68, 68, 0.25)' }}
+                                title="إزالة من الفصل"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Card List View */}
+              <div className="class-members-mobile-view" style={{ display: 'none', flexDirection: 'column', gap: '0.85rem' }}>
+                {filteredMembers.map((m) => {
+                  const memberId = m.member_id || m.id;
+                  return (
+                    <div key={memberId} className="glass-card" style={{ padding: '0.9rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                          <div style={{
+                            width: '36px', height: '36px', borderRadius: '50%',
+                            background: 'var(--bg-secondary)', overflow: 'hidden',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontWeight: 700, fontSize: '0.85rem', color: 'var(--color-gold)', flexShrink: 0
+                          }}>
+                            {m.photo_url ? (
+                              <img src={getPhotoUrl(m.photo_url)} alt={m.full_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            ) : (
+                              m.full_name?.charAt(0)
                             )}
                           </div>
-                        </td>
-                        <td>
-                          <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                            {m.group_name || '—'}
-                          </span>
-                        </td>
-                        <td style={{ textAlign: 'left' }}>
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
-                            <button
-                              onClick={() => {
-                                setTransferTarget(m);
-                                setTargetClassId('');
-                              }}
-                              className="btn btn-secondary"
-                              style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem', gap: '0.3rem' }}
-                              title="نقل لفصل آخر"
+                          <div>
+                            <Link
+                              to={`/members/${memberId}`}
+                              style={{ fontWeight: 700, color: 'var(--text-main)', textDecoration: 'none', fontSize: '0.95rem' }}
                             >
-                              <ArrowRightLeft size={13} />
-                              <span>نقل</span>
-                            </button>
-                            <button
-                              onClick={() => handleRemoveMember(memberId, m.full_name)}
-                              className="btn btn-secondary"
-                              style={{ padding: '0.3rem 0.5rem', color: 'var(--color-danger)', borderColor: 'rgba(239, 68, 68, 0.25)' }}
-                              title="إزالة من الفصل"
-                            >
-                              <Trash2 size={13} />
-                            </button>
+                              {m.full_name}
+                            </Link>
+                            <div style={{ fontSize: '0.75rem', fontFamily: 'monospace', color: 'var(--color-primary-light)' }}>
+                              ID: {memberId}
+                            </div>
                           </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                        </div>
+
+                        {m.area && (
+                          <span style={{
+                            fontSize: '0.72rem',
+                            padding: '2px 6px',
+                            background: 'rgba(168, 85, 247, 0.12)',
+                            color: '#c084fc',
+                            borderRadius: '4px',
+                            border: '1px solid rgba(168, 85, 247, 0.3)',
+                            fontWeight: 700
+                          }}>
+                            {m.area}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Communication & Actions */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap', paddingTop: '0.4rem', borderTop: '1px solid var(--border-subtle)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                          {m.phone && (
+                            <a
+                              href={`tel:${m.phone}`}
+                              className="btn btn-secondary"
+                              style={{ padding: '0.35rem 0.65rem', fontSize: '0.78rem', color: '#38bdf8', gap: '0.3rem' }}
+                            >
+                              <Phone size={13} />
+                              <span dir="ltr">{m.phone}</span>
+                            </a>
+                          )}
+                          {(m.whatsapp_phone || m.phone) && (
+                            <a
+                              href={getWaUrl(m.whatsapp_phone || m.phone)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="btn btn-secondary"
+                              style={{ padding: '0.35rem 0.55rem', fontSize: '0.78rem', color: '#34d399', borderColor: 'rgba(52, 211, 153, 0.3)' }}
+                              title="واتساب"
+                            >
+                              <MessageSquare size={14} />
+                            </a>
+                          )}
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                          <button
+                            onClick={() => {
+                              setTransferTarget(m);
+                              setTargetClassId('');
+                            }}
+                            className="btn btn-secondary"
+                            style={{ padding: '0.35rem 0.65rem', fontSize: '0.78rem', gap: '0.3rem' }}
+                          >
+                            <ArrowRightLeft size={13} />
+                            <span>نقل</span>
+                          </button>
+                          <button
+                            onClick={() => handleRemoveMember(memberId, m.full_name)}
+                            className="btn btn-secondary"
+                            style={{ padding: '0.35rem 0.55rem', color: 'var(--color-danger)', borderColor: 'rgba(239, 68, 68, 0.25)' }}
+                            title="إزالة من الفصل"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
           )}
         </div>
       )}
@@ -882,6 +1051,118 @@ export const ClassDetailsPage = () => {
                 إغلاق
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Edit Class Modal ──────────────────────────────────────────────── */}
+      {isEditModalOpen && classData && (
+        <div className="modal-backdrop" onClick={() => setIsEditModalOpen(false)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '520px' }}>
+            <div className="modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Edit3 size={20} style={{ color: 'var(--color-gold)' }} />
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800 }}>تعديل اسم وبيانات الفصل</h3>
+              </div>
+              <button className="btn-icon" onClick={() => setIsEditModalOpen(false)}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEdit}>
+              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div style={{ background: 'rgba(56, 189, 248, 0.08)', padding: '0.65rem 0.85rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(56, 189, 248, 0.2)', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                  كود الفصل: <strong style={{ color: 'var(--color-primary-light)', fontFamily: 'monospace' }}>{id}</strong>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label" style={{ fontWeight: 700 }}>
+                    اسم الفصل أو المجموعة <span style={{ color: 'var(--color-danger)' }}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    className="form-input"
+                    value={editForm.name}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="مثال: فصل أولي وثانية ابتدائي بنين"
+                  />
+                </div>
+
+                <div className="form-row-2">
+                  <div className="form-group">
+                    <label className="form-label">المرحلة الدراسية</label>
+                    <select
+                      className="form-input"
+                      value={editForm.stage}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, stage: e.target.value }))}
+                    >
+                      <option value="">عام (بدون مرحلة محددة)</option>
+                      <option value="حضانة">حضانة</option>
+                      <option value="ابتدائي">ابتدائي</option>
+                      <option value="إعدادي">إعدادي</option>
+                      <option value="ثانوي">ثانوي</option>
+                      <option value="جامعيين">جامعيين</option>
+                      <option value="خريجين">خريجين</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">نوع الخدمة</label>
+                    <select
+                      className="form-input"
+                      value={editForm.group_type}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, group_type: e.target.value }))}
+                    >
+                      <option value="Regular">⛪ مدارس أحد (أساسي)</option>
+                      <option value="Summer">☀️ نشاط صيفي</option>
+                      <option value="General">🌟 عام</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">السنة الدراسية (اختياري)</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={editForm.educational_year}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, educational_year: e.target.value }))}
+                    placeholder="مثال: الصف الأول والثاني الابتدائي"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">الوصف أو الملاحظات</label>
+                  <textarea
+                    className="form-input"
+                    rows={2}
+                    value={editForm.description}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, description: e.target.value }))}
+                    placeholder="وصف مختصر لطبيعة الفصل أو ميعاد ومكان الانعقاد..."
+                  />
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setIsEditModalOpen(false)}
+                  disabled={savingEdit}
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={savingEdit}
+                  style={{ gap: '0.4rem', fontWeight: 700 }}
+                >
+                  {savingEdit ? 'جاري الحفظ...' : 'حفظ التعديلات ✨'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

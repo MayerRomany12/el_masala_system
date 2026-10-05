@@ -256,8 +256,8 @@ class ReportsService:
             raise BadRequestException(f"صيغة التصدير ({export_format}) غير مدعومة")
 
     async def generate_member_profile_report(self, member_id: str) -> str:
-        from app.members.repository import MembersRepository
-        members_repo = MembersRepository(self.db)
+        from app.members.repository import MemberRepository
+        members_repo = MemberRepository(self.db)
         member = await members_repo.get_by_id(member_id)
         if not member:
             raise BadRequestException("المخدوم غير موجود")

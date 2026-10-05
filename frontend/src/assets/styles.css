@@ -766,6 +766,22 @@ select.form-control option {
   display: none;
 }
 
+/* Members Management Responsive Views */
+.members-desktop-view {
+  display: block;
+}
+.members-mobile-view {
+  display: none;
+}
+
+/* Class Details Members Responsive Views */
+.class-members-desktop-view {
+  display: block;
+}
+.class-members-mobile-view {
+  display: none;
+}
+
 @media (max-width: 768px) {
   .followup-desktop-view {
     display: none !important;
@@ -775,4 +791,19 @@ select.form-control option {
     flex-direction: column;
     gap: 0.85rem;
   }
+
+  .members-desktop-view {
+    display: none !important;
+  }
+  .members-mobile-view {
+    display: flex !important;
+  }
+
+  .class-members-desktop-view {
+    display: none !important;
+  }
+  .class-members-mobile-view {
+    display: flex !important;
+  }
 }
+

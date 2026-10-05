@@ -434,3 +434,8 @@ class MemberRepository:
             "monthly_stats": monthly_stats
         }
 
+
+# Alias for backward compatibility
+MembersRepository = MemberRepository
+
+
