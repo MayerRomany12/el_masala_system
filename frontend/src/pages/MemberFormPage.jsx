@@ -139,13 +139,14 @@ export const MemberFormPage = () => {
     setLoading(true);
     membersApi.getMemberById(id)
       .then(res => {
-        const member = res.data || res;
+        const member = res?.data?.data || res?.data || res;
         const currentArea = member.area || '';
+        const currentClassId = member.class_id || member.active_class_id || member.active_classes?.[0]?.class_id || '';
         setFormData({
           full_name: member.full_name || '',
           gender: member.gender || 'ذكر',
           date_of_birth: member.date_of_birth || '',
-          class_id: member.active_class_id || member.class_id || '',
+          class_id: currentClassId,
           group_name: member.group_name || '',
           email: member.email || '',
           area: currentArea,
@@ -498,6 +499,11 @@ export const MemberFormPage = () => {
                 required
               >
                 <option value="">— اختر الفصل الخدمي —</option>
+                {formData.class_id && !classes.some(c => c.class_id === formData.class_id) && (
+                  <option value={formData.class_id}>
+                    الفصل المسجل به حالياً ({formData.class_id})
+                  </option>
+                )}
                 {classes.map((cls) => (
                   <option key={cls.class_id} value={cls.class_id}>
                     {cls.name} {cls.stage ? `— (${cls.stage})` : ''}

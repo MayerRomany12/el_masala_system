@@ -241,16 +241,26 @@ class ClassRepository:
 
     # ---------------- MEMBERS MANAGEMENT ---------------- #
     async def add_member(self, class_id: str, member_id: str) -> Dict[str, Any]:
+        clean_cid = class_id.strip()
+        clean_mid = member_id.strip().upper()
         # Check active membership
         res = await self.db.execute(
             select(ClassGroupMember).where(
-                ClassGroupMember.class_id == class_id,
-                ClassGroupMember.member_id == member_id,
+                func.upper(ClassGroupMember.class_id) == clean_cid.upper(),
+                func.upper(ClassGroupMember.member_id) == clean_mid,
                 ClassGroupMember.is_active == True
             )
         )
-        if res.scalar_one_or_none():
-            raise ConflictException("المخدوم مسجل بالفعل كعضو نشط في هذا الفصل")
+        existing = res.scalar_one_or_none()
+        if existing:
+            return {
+                "membership_id": existing.membership_id,
+                "class_id": existing.class_id,
+                "member_id": existing.member_id,
+                "is_active": existing.is_active,
+                "joined_at": existing.joined_at,
+                "left_at": existing.left_at
+            }
 
         now_ts = datetime.now(timezone.utc)
         max_retries = 10
@@ -259,8 +269,8 @@ class ClassRepository:
             candidate_id = f"CGM-{rand_num:06d}"
             membership = ClassGroupMember(
                 membership_id=candidate_id,
-                class_id=class_id,
-                member_id=member_id,
+                class_id=clean_cid,
+                member_id=clean_mid,
                 is_active=True,
                 joined_at=now_ts,
                 left_at=None
@@ -348,6 +358,7 @@ class ClassRepository:
         return True
 
     async def list_class_members(self, class_id: str, active_only: bool = True) -> List[Dict[str, Any]]:
+        clean_cid = class_id.strip().upper()
         query = (
             select(
                 ClassGroupMember,
@@ -355,6 +366,8 @@ class ClassRepository:
                 Member.phone,
                 Member.secondary_phone,
                 Member.member_phone,
+                Member.whatsapp_phone,
+                Member.group_name,
                 Member.stage,
                 Member.area,
                 Member.email,
@@ -362,8 +375,8 @@ class ClassRepository:
                 Member.gender,
                 Member.father_of_confession
             )
-            .join(Member, ClassGroupMember.member_id == Member.member_id)
-            .where(ClassGroupMember.class_id == class_id)
+            .join(Member, func.upper(ClassGroupMember.member_id) == func.upper(Member.member_id))
+            .where(func.upper(ClassGroupMember.class_id) == clean_cid)
             .order_by(ClassGroupMember.joined_at.desc())
         )
         if active_only:
@@ -372,7 +385,7 @@ class ClassRepository:
         res = await self.db.execute(query)
         members = []
         for row in res.all():
-            cgm, full_name, phone, secondary_phone, member_phone, stage, area, email, photo_url, gender, father_of_confession = row
+            cgm, full_name, phone, secondary_phone, member_phone, whatsapp_phone, group_name, stage, area, email, photo_url, gender, father_of_confession = row
             members.append({
                 "membership_id": cgm.membership_id,
                 "class_id": cgm.class_id,
@@ -381,6 +394,8 @@ class ClassRepository:
                 "phone": phone or member_phone or secondary_phone or "",
                 "secondary_phone": secondary_phone,
                 "member_phone": member_phone,
+                "whatsapp_phone": whatsapp_phone or "",
+                "group_name": group_name or "",
                 "stage": stage,
                 "area": area or "",
                 "email": email or "",

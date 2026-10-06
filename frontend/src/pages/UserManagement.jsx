@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import { UserPlus, RefreshCw, Shield, AlertCircle, Check, Key, X } from 'lucide-react';
+import { UserPlus, RefreshCw, Shield, AlertCircle, Check, Key, X, Trash2 } from 'lucide-react';
 
 const AVAILABLE_PERMISSIONS = [
   { key: 'members:read', label: 'قراءة وسجل الأطفال' },
@@ -49,7 +49,28 @@ export const UserManagement = () => {
   const [modalError, setModalError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const { hasPermission } = useAuth();
+  const { user: currentUser, hasPermission } = useAuth();
+
+  const handleDeleteUser = async (u) => {
+    if (u.user_id === currentUser?.user_id) {
+      alert('لا يمكنك حذف حسابك الشخصي المسجل به حالياً!');
+      return;
+    }
+    if (u.role === 'Super Admin' || u.username === 'superadmin') {
+      alert('حظر أمني: لا يمكن حذف حساب مسؤول النظام الأكبر (Super Admin)!');
+      return;
+    }
+    const confirmDelete = window.confirm(`هل أنت متأكد من حذف حساب المسؤول/الخادم (${u.full_name || u.username}) نهائياً من النظام؟\n\nلن يتمكن من تسجيل الدخول بعد الآن.`);
+    if (!confirmDelete) return;
+
+    try {
+      await apiClient.delete(`/users/${u.user_id}`);
+      setUsers(prev => prev.filter(item => item.user_id !== u.user_id));
+      alert(`تم حذف حساب (${u.full_name || u.username}) بنجاح ✨`);
+    } catch (err) {
+      alert(err.response?.data?.detail || err.response?.data?.message || 'تعذر حذف حساب المستخدم');
+    }
+  };
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -189,18 +210,19 @@ export const UserManagement = () => {
                 <th>تخصيص الصلاحيات</th>
                 <th>الحالة</th>
                 <th>تاريخ الإنشاء</th>
+                <th>إجراءات</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)' }}>
+                  <td colSpan={8} style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)' }}>
                     جاري تحميل حسابات المستخدمين...
                   </td>
                 </tr>
               ) : users.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)' }}>
+                  <td colSpan={8} style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)' }}>
                     لا يوجد مستخدمين مسجلين حالياً.
                   </td>
                 </tr>
@@ -267,6 +289,25 @@ export const UserManagement = () => {
                     </td>
                     <td style={{ color: 'var(--text-subtle)', fontSize: '0.85rem' }}>
                       {new Date(user.created_at).toLocaleDateString('ar-EG')}
+                    </td>
+                    <td>
+                      {user.role !== 'Super Admin' && user.user_id !== currentUser?.user_id && (
+                        <button
+                          onClick={() => handleDeleteUser(user)}
+                          className="btn btn-secondary"
+                          style={{
+                            padding: '0.25rem 0.55rem',
+                            fontSize: '0.75rem',
+                            color: 'var(--color-danger, #ef4444)',
+                            borderColor: 'rgba(239, 68, 68, 0.3)',
+                            gap: '0.25rem'
+                          }}
+                          title="حذف المسؤول / الخادم نهائياً"
+                        >
+                          <Trash2 size={13} />
+                          <span>حذف</span>
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))
@@ -355,8 +396,26 @@ export const UserManagement = () => {
                 </div>
               </div>
 
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-subtle)', textAlign: 'left' }}>
-                تاريخ الإنشاء: {new Date(user.created_at).toLocaleDateString('ar-EG')}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', marginTop: '0.35rem' }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-subtle)' }}>
+                  تاريخ الإنشاء: {new Date(user.created_at).toLocaleDateString('ar-EG')}
+                </div>
+                {user.role !== 'Super Admin' && user.user_id !== currentUser?.user_id && (
+                  <button
+                    onClick={() => handleDeleteUser(user)}
+                    className="btn btn-secondary"
+                    style={{
+                      padding: '0.25rem 0.6rem',
+                      fontSize: '0.75rem',
+                      color: 'var(--color-danger, #ef4444)',
+                      borderColor: 'rgba(239, 68, 68, 0.3)',
+                      gap: '0.3rem'
+                    }}
+                  >
+                    <Trash2 size={13} />
+                    <span>حذف المسؤول</span>
+                  </button>
+                )}
               </div>
             </div>
           ))

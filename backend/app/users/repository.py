@@ -2,7 +2,7 @@ from typing import Optional, List
 from datetime import datetime, timezone
 import uuid
 
-from sqlalchemy import select, update, func
+from sqlalchemy import select, update, delete, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user import User
@@ -122,3 +122,17 @@ class UserRepository:
             .values(last_login=datetime.now(timezone.utc))
         )
         await self._get_db().flush()
+
+    async def delete_user(self, user_id: str) -> bool:
+        clean_uid = user_id.strip()
+        user = await self._get_db().scalar(select(User).where(User.user_id == clean_uid))
+        if not user:
+            return False
+
+        from app.models.class_group import ClassGroupServant
+        await self._get_db().execute(
+            delete(ClassGroupServant).where(ClassGroupServant.servant_id == clean_uid)
+        )
+        await self._get_db().delete(user)
+        await self._get_db().flush()
+        return True

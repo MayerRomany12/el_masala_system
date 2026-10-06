@@ -42,6 +42,7 @@ class MemberUpdate(BaseModel):
     gender: Optional[str] = None
     date_of_birth: Optional[Union[str, date]] = None
     stage: Optional[str] = None
+    class_id: Optional[str] = None
     group_name: Optional[str] = None
     phone: Optional[str] = None
     secondary_phone: Optional[str] = None

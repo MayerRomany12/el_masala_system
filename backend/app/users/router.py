@@ -99,3 +99,17 @@ async def update_user_permissions(
         "message": "تم تحديث الصلاحيات المخصصة للمستخدم بنجاح",
         "data": UserResponse(**updated_user).model_dump()
     }
+
+
+@router.delete("/{user_id}", response_model=dict)
+async def delete_user(
+    user_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(require_permission("users:write"))
+):
+    service = UserService(db)
+    await service.delete_user(user_id, current_user_id=current_user.get("user_id", ""))
+    return {
+        "success": True,
+        "message": "تم حذف حساب المستخدم / المسؤول بنجاح"
+    }

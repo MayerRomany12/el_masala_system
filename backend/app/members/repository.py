@@ -109,6 +109,16 @@ class MemberRepository:
             }
             for r in cgm_res.all()
         ]
+        if member_dict["active_classes"]:
+            first_cls = member_dict["active_classes"][0]
+            member_dict["class_id"] = first_cls["class_id"]
+            member_dict["active_class_id"] = first_cls["class_id"]
+            member_dict["class_name"] = first_cls["class_name"]
+        else:
+            member_dict["class_id"] = None
+            member_dict["active_class_id"] = None
+            member_dict["class_name"] = None
+
         return member_dict
 
     async def get_members(
@@ -212,7 +222,16 @@ class MemberRepository:
                     "joined_at": r.joined_at.isoformat() if r.joined_at else None
                 })
             for item in items:
-                item["active_classes"] = classes_by_member.get(item["member_id"], [])
+                act = classes_by_member.get(item["member_id"], [])
+                item["active_classes"] = act
+                if act:
+                    item["class_id"] = act[0]["class_id"]
+                    item["active_class_id"] = act[0]["class_id"]
+                    item["class_name"] = act[0]["class_name"]
+                else:
+                    item["class_id"] = None
+                    item["active_class_id"] = None
+                    item["class_name"] = None
 
         return items, total
 

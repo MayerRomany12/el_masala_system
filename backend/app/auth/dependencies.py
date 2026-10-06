@@ -13,7 +13,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token")
 ROLE_PERMISSIONS = {
     RoleEnum.SUPER_ADMIN: list(ALL_PERMISSIONS),
     RoleEnum.ADMIN: [
-        "users:read",
+        "users:read", "users:write", "users:delete",
         "classes:read", "classes:manage",
         "members:read", "members:write", "members:archive",
         "cards:issue", "cards:revoke",
@@ -42,11 +42,11 @@ ROLE_PERMISSIONS = {
 
 async def get_servant_class_ids(user: dict, db: AsyncSession) -> Optional[List[str]]:
     """
-    Returns None if user is Super Admin (meaning unrestricted access to all classes).
-    Returns list of class_id strings for Admin / Servant based on active assignments.
+    Returns None if user is Super Admin or Admin (meaning unrestricted access to all classes).
+    Returns list of class_id strings for Servant based on active assignments.
     """
     role = user.get("role", RoleEnum.SERVANT)
-    if role in [RoleEnum.SUPER_ADMIN, "Super Admin"]:
+    if role in [RoleEnum.SUPER_ADMIN, "Super Admin", RoleEnum.ADMIN, "Admin"]:
         return None  # Unrestricted
 
     from app.models.class_group import ClassGroupServant

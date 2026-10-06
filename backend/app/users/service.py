@@ -68,3 +68,13 @@ class UserService:
         updated = await self.repo.update_permissions(user_id, data.custom_permissions, data.revoked_permissions)
         updated["effective_permissions"] = list(compute_effective_permissions(updated))
         return updated
+
+    async def delete_user(self, user_id: str, current_user_id: str) -> bool:
+        user = await self.get_user_by_id(user_id)
+        if not user:
+            raise NotFoundException("المستخدم غير موجود")
+        if user.get("username") == "superadmin" or user.get("role") == "Super Admin" or user.get("user_id") == "USR-SUPERADMIN-001":
+            raise BadRequestException("حظر أمني: لا يمكن حذف حساب مسؤول النظام الأكبر (Super Admin)")
+        if user_id == current_user_id:
+            raise BadRequestException("لا يمكنك حذف حسابك الشخصي أثناء تسجيل الدخول به")
+        return await self.repo.delete_user(user_id)

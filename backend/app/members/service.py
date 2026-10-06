@@ -29,6 +29,53 @@ class MemberService:
     def __init__(self, db: AsyncSession):
         self.repository = MemberRepository(db)
 
+    async def _sync_member_class(self, member_id: str, class_id: Optional[str]):
+        if not class_id or not str(class_id).strip():
+            return
+        clean_class_id = str(class_id).strip()
+        clean_member_id = member_id.strip().upper()
+
+        from app.models.class_group import ClassGroup, ClassGroupMember
+        from sqlalchemy import select, update, func
+        from datetime import datetime, timezone
+
+        # Check existing active memberships for this member
+        res = await self.repository.db.execute(
+            select(ClassGroupMember.class_id).where(
+                func.upper(ClassGroupMember.member_id) == clean_member_id,
+                ClassGroupMember.is_active == True
+            )
+        )
+        active_class_ids = [c.upper() for c in res.scalars().all()]
+
+        # If already actively in this class, nothing to do
+        if clean_class_id.upper() in active_class_ids:
+            return
+
+        # Deactivate all previous active class memberships for this member
+        now_ts = datetime.now(timezone.utc)
+        await self.repository.db.execute(
+            update(ClassGroupMember)
+            .where(
+                func.upper(ClassGroupMember.member_id) == clean_member_id,
+                ClassGroupMember.is_active == True
+            )
+            .values(is_active=False, left_at=now_ts)
+        )
+
+        # Enroll in the new class
+        from app.classes.repository import ClassRepository
+        class_repo = ClassRepository(self.repository.db)
+        await class_repo.add_member(clean_class_id, clean_member_id)
+
+        # Sync member stage to match class stage
+        cg_res = await self.repository.db.execute(
+            select(ClassGroup.stage).where(func.upper(ClassGroup.class_id) == clean_class_id.upper())
+        )
+        cls_stage = cg_res.scalar_one_or_none()
+        if cls_stage:
+            await self.repository.update_member(clean_member_id, {"stage": cls_stage})
+
     async def create_member(self, data: MemberCreate) -> Dict[str, Any]:
         from app.shared.utils import validate_full_name, is_valid_egyptian_mobile
         from datetime import datetime, timezone
@@ -84,10 +131,8 @@ class MemberService:
         try:
             created = await self.repository.create_member(member_dict)
             if class_id:
-                from app.classes.repository import ClassRepository
-                class_repo = ClassRepository(self.repository.db)
                 try:
-                    await class_repo.add_member(class_id, created["member_id"])
+                    await self._sync_member_class(created["member_id"], class_id)
                     updated_member = await self.repository.get_by_member_id(created["member_id"])
                     if updated_member:
                         created = updated_member
@@ -181,9 +226,19 @@ class MemberService:
         if "member_phone" in update_fields and update_fields["member_phone"]:
             update_fields["member_phone"] = normalize_phone_number(update_fields["member_phone"])
 
+        # Extract class_id if provided for atomic class switching
+        new_class_id = update_fields.pop("class_id", None)
+
         updated = await self.repository.update_member(member_id, update_fields)
         if not updated:
             raise NotFoundException("فشل تعديل بيانات المخدوم")
+
+        if new_class_id:
+            await self._sync_member_class(member_id, new_class_id)
+            refreshed = await self.repository.get_by_member_id(member_id)
+            if refreshed:
+                updated = refreshed
+
         return updated
 
     async def update_member_status(self, member_id: str, new_status: str) -> Dict[str, Any]:
