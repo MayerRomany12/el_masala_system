@@ -26,7 +26,8 @@ def test_role_permissions():
     servant_perms = get_permissions_for_role(RoleEnum.SERVANT)
 
     assert "users:delete" in super_admin_perms
-    assert "users:delete" not in admin_perms
+    assert "users:delete" in admin_perms
+    assert "users:permissions" not in admin_perms
     assert "users:write" not in servant_perms
     assert "attendance:scan" in servant_perms
 

@@ -58,6 +58,20 @@ async def create_attendance_session(
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="ليس لديك صلاحية لفتح جلسة حضور لهذا الفصل")
     service = AttendanceService(db)
     new_session = await service.create_session(session_in, current_user.get("user_id"))
+
+    try:
+        from app.audit.service import AuditService
+        audit_svc = AuditService(db)
+        await audit_svc.log_event(
+            action="CREATE_SESSION",
+            resource_type="Attendance",
+            resource_id=new_session.get("session_id"),
+            current_user=current_user,
+            details=f"قام بفتح جلسة حضور جديدة: {new_session.get('title')} ({new_session.get('session_id')})"
+        )
+    except Exception:
+        pass
+
     return success_response(data=new_session, message=f"تم فتح جلسة حضور جديدة بالرمز {new_session['session_id']}")
 
 
@@ -134,7 +148,22 @@ async def toggle_member_attendance(
         member_id=body.member_id,
         user_id=current_user.get("user_id")
     )
-    msg = "تم تسجيل الحضور 🟢" if result.get("is_present") else "تم تسجيل الغياب 🔴"
+    is_pres = result.get("is_present")
+    msg = "تم تسجيل الحضور 🟢" if is_pres else "تم تسجيل الغياب 🔴"
+
+    try:
+        from app.audit.service import AuditService
+        audit_svc = AuditService(db)
+        await audit_svc.log_event(
+            action="TOGGLE_ATTENDANCE",
+            resource_type="Attendance",
+            resource_id=session_id,
+            current_user=current_user,
+            details=f"قام بتسجيل {'حضور' if is_pres else 'غياب'} المخدوم {body.member_id} في الجلسة {session_id}"
+        )
+    except Exception:
+        pass
+
     return success_response(data=result, message=msg)
 
 

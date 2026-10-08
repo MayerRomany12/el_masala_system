@@ -44,6 +44,20 @@ async def create_user(
 ):
     service = UserService(db)
     new_user = await service.create_user(body)
+
+    try:
+        from app.audit.service import AuditService
+        audit_svc = AuditService(db)
+        await audit_svc.log_event(
+            action="CREATE_USER",
+            resource_type="User",
+            resource_id=new_user.get("user_id"),
+            current_user=current_user,
+            details=f"قام بإنشاء حساب مستخدم جديد: {new_user.get('username')} ({new_user.get('full_name')}) بدور {new_user.get('role')}"
+        )
+    except Exception:
+        pass
+
     return {
         "success": True,
         "message": "تم إنشاء حساب المستخدم بنجاح",
@@ -75,6 +89,20 @@ async def update_user(
 ):
     service = UserService(db)
     updated_user = await service.update_user(user_id, body)
+
+    try:
+        from app.audit.service import AuditService
+        audit_svc = AuditService(db)
+        await audit_svc.log_event(
+            action="UPDATE_USER",
+            resource_type="User",
+            resource_id=user_id,
+            current_user=current_user,
+            details=f"قام بتعديل بيانات المستخدم: {updated_user.get('username')} ({user_id})"
+        )
+    except Exception:
+        pass
+
     return {
         "success": True,
         "message": "تم تحديث بيانات المستخدم بنجاح",
@@ -94,6 +122,20 @@ async def update_user_permissions(
     """
     service = UserService(db)
     updated_user = await service.update_permissions(user_id, body)
+
+    try:
+        from app.audit.service import AuditService
+        audit_svc = AuditService(db)
+        await audit_svc.log_event(
+            action="UPDATE_PERMISSIONS",
+            resource_type="User",
+            resource_id=user_id,
+            current_user=current_user,
+            details=f"قام بتحديث الصلاحيات المخصصة للمستخدم: {user_id}"
+        )
+    except Exception:
+        pass
+
     return {
         "success": True,
         "message": "تم تحديث الصلاحيات المخصصة للمستخدم بنجاح",
@@ -109,6 +151,20 @@ async def delete_user(
 ):
     service = UserService(db)
     await service.delete_user(user_id, current_user_id=current_user.get("user_id", ""))
+
+    try:
+        from app.audit.service import AuditService
+        audit_svc = AuditService(db)
+        await audit_svc.log_event(
+            action="DELETE_USER",
+            resource_type="User",
+            resource_id=user_id,
+            current_user=current_user,
+            details=f"قام بحذف حساب المستخدم {user_id}"
+        )
+    except Exception:
+        pass
+
     return {
         "success": True,
         "message": "تم حذف حساب المستخدم / المسؤول بنجاح"

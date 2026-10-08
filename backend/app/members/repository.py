@@ -121,6 +121,8 @@ class MemberRepository:
 
         return member_dict
 
+    get_by_id = get_by_member_id
+
     async def get_members(
         self,
         search: Optional[str] = None,

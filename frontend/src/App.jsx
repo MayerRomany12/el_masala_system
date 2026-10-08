@@ -24,6 +24,7 @@ import { ClassManagement } from './pages/ClassManagement';
 import { ClassFormPage } from './pages/ClassFormPage';
 import { ClassDetailsPage } from './pages/ClassDetailsPage';
 import { SummerActivityManagement } from './pages/SummerActivityManagement';
+import { AuditLogsPage } from './pages/AuditLogsPage';
 
 const ProtectedLayout = () => {
   const { user, loading } = useAuth();
@@ -81,6 +82,7 @@ const ProtectedLayout = () => {
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/birthdays" element={<BirthdayManagement />} />
             <Route path="/reports" element={<ReportManagement />} />
+            <Route path="/audit-logs" element={<AuditLogsPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>

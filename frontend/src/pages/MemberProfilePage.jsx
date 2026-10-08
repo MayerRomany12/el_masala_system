@@ -507,7 +507,7 @@ export const MemberProfilePage = () => {
                   fontWeight: 700
                 }}
               >
-                {cls}
+                {typeof cls === 'object' ? (cls.class_name || cls.name || cls.class_id) : String(cls || '')}
               </span>
             ))
           ) : (
@@ -815,7 +815,7 @@ export const MemberProfilePage = () => {
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontWeight: 700 }}>
                       <span style={{ color: 'var(--text-muted)' }}>شهر: {m.month}</span>
                       <span style={{ color: m.rate >= 75 ? '#22c55e' : m.rate >= 50 ? '#eab308' : '#ef4444' }}>
-                        {m.present} حاضر / {m.total} جلسات ({m.rate}%)
+                        {m.attended ?? m.present ?? 0} حاضر / {m.total} جلسات ({m.rate}%)
                       </span>
                     </div>
 
@@ -861,43 +861,48 @@ export const MemberProfilePage = () => {
 
             <div style={{ maxHeight: '280px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               {history?.timeline && history.timeline.length > 0 ? (
-                history.timeline.map((item, idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '0.55rem 0.75rem',
-                      background: item.status === 'حاضر' ? 'rgba(34, 197, 94, 0.08)' : 'rgba(239, 68, 68, 0.08)',
-                      border: `1px solid ${item.status === 'حاضر' ? 'rgba(34, 197, 94, 0.25)' : 'rgba(239, 68, 68, 0.25)'}`,
-                      borderRadius: '8px',
-                      fontSize: '0.82rem'
-                    }}
-                  >
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                      <span style={{ fontWeight: 700, color: 'var(--text-main)' }}>
-                        {item.class_name} - {item.session_title || 'جلسة الأحد'}
-                      </span>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                        📅 {item.date} {item.method ? `• ${item.method}` : ''}
-                      </span>
-                    </div>
-
-                    <span
+                history.timeline.map((item, idx) => {
+                  const isAttended = item.attended === true || item.status === 'حاضر';
+                  const sessionDate = item.session_date || item.date || '—';
+                  const sessionTitle = item.title || item.session_title || 'جلسة الأحد';
+                  return (
+                    <div
+                      key={idx}
                       style={{
-                        padding: '0.2rem 0.55rem',
-                        borderRadius: '6px',
-                        fontWeight: 800,
-                        fontSize: '0.8rem',
-                        background: item.status === 'حاضر' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)',
-                        color: item.status === 'حاضر' ? '#86efac' : '#fca5a5'
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '0.55rem 0.75rem',
+                        background: isAttended ? 'rgba(34, 197, 94, 0.08)' : 'rgba(239, 68, 68, 0.08)',
+                        border: `1px solid ${isAttended ? 'rgba(34, 197, 94, 0.25)' : 'rgba(239, 68, 68, 0.25)'}`,
+                        borderRadius: '8px',
+                        fontSize: '0.82rem'
                       }}
                     >
-                      {item.status}
-                    </span>
-                  </div>
-                ))
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        <span style={{ fontWeight: 700, color: 'var(--text-main)' }}>
+                          {item.class_name || 'الفصل'} - {sessionTitle}
+                        </span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                          📅 {sessionDate} {item.method ? `• ${item.method}` : ''}
+                        </span>
+                      </div>
+
+                      <span
+                        style={{
+                          padding: '0.2rem 0.55rem',
+                          borderRadius: '6px',
+                          fontWeight: 800,
+                          fontSize: '0.8rem',
+                          background: isAttended ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                          color: isAttended ? '#86efac' : '#fca5a5'
+                        }}
+                      >
+                        {isAttended ? 'حاضر' : 'غائب'}
+                      </span>
+                    </div>
+                  );
+                })
               ) : (
                 <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
                   لا توجد جلسات مسجلة

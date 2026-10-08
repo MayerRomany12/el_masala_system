@@ -27,6 +27,20 @@ async def create_member(
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="ليس لديك صلاحية لإضافة مخدوم في هذا الفصل")
     service = MemberService(db)
     new_member = await service.create_member(member_in)
+
+    try:
+        from app.audit.service import AuditService
+        audit_svc = AuditService(db)
+        await audit_svc.log_event(
+            action="CREATE_MEMBER",
+            resource_type="Member",
+            resource_id=new_member.get("member_id"),
+            current_user=current_user,
+            details=f"قام بإضافة مخدوم جديد: {new_member.get('full_name')} (كود: {new_member.get('member_id')})"
+        )
+    except Exception:
+        pass
+
     return success_response(
         data=new_member,
         message=f"تم تسجيل المخدوم بنجاح بالرمز الفريد {new_member['member_id']}"
@@ -153,6 +167,20 @@ async def update_member(
 ):
     service = MemberService(db)
     updated = await service.update_member(member_id, update_in)
+
+    try:
+        from app.audit.service import AuditService
+        audit_svc = AuditService(db)
+        await audit_svc.log_event(
+            action="UPDATE_MEMBER",
+            resource_type="Member",
+            resource_id=member_id,
+            current_user=current_user,
+            details=f"قام بتعديل بيانات المخدوم {updated.get('full_name', member_id)} ({member_id})"
+        )
+    except Exception:
+        pass
+
     return success_response(data=updated, message="تم تحديث بيانات المخدوم بنجاح")
 
 
@@ -165,6 +193,20 @@ async def update_member_status(
 ):
     service = MemberService(db)
     updated = await service.update_member_status(member_id, status_in.status)
+
+    try:
+        from app.audit.service import AuditService
+        audit_svc = AuditService(db)
+        await audit_svc.log_event(
+            action="UPDATE_MEMBER_STATUS",
+            resource_type="Member",
+            resource_id=member_id,
+            current_user=current_user,
+            details=f"قام بتغيير حالة المخدوم {member_id} إلى {status_in.status}"
+        )
+    except Exception:
+        pass
+
     return success_response(data=updated, message=f"تم تغيير حالة المخدوم إلى {status_in.status}")
 
 
@@ -178,6 +220,20 @@ async def archive_member(
     service = MemberService(db)
     updated = await service.archive_member(member_id, is_archived, current_user.get("user_id"))
     msg = "تم أرشفة حساب المخدوم وتأمينه بنجاح" if is_archived else "تم إلغاء أرشفة حساب المخدوم وإعادته للنظام"
+
+    try:
+        from app.audit.service import AuditService
+        audit_svc = AuditService(db)
+        await audit_svc.log_event(
+            action="ARCHIVE_MEMBER" if is_archived else "UNARCHIVE_MEMBER",
+            resource_type="Member",
+            resource_id=member_id,
+            current_user=current_user,
+            details=f"قام بـ{'أرشفة' if is_archived else 'إلغاء أرشفة'} المخدوم {member_id}"
+        )
+    except Exception:
+        pass
+
     return success_response(data=updated, message=msg)
 
 

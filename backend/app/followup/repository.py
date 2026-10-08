@@ -439,24 +439,30 @@ class FollowupRepository:
     async def distribute_class_tasks(self, class_id: str) -> Dict[str, Any]:
         """
         توزيع مهام الافتقاد الخاصة بأعضاء الفصل بالتساوي على الخدام النشطين المسكنين فيه (Round-Robin)
+        مع استبعاد السوبر أدمن تلقائياً (السوبر أدمن يتابع فقط ولا يفتقد).
         """
-        from app.models.class_group import ClassGroupServant, ClassGroupMember
+        from app.models.class_group import ClassGroupServant, ClassGroupMember, ClassGroup
         from app.models.user import User
 
-        # 1. Fetch active servants in this class
+        # Fetch class info
+        c_res = await self.db.execute(select(ClassGroup.name).where(ClassGroup.class_id == class_id))
+        class_name = c_res.scalar_one_or_none() or class_id
+
+        # 1. Fetch active servants in this class (EXCLUDING SUPER ADMIN)
         s_query = (
             select(User.user_id, User.full_name)
             .join(ClassGroupServant, User.user_id == ClassGroupServant.servant_id)
             .where(
                 ClassGroupServant.class_id == class_id,
                 ClassGroupServant.is_active == True,
-                User.is_active == True
+                User.is_active == True,
+                ~User.role.in_(["SuperAdmin", "Super Admin"])
             )
             .order_by(User.full_name)
         )
         servants = (await self.db.execute(s_query)).all()
         if not servants:
-            raise AppException("لا يوجد خدام نشطون مسجلون في هذا الفصل لتوزيع المهام عليهم")
+            raise AppException(f"لا يوجد خدام (غير السوبر أدمن) مسجلون بنشاط في فصل '{class_name}' لتوزيع المهام عليهم")
 
         # 2. Fetch active members of this class
         m_query = select(ClassGroupMember.member_id).where(
@@ -465,7 +471,7 @@ class FollowupRepository:
         )
         class_member_ids = (await self.db.execute(m_query)).scalars().all()
         if not class_member_ids:
-            return {"distributed_count": 0, "message": "لا يوجد مخدومين في هذا الفصل", "per_servant": {}}
+            return {"distributed_count": 0, "message": "لا يوجد مخدومين في هذا الفصل", "per_servant": []}
 
         # 3. Fetch pending/unassigned or pending tasks for these members
         t_query = select(FollowupTask).where(
@@ -475,9 +481,9 @@ class FollowupRepository:
 
         tasks = (await self.db.execute(t_query)).scalars().all()
         if not tasks:
-            return {"distributed_count": 0, "message": "لا توجد مهام افتقاد معلقة لهذا الفصل", "per_servant": {}}
+            return {"distributed_count": 0, "message": "لا توجد مهام افتقاد معلقة لهذا الفصل", "per_servant": []}
 
-        per_servant_counts = {s[0]: {"servant_name": s[1], "count": 0} for s in servants}
+        per_servant_counts = {s[0]: {"servant_id": s[0], "servant_name": s[1], "count": 0} for s in servants}
         for idx, task in enumerate(tasks):
             assigned_servant = servants[idx % len(servants)]
             task.assigned_servant_id = assigned_servant[0]
@@ -488,9 +494,27 @@ class FollowupRepository:
 
         return {
             "class_id": class_id,
+            "class_name": class_name,
             "total_tasks": len(tasks),
             "servants_count": len(servants),
             "distribution": list(per_servant_counts.values())
+        }
+
+    async def detect_and_distribute_class(self, class_id: str) -> Dict[str, Any]:
+        """
+        كشف الغياب لفصل محدد ثم توزيعه تلقائياً بالتساوي على خدام الفصل
+        """
+        detect_res = await self.run_absence_detector(class_id=class_id)
+        dist_res = await self.distribute_class_tasks(class_id=class_id)
+        return {
+            "class_id": class_id,
+            "detected_count": detect_res.get("detected_count", 0),
+            "tasks_created": detect_res.get("tasks_created", 0),
+            "tasks_updated": detect_res.get("tasks_updated", 0),
+            "total_tasks": dist_res.get("total_tasks", 0),
+            "servants_count": dist_res.get("servants_count", 0),
+            "distribution": dist_res.get("distribution", []),
+            "message": f"تم كشف وتوزيع {dist_res.get('total_tasks', 0)} مهمة افتقاد بالتساوي على {dist_res.get('servants_count', 0)} من خدام الفصل."
         }
 
     async def get_class_followup_stats(self, class_id: str) -> Dict[str, Any]:

@@ -51,6 +51,20 @@ async def create_class_group(
 ):
     service = ClassService(db)
     class_group = await service.create_class_group(data)
+
+    try:
+        from app.audit.service import AuditService
+        audit_svc = AuditService(db)
+        await audit_svc.log_event(
+            action="CREATE_CLASS",
+            resource_type="Class",
+            resource_id=class_group.get("class_id"),
+            current_user=current_user,
+            details=f"قام بإنشاء فصل جديد: {class_group.get('name')} ({class_group.get('class_id')})"
+        )
+    except Exception:
+        pass
+
     return success_response(data=class_group, message="تم إنشاء الفصل/المجموعة بنجاح")
 
 
@@ -77,6 +91,20 @@ async def update_class_group(
 ):
     service = ClassService(db)
     class_group = await service.update_class_group(class_id, data)
+
+    try:
+        from app.audit.service import AuditService
+        audit_svc = AuditService(db)
+        await audit_svc.log_event(
+            action="UPDATE_CLASS",
+            resource_type="Class",
+            resource_id=class_id,
+            current_user=current_user,
+            details=f"قام بتعديل بيانات الفصل: {class_group.get('name') if isinstance(class_group, dict) else class_id} ({class_id})"
+        )
+    except Exception:
+        pass
+
     return success_response(data=class_group, message="تم تحديث بيانات الفصل بنجاح")
 
 
@@ -88,6 +116,20 @@ async def delete_class_group(
 ):
     service = ClassService(db)
     await service.delete_class_group(class_id)
+
+    try:
+        from app.audit.service import AuditService
+        audit_svc = AuditService(db)
+        await audit_svc.log_event(
+            action="DELETE_CLASS",
+            resource_type="Class",
+            resource_id=class_id,
+            current_user=current_user,
+            details=f"قام بحذف/أرشفة الفصل {class_id}"
+        )
+    except Exception:
+        pass
+
     return success_response(data=None, message="تم حذف الفصل بنجاح")
 
 
@@ -126,6 +168,20 @@ async def assign_servant(
 ):
     service = ClassService(db)
     result = await service.assign_servant(class_id, data)
+
+    try:
+        from app.audit.service import AuditService
+        audit_svc = AuditService(db)
+        await audit_svc.log_event(
+            action="ASSIGN_SERVANT",
+            resource_type="Class",
+            resource_id=class_id,
+            current_user=current_user,
+            details=f"قام بتسكين الخادم {data.servant_id} في الفصل {class_id} بدور {data.role}"
+        )
+    except Exception:
+        pass
+
     return success_response(data=result, message="تم تعيين الخادم للفصل بنجاح")
 
 
@@ -138,6 +194,20 @@ async def unassign_servant(
 ):
     service = ClassService(db)
     await service.unassign_servant(class_id, servant_id)
+
+    try:
+        from app.audit.service import AuditService
+        audit_svc = AuditService(db)
+        await audit_svc.log_event(
+            action="REMOVE_SERVANT",
+            resource_type="Class",
+            resource_id=class_id,
+            current_user=current_user,
+            details=f"قام بإلغاء تسكين الخادم {servant_id} من الفصل {class_id}"
+        )
+    except Exception:
+        pass
+
     return success_response(data=None, message="تم إخراج الخادم من الفصل بنجاح")
 
 
@@ -169,6 +239,20 @@ async def add_member(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="ليس لديك صلاحية لإضافة مخدوم لهذا الفصل")
     service = ClassService(db)
     result = await service.add_member(class_id, data)
+
+    try:
+        from app.audit.service import AuditService
+        audit_svc = AuditService(db)
+        await audit_svc.log_event(
+            action="ENROLL_MEMBER",
+            resource_type="Class",
+            resource_id=class_id,
+            current_user=current_user,
+            details=f"قام بتسكين المخدوم {data.member_id} في الفصل {class_id}"
+        )
+    except Exception:
+        pass
+
     return success_response(data=result, message="تم إضافة المخدوم للفصل بنجاح")
 
 
@@ -180,6 +264,20 @@ async def transfer_member(
 ):
     service = ClassService(db)
     result = await service.transfer_member(data)
+
+    try:
+        from app.audit.service import AuditService
+        audit_svc = AuditService(db)
+        await audit_svc.log_event(
+            action="TRANSFER_MEMBER",
+            resource_type="Class",
+            resource_id=data.member_id,
+            current_user=current_user,
+            details=f"قام بنقل المخدوم {data.member_id} من فصل {data.from_class_id} إلى فصل {data.to_class_id}"
+        )
+    except Exception:
+        pass
+
     return success_response(data=result, message="تم نقل المخدوم بين الفصول بنجاح مع حفظ السجل التاريخي 🔄")
 
 
@@ -195,4 +293,18 @@ async def remove_member(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="ليس لديك صلاحية لإزالة مخدوم من هذا الفصل")
     service = ClassService(db)
     await service.remove_member(class_id, member_id)
+
+    try:
+        from app.audit.service import AuditService
+        audit_svc = AuditService(db)
+        await audit_svc.log_event(
+            action="UNENROLL_MEMBER",
+            resource_type="Class",
+            resource_id=class_id,
+            current_user=current_user,
+            details=f"قام بإلغاء تسكين المخدوم {member_id} من الفصل {class_id}"
+        )
+    except Exception:
+        pass
+
     return success_response(data=None, message="تم إنهاء عضوية المخدوم بالفصل بنجاح")

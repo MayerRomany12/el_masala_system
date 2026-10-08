@@ -116,6 +116,9 @@ class FollowupService:
     async def distribute_class_tasks(self, class_id: str) -> Dict[str, Any]:
         return await self.repo.distribute_class_tasks(class_id)
 
+    async def detect_and_distribute_class(self, class_id: str) -> Dict[str, Any]:
+        return await self.repo.detect_and_distribute_class(class_id)
+
     async def get_class_followup_stats(self, class_id: str) -> Dict[str, Any]:
         return await self.repo.get_class_followup_stats(class_id)
 

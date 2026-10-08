@@ -44,6 +44,20 @@ async def deliver_gift(
 ):
     service = BirthdayService(db)
     result = await service.deliver_gift(deliver_in, current_user.get("user_id"))
+
+    try:
+        from app.audit.service import AuditService
+        audit_svc = AuditService(db)
+        await audit_svc.log_event(
+            action="DELIVER_GIFT",
+            resource_type="Birthday",
+            resource_id=deliver_in.member_id,
+            current_user=current_user,
+            details=f"قام بتسليم هدية عيد الميلاد ({deliver_in.gift_name or 'هدية عيد ميلاد'}) للمخدوم {deliver_in.member_id}"
+        )
+    except Exception as e:
+        pass
+
     return success_response(data=result, message="تم توثيق تسليم هدية عيد الميلاد بنجاح 🎁")
 
 

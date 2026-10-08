@@ -258,7 +258,7 @@ class ReportsService:
     async def generate_member_profile_report(self, member_id: str) -> str:
         from app.members.repository import MemberRepository
         members_repo = MemberRepository(self.db)
-        member = await members_repo.get_by_id(member_id)
+        member = await members_repo.get_by_member_id(member_id)
         if not member:
             raise BadRequestException("المخدوم غير موجود")
         history = await members_repo.get_member_attendance_history(member_id)

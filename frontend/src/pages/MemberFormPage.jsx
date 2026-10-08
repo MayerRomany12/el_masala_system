@@ -5,12 +5,14 @@ import { apiClient } from '../api/client';
 import { normalizePhone, isValidFullName, isValidEgyptianMobile } from '../utils/phone';
 import { getPhotoUrl } from '../utils/photo';
 import { PhotoCropperModal } from '../components/PhotoCropperModal';
+import { LocationPickerModal } from '../components/LocationPickerModal';
 import {
   ArrowRight,
   UserPlus,
   User,
   Phone,
   MapPin,
+  Navigation,
   Camera,
   Save,
   X,
@@ -40,6 +42,33 @@ export const MemberFormPage = () => {
   const [newAreaInput, setNewAreaInput] = useState('');
   const [areaOpLoading, setAreaOpLoading] = useState(false);
   const [isCustomArea, setIsCustomArea] = useState(false);
+
+  // Map & GPS Location Picker
+  const [isMapPickerOpen, setIsMapPickerOpen] = useState(false);
+  const [gpsLoading, setGpsLoading] = useState(false);
+
+  const handleGetDirectCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      alert('خدمة تحديد الموقع الجغرافي (GPS) غير مدعومة في متصفحك');
+      return;
+    }
+    setGpsLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        const mapUrl = `https://www.google.com/maps?q=${lat.toFixed(6)},${lng.toFixed(6)}`;
+        setFormData(prev => ({ ...prev, location_url: mapUrl }));
+        setGpsLoading(false);
+      },
+      (err) => {
+        console.warn('Geolocation error:', err);
+        alert('تعذر تحديد موقعك الحالي. يرجى التأكد من تفعيل إذن الموقع الجغرافي بالمتصفح.');
+        setGpsLoading(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
 
   const [formData, setFormData] = useState({
     full_name: '',
@@ -699,28 +728,81 @@ export const MemberFormPage = () => {
             </div>
 
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', flexWrap: 'wrap', gap: '4px' }}>
                 <label className="form-label" style={{ marginBottom: 0 }}>موقع السكن على Google Maps (اختياري)</label>
-                {formData.location_url && (
-                  <a
-                    href={formData.location_url.startsWith('http') ? formData.location_url : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(formData.location_url)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{ fontSize: '0.78rem', color: '#38bdf8', textDecoration: 'underline' }}
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                  <button
+                    type="button"
+                    onClick={handleGetDirectCurrentLocation}
+                    disabled={gpsLoading}
+                    className="btn btn-secondary"
+                    style={{
+                      padding: '0.2rem 0.6rem',
+                      fontSize: '0.78rem',
+                      gap: '4px',
+                      background: 'rgba(56, 189, 248, 0.12)',
+                      color: '#38bdf8',
+                      borderColor: 'rgba(56, 189, 248, 0.35)'
+                    }}
+                    title="التقاط موقعك الجغرافي الحالي (GPS) وحفظه للمخدوم فوراً بنقرة واحدة"
                   >
-                    🗺️ فتح على الخريطة
-                  </a>
+                    <Navigation size={13} />
+                    <span>{gpsLoading ? 'جاري الالتقاط...' : '📍 موقعي الحالي'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsMapPickerOpen(true)}
+                    className="btn btn-secondary"
+                    style={{
+                      padding: '0.2rem 0.6rem',
+                      fontSize: '0.78rem',
+                      gap: '4px',
+                      background: 'rgba(168, 85, 247, 0.12)',
+                      color: '#c084fc',
+                      borderColor: 'rgba(168, 85, 247, 0.35)'
+                    }}
+                    title="فتح خريطة تفاعلية لتحديد نقطة منزل المخدوم بدقة"
+                  >
+                    <MapPin size={13} />
+                    <span>🗺️ تحديد على الخريطة</span>
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={formData.location_url}
+                  onChange={(e) => setFormData({ ...formData, location_url: e.target.value })}
+                  placeholder="الصق رابط خرائط جوجل أو اضغط على أحد الأزرار بالأعلى..."
+                  dir="ltr"
+                  style={{ textAlign: 'right', paddingLeft: formData.location_url ? '6rem' : '1rem' }}
+                />
+                {formData.location_url && (
+                  <div style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <a
+                      href={formData.location_url.startsWith('http') ? formData.location_url : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(formData.location_url)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn-icon"
+                      style={{ padding: '2px 6px', fontSize: '0.72rem', color: '#38bdf8', background: 'rgba(56,189,248,0.15)', borderRadius: '4px' }}
+                      title="معاينة الرابط على Google Maps"
+                    >
+                      معاينة 🗺️
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, location_url: '' }))}
+                      style={{ background: 'transparent', border: 'none', color: '#f87171', cursor: 'pointer', padding: '2px', fontSize: '0.85rem' }}
+                      title="مسح الرابط"
+                    >
+                      ✕
+                    </button>
+                  </div>
                 )}
               </div>
-              <input
-                type="url"
-                className="form-input"
-                value={formData.location_url}
-                onChange={(e) => setFormData({ ...formData, location_url: e.target.value })}
-                placeholder="https://maps.app.goo.gl/... أو إحداثيات المكان"
-                dir="ltr"
-                style={{ textAlign: 'right' }}
-              />
             </div>
 
             <div className="form-group" style={{ marginBottom: 0 }}>
@@ -862,6 +944,16 @@ export const MemberFormPage = () => {
           </div>
         </div>
       )}
+
+      {/* Interactive Location Picker Modal */}
+      <LocationPickerModal
+        isOpen={isMapPickerOpen}
+        onClose={() => setIsMapPickerOpen(false)}
+        initialUrl={formData.location_url}
+        onSelect={(selectedUrl) => {
+          setFormData(prev => ({ ...prev, location_url: selectedUrl }));
+        }}
+      />
     </div>
   );
 };
