@@ -27,7 +27,7 @@ def test_role_permissions():
 
     assert "users:delete" in super_admin_perms
     assert "users:delete" in admin_perms
-    assert "users:permissions" not in admin_perms
+    assert "settings:write" not in admin_perms
     assert "users:write" not in servant_perms
     assert "attendance:scan" in servant_perms
 
@@ -41,6 +41,7 @@ async def test_composite_rate_limiting_lockout():
     FAILED_LOGIN_ATTEMPTS.clear()
 
     mock_db = AsyncMock()
+    mock_db.add = MagicMock()
     service = AuthService()
 
     # Mock user repository returning None (invalid user)

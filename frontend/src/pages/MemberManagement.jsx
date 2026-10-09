@@ -812,26 +812,28 @@ export const MemberManagement = () => {
                     </td>
                     <td>
                       <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem' }}>
-                        {/* Always available QR Card View / Download Button */}
-                        <button
-                          onClick={async () => {
-                            try {
-                              const cardRes = await membersApi.getMemberCard(member.member_id);
-                              if (cardRes && cardRes.data) {
-                                setCreatedMember(cardRes.data);
-                              } else {
+                        {/* QR Card View / Download Button */}
+                        {hasPermission('cards:issue') && (
+                          <button
+                            onClick={async () => {
+                              try {
+                                const cardRes = await membersApi.getMemberCard(member.member_id);
+                                if (cardRes && cardRes.data) {
+                                  setCreatedMember(cardRes.data);
+                                } else {
+                                  setCreatedMember(member);
+                                }
+                              } catch (e) {
                                 setCreatedMember(member);
                               }
-                            } catch (e) {
-                              setCreatedMember(member);
-                            }
-                          }}
-                          className="btn btn-secondary"
-                          style={{ padding: '0.35rem 0.6rem', fontSize: '0.8rem', color: '#38bdf8' }}
-                          title="عرض وتحميل رمز الـ QR والبطاقة في أي وقت"
-                        >
-                          <QrCode size={15} />
-                        </button>
+                            }}
+                            className="btn btn-secondary"
+                            style={{ padding: '0.35rem 0.6rem', fontSize: '0.8rem', color: '#38bdf8' }}
+                            title="عرض وتحميل رمز الـ QR والبطاقة في أي وقت"
+                          >
+                            <QrCode size={15} />
+                          </button>
+                        )}
 
                         <button
                           onClick={() => navigate(`/members/${member.member_id}`)}
@@ -842,17 +844,19 @@ export const MemberManagement = () => {
                           <Eye size={15} />
                         </button>
 
-                        <button
-                          onClick={() => handlePrintMember(member.member_id)}
-                          className="btn btn-secondary"
-                          style={{ padding: '0.35rem 0.6rem', fontSize: '0.8rem', color: '#60a5fa' }}
-                          title="طباعة استمارة المخدوم الشاملة (PDF)"
-                        >
-                          <Printer size={15} />
-                        </button>
+                        {hasPermission('reports:export') && (
+                          <button
+                            onClick={() => handlePrintMember(member.member_id)}
+                            className="btn btn-secondary"
+                            style={{ padding: '0.35rem 0.6rem', fontSize: '0.8rem', color: '#60a5fa' }}
+                            title="طباعة استمارة المخدوم الشاملة (PDF)"
+                          >
+                            <Printer size={15} />
+                          </button>
+                        )}
 
                         {/* Unarchive Quick Button if archived */}
-                        {member.is_archived && hasPermission('members:write') && (
+                        {member.is_archived && hasPermission('members:archive') && (
                           <button
                             onClick={async () => {
                               try {
@@ -869,7 +873,7 @@ export const MemberManagement = () => {
                         )}
 
                         {/* Status Change Button */}
-                        {hasPermission('members:write') && !member.is_archived && (
+                        {hasPermission('members:archive') && !member.is_archived && (
                           <button
                             onClick={() => setStatusModalMember(member)}
                             className="btn btn-secondary"
@@ -1035,7 +1039,7 @@ export const MemberManagement = () => {
                 </div>
 
                 {/* Mobile Actions Toolbar */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.4rem', paddingTop: '0.2rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(70px, 1fr))', gap: '0.4rem', paddingTop: '0.2rem' }}>
                   <button
                     onClick={() => navigate(`/members/${member.member_id}`)}
                     className="btn btn-secondary"
@@ -1046,36 +1050,40 @@ export const MemberManagement = () => {
                     <span>الملف</span>
                   </button>
 
-                  <button
-                    onClick={() => handlePrintMember(member.member_id)}
-                    className="btn btn-secondary"
-                    style={{ padding: '0.45rem', fontSize: '0.78rem', justifyContent: 'center', gap: '4px', color: '#60a5fa' }}
-                    title="طباعة الاستمارة الشاملة"
-                  >
-                    <Printer size={14} />
-                    <span>طباعة</span>
-                  </button>
+                  {hasPermission('reports:export') && (
+                    <button
+                      onClick={() => handlePrintMember(member.member_id)}
+                      className="btn btn-secondary"
+                      style={{ padding: '0.45rem', fontSize: '0.78rem', justifyContent: 'center', gap: '4px', color: '#60a5fa' }}
+                      title="طباعة الاستمارة الشاملة"
+                    >
+                      <Printer size={14} />
+                      <span>طباعة</span>
+                    </button>
+                  )}
 
-                  <button
-                    onClick={async () => {
-                      try {
-                        const cardRes = await membersApi.getMemberCard(member.member_id);
-                        if (cardRes && cardRes.data) {
-                          setCreatedMember(cardRes.data);
-                        } else {
+                  {hasPermission('cards:issue') && (
+                    <button
+                      onClick={async () => {
+                        try {
+                          const cardRes = await membersApi.getMemberCard(member.member_id);
+                          if (cardRes && cardRes.data) {
+                            setCreatedMember(cardRes.data);
+                          } else {
+                            setCreatedMember(member);
+                          }
+                        } catch (e) {
                           setCreatedMember(member);
                         }
-                      } catch (e) {
-                        setCreatedMember(member);
-                      }
-                    }}
-                    className="btn btn-secondary"
-                    style={{ padding: '0.45rem', fontSize: '0.78rem', justifyContent: 'center', gap: '4px', color: '#38bdf8' }}
-                    title="كارت QR"
-                  >
-                    <QrCode size={14} />
-                    <span>QR</span>
-                  </button>
+                      }}
+                      className="btn btn-secondary"
+                      style={{ padding: '0.45rem', fontSize: '0.78rem', justifyContent: 'center', gap: '4px', color: '#38bdf8' }}
+                      title="كارت QR"
+                    >
+                      <QrCode size={14} />
+                      <span>QR</span>
+                    </button>
+                  )}
 
                   {hasPermission('members:write') && (
                     <button

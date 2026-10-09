@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { settingsApi } from '../api/settings';
 import { apiClient } from '../api/client';
 import { AuditLogModal } from '../components/AuditLogModal';
@@ -19,6 +20,7 @@ import {
 } from 'lucide-react';
 
 export const SettingsPage = () => {
+  const { hasPermission } = useAuth();
   const [settings, setSettings] = useState({
     attendance_points: '10',
     event_points: '20',
@@ -320,64 +322,72 @@ export const SettingsPage = () => {
             </p>
 
             <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={handleDownloadBackup}
-                disabled={backupActionLoading}
-                style={{ padding: '0.65rem 1.25rem', gap: '8px', background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.4)' }}
-              >
-                <span>💾 تنزيل نسخة احتياطية كاملة (JSON)</span>
-              </button>
-
-              <label
-                style={{
-                  padding: '0.65rem 1.25rem',
-                  borderRadius: '8px',
-                  background: 'rgba(239, 68, 68, 0.15)',
-                  color: '#f87171',
-                  border: '1px solid rgba(239, 68, 68, 0.4)',
-                  fontWeight: '700',
-                  cursor: 'pointer',
-                  fontSize: '0.9rem',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}
-              >
-                <span>🔄 استعادة نسخة احتياطية من ملف</span>
-                <input
-                  type="file"
-                  accept=".json"
-                  onChange={handleRestoreBackup}
+              {hasPermission('settings:write') && (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={handleDownloadBackup}
                   disabled={backupActionLoading}
-                  style={{ display: 'none' }}
-                />
-              </label>
+                  style={{ padding: '0.65rem 1.25rem', gap: '8px', background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.4)' }}
+                >
+                  <span>💾 تنزيل نسخة احتياطية كاملة (JSON)</span>
+                </button>
+              )}
 
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => setShowAuditModal(true)}
-                style={{ padding: '0.65rem 1.25rem', gap: '8px', background: 'rgba(168, 85, 247, 0.15)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.4)' }}
-              >
-                <span>🛡️ عرض سجل النشاطات والتدقيق (Audit Logs)</span>
-              </button>
+              {hasPermission('settings:write') && (
+                <label
+                  style={{
+                    padding: '0.65rem 1.25rem',
+                    borderRadius: '8px',
+                    background: 'rgba(239, 68, 68, 0.15)',
+                    color: '#f87171',
+                    border: '1px solid rgba(239, 68, 68, 0.4)',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    fontSize: '0.9rem',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <span>🔄 استعادة نسخة احتياطية من ملف</span>
+                  <input
+                    type="file"
+                    accept=".json"
+                    onChange={handleRestoreBackup}
+                    disabled={backupActionLoading}
+                    style={{ display: 'none' }}
+                  />
+                </label>
+              )}
+
+              {hasPermission('audit:read') && (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setShowAuditModal(true)}
+                  style={{ padding: '0.65rem 1.25rem', gap: '8px', background: 'rgba(168, 85, 247, 0.15)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.4)' }}
+                >
+                  <span>🛡️ عرض سجل النشاطات والتدقيق (Audit Logs)</span>
+                </button>
+              )}
             </div>
           </div>
 
           {/* Submit Button */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={saving}
-              style={{ padding: '0.75rem 2rem', fontSize: '1rem', gap: '0.5rem', background: 'linear-gradient(135deg, #0284c7 0%, #38bdf8 100%)' }}
-            >
-              <Save size={20} />
-              <span>{saving ? 'جاري حفظ التغييرات...' : 'حفظ وإرسال التغييرات للنظام ⚙️'}</span>
-            </button>
-          </div>
+          {hasPermission('settings:write') && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={saving}
+                style={{ padding: '0.75rem 2rem', fontSize: '1rem', gap: '0.5rem', background: 'linear-gradient(135deg, #0284c7 0%, #38bdf8 100%)' }}
+              >
+                <Save size={20} />
+                <span>{saving ? 'جاري حفظ التغييرات...' : 'حفظ وإرسال التغييرات للنظام ⚙️'}</span>
+              </button>
+            </div>
+          )}
         </form>
       )}
 

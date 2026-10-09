@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { apiClient } from '../api/client';
 import { getPhotoUrl } from '../utils/photo';
 import { getWaUrl } from '../utils/phone';
@@ -26,6 +27,7 @@ import {
 export const ClassDetailsPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { hasPermission } = useAuth();
 
   const [classData, setClassData] = useState(null);
   const [allClasses, setAllClasses] = useState([]);
@@ -324,15 +326,17 @@ export const ClassDetailsPage = () => {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
-            <button
-              onClick={handleOpenEdit}
-              className="btn btn-secondary"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}
-              title="تعديل اسم وبيانات الفصل"
-            >
-              <Edit3 size={16} />
-              <span>تعديل الفصل ✏️</span>
-            </button>
+            {hasPermission('classes:manage') && (
+              <button
+                onClick={handleOpenEdit}
+                className="btn btn-secondary"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}
+                title="تعديل اسم وبيانات الفصل"
+              >
+                <Edit3 size={16} />
+                <span>تعديل الفصل ✏️</span>
+              </button>
+            )}
 
             <button
               onClick={() => setIsBroadcastModalOpen(true)}
@@ -433,23 +437,27 @@ export const ClassDetailsPage = () => {
           <span>خدام الفصل ({servants.length})</span>
         </button>
 
-        <button
-          onClick={() => setActiveTab('addMember')}
-          className={`btn ${activeTab === 'addMember' ? 'btn-primary' : 'btn-secondary'}`}
-          style={{ fontSize: '0.85rem', gap: '0.4rem' }}
-        >
-          <UserPlus size={16} />
-          <span>إضافة مخدوم للفصل</span>
-        </button>
+        {hasPermission('classes:manage') && (
+          <button
+            onClick={() => setActiveTab('addMember')}
+            className={`btn ${activeTab === 'addMember' ? 'btn-primary' : 'btn-secondary'}`}
+            style={{ fontSize: '0.85rem', gap: '0.4rem' }}
+          >
+            <UserPlus size={16} />
+            <span>إضافة مخدوم للفصل</span>
+          </button>
+        )}
 
-        <button
-          onClick={() => setActiveTab('addServant')}
-          className={`btn ${activeTab === 'addServant' ? 'btn-primary' : 'btn-secondary'}`}
-          style={{ fontSize: '0.85rem', gap: '0.4rem' }}
-        >
-          <Plus size={16} />
-          <span>تعيين خادم مشرف</span>
-        </button>
+        {hasPermission('classes:manage') && (
+          <button
+            onClick={() => setActiveTab('addServant')}
+            className={`btn ${activeTab === 'addServant' ? 'btn-primary' : 'btn-secondary'}`}
+            style={{ fontSize: '0.85rem', gap: '0.4rem' }}
+          >
+            <Plus size={16} />
+            <span>تعيين خادم مشرف</span>
+          </button>
+        )}
       </div>
 
       {/* Tab 1: Members List */}
@@ -492,7 +500,7 @@ export const ClassDetailsPage = () => {
                       <th>المنطقة</th>
                       <th>الهاتف والواتساب</th>
                       <th>المجموعة</th>
-                      <th style={{ textAlign: 'left' }}>إجراءات</th>
+                      {hasPermission('classes:manage') && <th style={{ textAlign: 'left' }}>إجراءات</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -568,30 +576,32 @@ export const ClassDetailsPage = () => {
                               {m.group_name || '—'}
                             </span>
                           </td>
-                          <td style={{ textAlign: 'left' }}>
-                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
-                              <button
-                                onClick={() => {
-                                  setTransferTarget(m);
-                                  setTargetClassId('');
-                                }}
-                                className="btn btn-secondary"
-                                style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem', gap: '0.3rem' }}
-                                title="نقل لفصل آخر"
-                              >
-                                <ArrowRightLeft size={13} />
-                                <span>نقل</span>
-                              </button>
-                              <button
-                                onClick={() => handleRemoveMember(memberId, m.full_name)}
-                                className="btn btn-secondary"
-                                style={{ padding: '0.3rem 0.5rem', color: 'var(--color-danger)', borderColor: 'rgba(239, 68, 68, 0.25)' }}
-                                title="إزالة من الفصل"
-                              >
-                                <Trash2 size={13} />
-                              </button>
-                            </div>
-                          </td>
+                          {hasPermission('classes:manage') && (
+                            <td style={{ textAlign: 'left' }}>
+                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                                <button
+                                  onClick={() => {
+                                    setTransferTarget(m);
+                                    setTargetClassId('');
+                                  }}
+                                  className="btn btn-secondary"
+                                  style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem', gap: '0.3rem' }}
+                                  title="نقل لفصل آخر"
+                                >
+                                  <ArrowRightLeft size={13} />
+                                  <span>نقل</span>
+                                </button>
+                                <button
+                                  onClick={() => handleRemoveMember(memberId, m.full_name)}
+                                  className="btn btn-secondary"
+                                  style={{ padding: '0.3rem 0.5rem', color: 'var(--color-danger)', borderColor: 'rgba(239, 68, 68, 0.25)' }}
+                                  title="إزالة من الفصل"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </div>
+                            </td>
+                          )}
                         </tr>
                       );
                     })}
@@ -674,27 +684,29 @@ export const ClassDetailsPage = () => {
                           )}
                         </div>
 
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                          <button
-                            onClick={() => {
-                              setTransferTarget(m);
-                              setTargetClassId('');
-                            }}
-                            className="btn btn-secondary"
-                            style={{ padding: '0.35rem 0.65rem', fontSize: '0.78rem', gap: '0.3rem' }}
-                          >
-                            <ArrowRightLeft size={13} />
-                            <span>نقل</span>
-                          </button>
-                          <button
-                            onClick={() => handleRemoveMember(memberId, m.full_name)}
-                            className="btn btn-secondary"
-                            style={{ padding: '0.35rem 0.55rem', color: 'var(--color-danger)', borderColor: 'rgba(239, 68, 68, 0.25)' }}
-                            title="إزالة من الفصل"
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                        </div>
+                        {hasPermission('classes:manage') && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <button
+                              onClick={() => {
+                                setTransferTarget(m);
+                                setTargetClassId('');
+                              }}
+                              className="btn btn-secondary"
+                              style={{ padding: '0.35rem 0.65rem', fontSize: '0.78rem', gap: '0.3rem' }}
+                            >
+                              <ArrowRightLeft size={13} />
+                              <span>نقل</span>
+                            </button>
+                            <button
+                              onClick={() => handleRemoveMember(memberId, m.full_name)}
+                              className="btn btn-secondary"
+                              style={{ padding: '0.35rem 0.55rem', color: 'var(--color-danger)', borderColor: 'rgba(239, 68, 68, 0.25)' }}
+                              title="إزالة من الفصل"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
@@ -711,10 +723,12 @@ export const ClassDetailsPage = () => {
           {servants.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '2.5rem 1rem', color: 'var(--text-muted)' }}>
               <p>لم يتم تعيين خدام مشرفين لهذا الفصل حتى الآن</p>
-              <button onClick={() => setActiveTab('addServant')} className="btn btn-secondary" style={{ fontSize: '0.85rem', marginTop: '0.5rem' }}>
-                <Plus size={15} />
-                <span>تعيين خادم مشرف</span>
-              </button>
+              {hasPermission('classes:manage') && (
+                <button onClick={() => setActiveTab('addServant')} className="btn btn-secondary" style={{ fontSize: '0.85rem', marginTop: '0.5rem' }}>
+                  <Plus size={15} />
+                  <span>تعيين خادم مشرف</span>
+                </button>
+              )}
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
@@ -748,14 +762,16 @@ export const ClassDetailsPage = () => {
                       )}
                     </div>
 
-                    <button
-                      onClick={() => handleRemoveServant(servantId, s.full_name || s.username)}
-                      className="btn btn-secondary"
-                      style={{ padding: '0.35rem 0.5rem', color: 'var(--color-danger)', borderColor: 'rgba(239, 68, 68, 0.25)' }}
-                      title="إلغاء الإشراف"
-                    >
-                      <Trash2 size={15} />
-                    </button>
+                    {hasPermission('classes:manage') && (
+                      <button
+                        onClick={() => handleRemoveServant(servantId, s.full_name || s.username)}
+                        className="btn btn-secondary"
+                        style={{ padding: '0.35rem 0.5rem', color: 'var(--color-danger)', borderColor: 'rgba(239, 68, 68, 0.25)' }}
+                        title="إلغاء الإشراف"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    )}
                   </div>
                 );
               })}

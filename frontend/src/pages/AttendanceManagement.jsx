@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
+import { useAuth } from '../context/AuthContext';
 import { apiClient } from '../api/client';
 import { attendanceApi } from '../api/attendance';
 import { membersApi } from '../api/members';
@@ -64,6 +65,8 @@ const formatArabicSessionTitle = (dateStr) => {
 };
 
 export const AttendanceManagement = () => {
+  const { hasPermission, hasAnyPermission } = useAuth();
+
   // Classes & Sessions states
   const [classesList, setClassesList] = useState([]);
   const [selectedClassId, setSelectedClassId] = useState('');
@@ -573,55 +576,61 @@ export const AttendanceManagement = () => {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
-          <button
-            onClick={() => {
-              const todayStr = new Date().toISOString().split('T')[0];
-              setSessionFormData({
-                selected_class_ids: selectedClassId ? [selectedClassId] : (classesList[0] ? [classesList[0].class_id] : []),
-                session_date: todayStr,
-                title: formatArabicSessionTitle(todayStr),
-                recurrence: 'Weekly'
-              });
-              setIsSessionModalOpen(true);
-            }}
-            className="btn btn-primary"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.88rem', fontWeight: 700 }}
-          >
-            <Plus size={16} />
-            <span>فتح جلسة حضور جديدة</span>
-          </button>
+          {hasPermission('attendance:session') && (
+            <button
+              onClick={() => {
+                const todayStr = new Date().toISOString().split('T')[0];
+                setSessionFormData({
+                  selected_class_ids: selectedClassId ? [selectedClassId] : (classesList[0] ? [classesList[0].class_id] : []),
+                  session_date: todayStr,
+                  title: formatArabicSessionTitle(todayStr),
+                  recurrence: 'Weekly'
+                });
+                setIsSessionModalOpen(true);
+              }}
+              className="btn btn-primary"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.88rem', fontWeight: 700 }}
+            >
+              <Plus size={16} />
+              <span>فتح جلسة حضور جديدة</span>
+            </button>
+          )}
 
-          <button
-            onClick={handleToggleScanner}
-            className={`btn ${cameraActive ? 'btn-danger' : 'btn-primary'}`}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.45rem',
-              fontSize: '0.88rem',
-              fontWeight: 800,
-              background: cameraActive
-                ? 'linear-gradient(135deg, #ef4444, #dc2626)'
-                : 'linear-gradient(135deg, #0284c7, #0369a1)',
-              boxShadow: cameraActive
-                ? '0 0 15px rgba(239, 68, 68, 0.45)'
-                : '0 4px 14px rgba(2, 132, 199, 0.4)',
-              color: '#ffffff'
-            }}
-          >
-            <Camera size={17} />
-            <span>{cameraActive ? 'إيقاف كاميرا الـ QR ⏹️' : 'تشغيل كاميرا الـ QR للتحضير اللحظي 📷'}</span>
-          </button>
+          {hasPermission('attendance:scan') && (
+            <button
+              onClick={handleToggleScanner}
+              className={`btn ${cameraActive ? 'btn-danger' : 'btn-primary'}`}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                fontSize: '0.88rem',
+                fontWeight: 800,
+                background: cameraActive
+                  ? 'linear-gradient(135deg, #ef4444, #dc2626)'
+                  : 'linear-gradient(135deg, #0284c7, #0369a1)',
+                boxShadow: cameraActive
+                  ? '0 0 15px rgba(239, 68, 68, 0.45)'
+                  : '0 4px 14px rgba(2, 132, 199, 0.4)',
+                color: '#ffffff'
+              }}
+            >
+              <Camera size={17} />
+              <span>{cameraActive ? 'إيقاف كاميرا الـ QR ⏹️' : 'تشغيل كاميرا الـ QR للتحضير اللحظي 📷'}</span>
+            </button>
+          )}
 
-          <button
-            onClick={handlePrintSheet}
-            disabled={!selectedSession || sheetItems.length === 0}
-            className="btn btn-secondary"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.88rem', color: '#f59e0b', borderColor: 'rgba(245, 158, 11, 0.3)' }}
-          >
-            <Printer size={16} />
-            <span>طباعة الكشف (PDF)</span>
-          </button>
+          {hasPermission('reports:export') && (
+            <button
+              onClick={handlePrintSheet}
+              disabled={!selectedSession || sheetItems.length === 0}
+              className="btn btn-secondary"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.88rem', color: '#f59e0b', borderColor: 'rgba(245, 158, 11, 0.3)' }}
+            >
+              <Printer size={16} />
+              <span>طباعة الكشف (PDF)</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -683,15 +692,17 @@ export const AttendanceManagement = () => {
                 {selectedSession.status === 'Open' ? 'الجلسة مفتوحة للتسجيل 🔓' : 'الجلسة مغلقة 🔒'}
               </span>
 
-              <button
-                type="button"
-                onClick={handleToggleSessionStatus}
-                className="btn btn-secondary"
-                style={{ fontSize: '0.82rem', padding: '0.4rem 0.75rem', gap: '4px' }}
-              >
-                {selectedSession.status === 'Open' ? <Lock size={14} /> : <Unlock size={14} />}
-                <span>{selectedSession.status === 'Open' ? 'إغلاق' : 'فتح'}</span>
-              </button>
+              {hasPermission('attendance:session') && (
+                <button
+                  type="button"
+                  onClick={handleToggleSessionStatus}
+                  className="btn btn-secondary"
+                  style={{ fontSize: '0.82rem', padding: '0.4rem 0.75rem', gap: '4px' }}
+                >
+                  {selectedSession.status === 'Open' ? <Lock size={14} /> : <Unlock size={14} />}
+                  <span>{selectedSession.status === 'Open' ? 'إغلاق' : 'فتح'}</span>
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -1068,41 +1079,55 @@ export const AttendanceManagement = () => {
 
                     {/* 5. 1-Click Interactive Attendance Toggle Button */}
                     <td style={{ textAlign: 'center' }}>
-                      <button
-                        type="button"
-                        onClick={() => handleToggleAttendance(member.member_id)}
-                        disabled={togglingMemberId === member.member_id || selectedSession?.status === 'Closed'}
-                        className="btn"
-                        style={{
-                          width: '120px',
-                          padding: '0.45rem 0.6rem',
-                          fontSize: '0.86rem',
-                          fontWeight: 800,
-                          borderRadius: '8px',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '6px',
-                          cursor: selectedSession?.status === 'Closed' ? 'not-allowed' : 'pointer',
-                          background: member.attended ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)',
-                          borderColor: member.attended ? '#22c55e' : '#ef4444',
-                          color: member.attended ? '#86efac' : '#fca5a5',
-                          boxShadow: member.attended ? '0 0 10px rgba(34, 197, 94, 0.2)' : 'none',
-                          transition: 'all 0.15s ease'
-                        }}
-                      >
-                        {member.attended ? (
-                          <>
-                            <CheckCircle2 size={16} />
-                            <span>حاضر ✓</span>
-                          </>
-                        ) : (
-                          <>
-                            <XCircle size={16} />
-                            <span>غائب ✗</span>
-                          </>
-                        )}
-                      </button>
+                      {hasAnyPermission(['attendance:scan', 'attendance:session']) ? (
+                        <button
+                          type="button"
+                          onClick={() => handleToggleAttendance(member.member_id)}
+                          disabled={togglingMemberId === member.member_id || selectedSession?.status === 'Closed'}
+                          className="btn"
+                          style={{
+                            width: '120px',
+                            padding: '0.45rem 0.6rem',
+                            fontSize: '0.86rem',
+                            fontWeight: 800,
+                            borderRadius: '8px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px',
+                            cursor: selectedSession?.status === 'Closed' ? 'not-allowed' : 'pointer',
+                            background: member.attended ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                            borderColor: member.attended ? '#22c55e' : '#ef4444',
+                            color: member.attended ? '#86efac' : '#fca5a5',
+                            boxShadow: member.attended ? '0 0 10px rgba(34, 197, 94, 0.2)' : 'none',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          {member.attended ? (
+                            <>
+                              <CheckCircle2 size={16} />
+                              <span>حاضر ✓</span>
+                            </>
+                          ) : (
+                            <>
+                              <XCircle size={16} />
+                              <span>غائب ✗</span>
+                            </>
+                          )}
+                        </button>
+                      ) : (
+                        <span
+                          className="badge"
+                          style={{
+                            padding: '0.4rem 0.75rem',
+                            fontSize: '0.82rem',
+                            background: member.attended ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                            color: member.attended ? '#86efac' : '#fca5a5'
+                          }}
+                        >
+                          {member.attended ? 'حاضر ✓' : 'غائب ✗'}
+                        </span>
+                      )}
                     </td>
 
                     {/* 6. Scanned At / Method */}

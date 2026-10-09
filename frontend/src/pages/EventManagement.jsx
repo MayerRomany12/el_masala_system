@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { eventsApi } from '../api/events';
 import { membersApi } from '../api/members';
 import {
@@ -42,6 +43,7 @@ const STAGE_OPTIONS = [
 ];
 
 export const EventManagement = () => {
+  const { hasPermission } = useAuth();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -315,10 +317,12 @@ export const EventManagement = () => {
         </div>
 
         <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <button onClick={handleOpenCreateModal} className="btn btn-primary" style={{ gap: '0.5rem' }}>
-            <Plus size={18} />
-            <span>إنشاء نشاط / رحلة جديدة</span>
-          </button>
+          {hasPermission('events:manage') && (
+            <button onClick={handleOpenCreateModal} className="btn btn-primary" style={{ gap: '0.5rem' }}>
+              <Plus size={18} />
+              <span>إنشاء نشاط / رحلة جديدة</span>
+            </button>
+          )}
           <button onClick={fetchEvents} className="btn btn-secondary">
             <RefreshCw size={16} />
             <span>تحديث</span>
@@ -534,15 +538,17 @@ export const EventManagement = () => {
                     <span>المشاركون والاشتراكات</span>
                   </button>
 
-                  <button
-                    onClick={() => handleOpenEditModal(evt)}
-                    className="btn btn-secondary"
-                    style={{ padding: '0.4rem 0.6rem', fontSize: '0.8rem' }}
-                  >
-                    <Edit size={15} />
-                  </button>
+                  {hasPermission('events:manage') && (
+                    <button
+                      onClick={() => handleOpenEditModal(evt)}
+                      className="btn btn-secondary"
+                      style={{ padding: '0.4rem 0.6rem', fontSize: '0.8rem' }}
+                    >
+                      <Edit size={15} />
+                    </button>
+                  )}
 
-                  {evt.status === 'Active' && (
+                  {hasPermission('events:manage') && evt.status === 'Active' && (
                     <button
                       onClick={() => handleStatusChange(evt.event_id, 'Completed')}
                       className="btn btn-secondary"
@@ -884,13 +890,15 @@ export const EventManagement = () => {
                               </span>
                             </td>
                             <td style={{ textAlign: 'center' }}>
-                              <button
-                                onClick={() => handleOpenEditPayment(p)}
-                                className="btn btn-secondary"
-                                style={{ padding: '0.25rem 0.6rem', fontSize: '0.78rem' }}
-                              >
-                                تحديث السداد 💳
-                              </button>
+                              {hasPermission('events:manage') && (
+                                <button
+                                  onClick={() => handleOpenEditPayment(p)}
+                                  className="btn btn-secondary"
+                                  style={{ padding: '0.25rem 0.6rem', fontSize: '0.78rem' }}
+                                >
+                                  تحديث السداد 💳
+                                </button>
+                              )}
                             </td>
                           </tr>
                         );

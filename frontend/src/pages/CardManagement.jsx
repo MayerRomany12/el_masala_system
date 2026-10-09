@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { membersApi } from '../api/members';
 import { cardsApi } from '../api/cards';
 import { apiClient } from '../api/client';
@@ -38,6 +39,7 @@ const STAGE_OPTIONS = [
 
 export const CardManagement = () => {
   const navigate = useNavigate();
+  const { hasPermission } = useAuth();
   // Page mode: 'list' or 'scan'
   const [mode, setMode] = useState('list');
 
@@ -138,10 +140,12 @@ export const CardManagement = () => {
         </div>
 
         <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <button onClick={() => setMode('scan')} className="btn btn-primary" style={{ gap: '0.5rem' }}>
-            <QrCode size={18} />
-            <span>فتح ماسح الكاميرا 📷</span>
-          </button>
+          {hasPermission('attendance:scan') && (
+            <button onClick={() => setMode('scan')} className="btn btn-primary" style={{ gap: '0.5rem' }}>
+              <QrCode size={18} />
+              <span>فتح ماسح الكاميرا 📷</span>
+            </button>
+          )}
           <button onClick={fetchMembers} className="btn btn-secondary">
             <RefreshCw size={16} />
             <span>تحديث</span>
@@ -267,15 +271,17 @@ export const CardManagement = () => {
                     </td>
                     <td>
                       <div style={{ display: 'flex', justifyContent: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                        <button
-                          onClick={() => handleOpenCard(member)}
-                          className="btn btn-secondary"
-                          style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', gap: '0.35rem' }}
-                          title="معاينة وطباعة بطاقة العضوية"
-                        >
-                          <Eye size={14} />
-                          <span>معاينة</span>
-                        </button>
+                        {hasPermission('cards:issue') && (
+                          <button
+                            onClick={() => handleOpenCard(member)}
+                            className="btn btn-secondary"
+                            style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', gap: '0.35rem' }}
+                            title="معاينة وطباعة بطاقة العضوية"
+                          >
+                            <Eye size={14} />
+                            <span>معاينة</span>
+                          </button>
+                        )}
 
                         <button
                           onClick={() => navigate(`/members/${member.member_id}`)}
@@ -406,10 +412,12 @@ export const CardManagement = () => {
               <button onClick={() => setSelectedMemberCard(null)} className="btn btn-secondary">
                 إغلاق
               </button>
-              <button onClick={handlePrint} className="btn btn-primary" style={{ gap: '0.4rem' }}>
-                <Printer size={18} />
-                <span>طباعة البطاقة الحالية 🖨️</span>
-              </button>
+              {hasPermission('reports:export') && (
+                <button onClick={handlePrint} className="btn btn-primary" style={{ gap: '0.4rem' }}>
+                  <Printer size={18} />
+                  <span>طباعة البطاقة الحالية 🖨️</span>
+                </button>
+              )}
             </div>
           </div>
         </div>

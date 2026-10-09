@@ -3,28 +3,125 @@ import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { UserPlus, RefreshCw, Shield, AlertCircle, Check, Key, X, Trash2 } from 'lucide-react';
 
-const AVAILABLE_PERMISSIONS = [
-  { key: 'members:read', label: 'قراءة وسجل الأطفال' },
-  { key: 'members:write', label: 'إضافة وتعديل بيانات الأطفال' },
-  { key: 'members:archive', label: 'أرشفة وإعادة تفعيل المخدومين المستبعدين' },
-  { key: 'cards:issue', label: 'طباعة وإصدار بطاقات الـ QR' },
-  { key: 'attendance:session', label: 'إنشاء وإدارة جلسات الحضور' },
-  { key: 'attendance:scan', label: 'مسح وتسجيل الحضور بالكاميرا' },
-  { key: 'attendance:cancel', label: 'إلغاء وتصحيح الحضور' },
-  { key: 'followup:read', label: 'استعراض سجل الغائبين والافتقاد' },
-  { key: 'followup:write', label: 'توثيق افتقاد الأطفال والمكالمات' },
-  { key: 'followup:manage', label: 'تشغيل كاشف الغائبين وتصعيد المهام' },
-  { key: 'events:read', label: 'استعراض الرحلات والأنشطة' },
-  { key: 'events:write', label: 'إنشاء وتعديل الرحلات والأنشطة' },
-  { key: 'rewards:read', label: 'استعراض لوحة النقاط المتصدرين' },
-  { key: 'rewards:manage', label: 'منح واستبدال النقاط والخصومات' },
-  { key: 'birthdays:read', label: 'استعراض أعياد الميلاد' },
-  { key: 'birthdays:gift', label: 'توثيق تسليم هدايا أعياد الميلاد' },
-  { key: 'reports:read', label: 'استعراض التقارير التحليلية' },
-  { key: 'reports:export', label: 'تصدير التقارير (Excel / PDF / CSV)' },
-  { key: 'users:manage', label: 'إدارة حسابات وصلاحيات الخدام' },
-  { key: 'messages:send', label: 'إرسال رسائل وتكليف مهام بالسيستم' }
+const ROLE_BASE_PERMISSIONS = {
+  'Super Admin': [
+    'users:read', 'users:write', 'users:delete', 'users:permissions',
+    'settings:read', 'settings:write', 'stages:manage',
+    'classes:read', 'classes:manage',
+    'members:read', 'members:write', 'members:archive',
+    'cards:issue', 'cards:revoke',
+    'events:read', 'events:write', 'events:delete',
+    'attendance:session', 'attendance:scan', 'attendance:cancel', 'devices:manage',
+    'followup:read', 'followup:write', 'followup:manage',
+    'rewards:read', 'rewards:manage', 'discounts:manage',
+    'birthdays:read', 'birthdays:gift',
+    'reports:read', 'reports:export', 'audit:read',
+    'messages:send', 'messages:manage'
+  ],
+  'Admin': [
+    'users:read', 'users:write', 'users:delete', 'users:permissions',
+    'classes:read', 'classes:manage',
+    'members:read', 'members:write', 'members:archive',
+    'cards:issue', 'cards:revoke',
+    'events:read', 'events:write',
+    'attendance:session', 'attendance:scan', 'attendance:cancel',
+    'devices:manage',
+    'followup:read', 'followup:write', 'followup:manage',
+    'rewards:read', 'rewards:manage', 'discounts:manage',
+    'birthdays:read', 'birthdays:gift',
+    'reports:read', 'reports:export', 'audit:read',
+    'messages:send', 'messages:manage',
+    'settings:read'
+  ],
+  'Servant': [
+    'classes:read',
+    'members:read', 'members:write',
+    'events:read',
+    'attendance:session', 'attendance:scan',
+    'followup:read', 'followup:write',
+    'birthdays:read',
+    'reports:read',
+    'messages:send'
+  ]
+};
+
+const PERMISSION_CATEGORIES = [
+  {
+    id: 'members',
+    label: 'سجل المخدومين والأطفال',
+    items: [
+      { key: 'members:read', label: 'استعراض بيانات وسجل المخدومين', desc: 'عرض قائمة الأطفال والبحث والتفاصيل' },
+      { key: 'members:write', label: 'إضافة وتعديل بيانات المخدومين', desc: 'إنشاء مخدوم جديد، تعديل البيانات والموقع الجغرافي' },
+      { key: 'members:archive', label: 'أرشفة واستعادة المخدومين المستبعدين', desc: 'أرشفة المخدوم المستبعد أو فك أرشفته' },
+      { key: 'cards:issue', label: 'إصدار وطباعة كروت وبطاقات QR', desc: 'توليد وطباعة بطاقات الهوية والـ QR للمخدومين' }
+    ]
+  },
+  {
+    id: 'classes',
+    label: 'الفصول والمجموعات',
+    items: [
+      { key: 'classes:read', label: 'استعراض الفصول والمجموعات', desc: 'رؤية فصول مدارس الأحد والأنشطة' },
+      { key: 'classes:manage', label: 'إنشاء وتعديل وإدارة الفصول', desc: 'إنشاء فصل جديد، تعديل بياناته، وتسكين الخدام والأطفال' }
+    ]
+  },
+  {
+    id: 'attendance',
+    label: 'الحضور والانصراف والـ QR',
+    items: [
+      { key: 'attendance:session', label: 'فتح وإدارة جلسات الحضور', desc: 'إنشاء جلسة حضور جديدة للفصول وتحديد المواعيد' },
+      { key: 'attendance:scan', label: 'تسجيل ومسح الحضور بالكاميرا', desc: 'مسح باركود QR للأطفال ورصد الحضور اللحظي' },
+      { key: 'attendance:cancel', label: 'تعديل وإلغاء وتصحيح الحضور يدويًا', desc: 'تعديل حالة الحاضر إلى غائب أو العكس يدوياً' }
+    ]
+  },
+  {
+    id: 'followup',
+    label: 'الافتقاد ومتابعة الغياب',
+    items: [
+      { key: 'followup:read', label: 'استعراض سجل الغائبين والافتقاد', desc: 'عرض مهام الافتقاد ومتابعة غياب الفصل' },
+      { key: 'followup:write', label: 'توثيق وتسجيل الافتقاد والمكالمات', desc: 'تسجيل نتائج المكالمات والزيارات والملاحظات' },
+      { key: 'followup:manage', label: 'تشغيل كاشف الغياب وتوزيع المهام', desc: 'فحص الغياب آلياً وتوزيع المهام بالتساوي على خدام الفصل' }
+    ]
+  },
+  {
+    id: 'birthdays',
+    label: 'أعياد الميلاد والهدايا',
+    items: [
+      { key: 'birthdays:read', label: 'استعراض أعياد الميلاد', desc: 'متابعة قائمة أعياد الميلاد القادمة للمخدومين' },
+      { key: 'birthdays:gift', label: 'توثيق تسليم هدايا أعياد الميلاد', desc: 'تسجيل تسليم الهدايا السنوية للأطفال' }
+    ]
+  },
+  {
+    id: 'reports',
+    label: 'التقارير وسجل الرقابة',
+    items: [
+      { key: 'reports:read', label: 'استعراض التقارير الإحصائية', desc: 'الاطلاع على تقارير وكشوفات الحضور والغياب' },
+      { key: 'reports:export', label: 'تصدير التقارير (Excel / PDF / طباعة)', desc: 'تنزيل ملفات الإكسل وطباعة الكشوفات الرسمية' },
+      { key: 'audit:read', label: 'الاطلاع على سجل العمليات والرقابة', desc: 'متابعة سجل تدقيق النشاطات والتعديلات الحساسة (Audit Logs)' }
+    ]
+  },
+  {
+    id: 'events_rewards',
+    label: 'الأنشطة والمكافآت',
+    items: [
+      { key: 'events:read', label: 'استعراض الرحلات والأنشطة', desc: 'رؤية الفعاليات والرحلات الصيفية' },
+      { key: 'events:write', label: 'إدارة وتعديل الأنشطة والاشتراكات', desc: 'إنشاء الفعاليات والرحلات وتسجيل المشتركين' },
+      { key: 'rewards:read', label: 'استعراض لوحة النقاط والشرف', desc: 'عرض نقاط المخدومين والمتميزين' },
+      { key: 'rewards:manage', label: 'إدارة ومنح واستبدال النقاط', desc: 'إضافة وخصم نقاط المخدومين' }
+    ]
+  },
+  {
+    id: 'users',
+    label: 'إدارة الخدام والمستخدمين',
+    items: [
+      { key: 'users:read', label: 'استعراض قائمة المستخدمين والخدام', desc: 'عرض حسابات الخدام والمسؤولين' },
+      { key: 'users:write', label: 'إضافة وتعديل بيانات الخدام والحسابات', desc: 'إنشاء حساب جديد وتعديل بيانات المستخدمين' },
+      { key: 'users:delete', label: 'حذف حسابات المستخدمين', desc: 'حذف حساب مستخدم نهائياً من النظام' },
+      { key: 'users:permissions', label: 'تخصيص وتعديل الصلاحيات', desc: 'منح وسحب الصلاحيات الفردية للمستخدمين' }
+    ]
+  }
 ];
+
+const ALL_DEFINED_PERMISSIONS = PERMISSION_CATEGORIES.flatMap(cat => cat.items);
 
 export const UserManagement = () => {
   const [users, setUsers] = useState([]);
@@ -110,28 +207,64 @@ export const UserManagement = () => {
     }
   };
 
+  const [permFilterCategory, setPermFilterCategory] = useState('all');
+
   const handleOpenPermModal = (user) => {
     setSelectedUser(user);
     setCustomPerms(user.custom_permissions || []);
     setRevokedPerms(user.revoked_permissions || []);
+    setPermFilterCategory('all');
   };
 
-  const handleToggleCustomPerm = (permKey) => {
-    if (customPerms.includes(permKey)) {
-      setCustomPerms(customPerms.filter(p => p !== permKey));
+  const handleTogglePerm = (permKey) => {
+    if (!selectedUser) return;
+    const basePerms = ROLE_BASE_PERMISSIONS[selectedUser.role] || [];
+    const isBase = basePerms.includes(permKey);
+    const isCustom = customPerms.includes(permKey);
+    const isRevoked = revokedPerms.includes(permKey);
+    const isEffective = (isBase || isCustom) && !isRevoked;
+
+    if (isEffective) {
+      // Turn it OFF
+      if (isBase) {
+        if (!revokedPerms.includes(permKey)) {
+          setRevokedPerms(prev => [...prev, permKey]);
+        }
+        setCustomPerms(prev => prev.filter(k => k !== permKey));
+      } else {
+        setCustomPerms(prev => prev.filter(k => k !== permKey));
+      }
     } else {
-      setCustomPerms([...customPerms, permKey]);
-      setRevokedPerms(revokedPerms.filter(p => p !== permKey));
+      // Turn it ON
+      if (isBase) {
+        setRevokedPerms(prev => prev.filter(k => k !== permKey));
+      } else {
+        if (!customPerms.includes(permKey)) {
+          setCustomPerms(prev => [...prev, permKey]);
+        }
+        setRevokedPerms(prev => prev.filter(k => k !== permKey));
+      }
     }
   };
 
-  const handleToggleRevokedPerm = (permKey) => {
-    if (revokedPerms.includes(permKey)) {
-      setRevokedPerms(revokedPerms.filter(p => p !== permKey));
-    } else {
-      setRevokedPerms([...revokedPerms, permKey]);
-      setCustomPerms(customPerms.filter(p => p !== permKey));
-    }
+  const handleGrantAll = () => {
+    if (!selectedUser) return;
+    const basePerms = ROLE_BASE_PERMISSIONS[selectedUser.role] || [];
+    setRevokedPerms([]);
+    const nonBase = ALL_DEFINED_PERMISSIONS.map(p => p.key).filter(k => !basePerms.includes(k));
+    setCustomPerms(nonBase);
+  };
+
+  const handleResetToDefault = () => {
+    setCustomPerms([]);
+    setRevokedPerms([]);
+  };
+
+  const handleRevokeAll = () => {
+    if (!selectedUser) return;
+    const basePerms = ROLE_BASE_PERMISSIONS[selectedUser.role] || [];
+    setCustomPerms([]);
+    setRevokedPerms([...basePerms]);
   };
 
   const handleSavePermissions = async () => {
@@ -237,6 +370,7 @@ export const UserManagement = () => {
                         className="form-input"
                         style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem', width: '130px' }}
                         value={user.role}
+                        disabled={!hasPermission('users:write') || user.role === 'Super Admin'}
                         onChange={async (e) => {
                           const newRole = e.target.value;
                           try {
@@ -255,20 +389,27 @@ export const UserManagement = () => {
 
                     {/* Custom Permissions Matrix Button */}
                     <td>
-                      <button
-                        onClick={() => handleOpenPermModal(user)}
-                        className="btn btn-secondary"
-                        style={{ padding: '0.25rem 0.6rem', fontSize: '0.78rem', gap: '0.3rem', color: 'var(--color-gold-light)' }}
-                        title="تعديل الصلاحيات المخصصة والمسترجعة بالاسم"
-                      >
-                        <Key size={14} />
-                        <span>تخصيص ({user.effective_permissions?.length || 0})</span>
-                      </button>
+                      {hasPermission('users:permissions') ? (
+                        <button
+                          onClick={() => handleOpenPermModal(user)}
+                          className="btn btn-secondary"
+                          style={{ padding: '0.25rem 0.6rem', fontSize: '0.78rem', gap: '0.3rem', color: 'var(--color-gold-light)' }}
+                          title="تعديل الصلاحيات المخصصة والمسترجعة بالاسم"
+                        >
+                          <Key size={14} />
+                          <span>تخصيص ({user.effective_permissions?.length || 0})</span>
+                        </button>
+                      ) : (
+                        <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                          {user.effective_permissions?.length || 0} صلاحية
+                        </span>
+                      )}
                     </td>
 
                     <td>
                       <button
                         onClick={async () => {
+                          if (!hasPermission('users:write')) return;
                           try {
                             await apiClient.patch(`/users/${user.user_id}`, { is_active: !user.is_active });
                             fetchUsers();
@@ -276,12 +417,14 @@ export const UserManagement = () => {
                             alert(err.response?.data?.message || 'تعذر تغيير حالة حساب المستخدم');
                           }
                         }}
+                        disabled={!hasPermission('users:write') || user.role === 'Super Admin'}
                         className="btn btn-secondary"
                         style={{
                           padding: '0.25rem 0.6rem',
                           fontSize: '0.78rem',
                           color: user.is_active ? '#34d399' : '#f87171',
-                          borderColor: user.is_active ? 'rgba(52, 211, 153, 0.3)' : 'rgba(248, 113, 113, 0.3)'
+                          borderColor: user.is_active ? 'rgba(52, 211, 153, 0.3)' : 'rgba(248, 113, 113, 0.3)',
+                          cursor: !hasPermission('users:write') || user.role === 'Super Admin' ? 'default' : 'pointer'
                         }}
                       >
                         {user.is_active ? 'نشط 🟢' : 'معطل 🔴'}
@@ -291,7 +434,7 @@ export const UserManagement = () => {
                       {new Date(user.created_at).toLocaleDateString('ar-EG')}
                     </td>
                     <td>
-                      {user.role !== 'Super Admin' && user.user_id !== currentUser?.user_id && (
+                      {hasPermission('users:delete') && user.role !== 'Super Admin' && user.user_id !== currentUser?.user_id && (
                         <button
                           onClick={() => handleDeleteUser(user)}
                           className="btn btn-secondary"
@@ -337,6 +480,7 @@ export const UserManagement = () => {
                 </div>
                 <button
                   onClick={async () => {
+                    if (!hasPermission('users:write')) return;
                     try {
                       await apiClient.patch(`/users/${user.user_id}`, { is_active: !user.is_active });
                       fetchUsers();
@@ -344,12 +488,14 @@ export const UserManagement = () => {
                       alert(err.response?.data?.message || 'تعذر تغيير حالة حساب المستخدم');
                     }
                   }}
+                  disabled={!hasPermission('users:write') || user.role === 'Super Admin'}
                   className="btn btn-secondary"
                   style={{
                     padding: '0.25rem 0.6rem',
                     fontSize: '0.78rem',
                     color: user.is_active ? '#34d399' : '#f87171',
-                    borderColor: user.is_active ? 'rgba(52, 211, 153, 0.3)' : 'rgba(248, 113, 113, 0.3)'
+                    borderColor: user.is_active ? 'rgba(52, 211, 153, 0.3)' : 'rgba(248, 113, 113, 0.3)',
+                    cursor: !hasPermission('users:write') || user.role === 'Super Admin' ? 'default' : 'pointer'
                   }}
                 >
                   {user.is_active ? 'نشط 🟢' : 'معطل 🔴'}
@@ -367,6 +513,7 @@ export const UserManagement = () => {
                     className="form-input"
                     style={{ padding: '0.35rem 0.5rem', fontSize: '0.8rem', width: '100%' }}
                     value={user.role}
+                    disabled={!hasPermission('users:write') || user.role === 'Super Admin'}
                     onChange={async (e) => {
                       const newRole = e.target.value;
                       try {
@@ -385,14 +532,20 @@ export const UserManagement = () => {
 
                 <div style={{ flex: 1 }}>
                   <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.2rem' }}>الصلاحيات</label>
-                  <button
-                    onClick={() => handleOpenPermModal(user)}
-                    className="btn btn-secondary"
-                    style={{ width: '100%', padding: '0.35rem 0.5rem', fontSize: '0.78rem', gap: '0.3rem', color: 'var(--color-gold-light)' }}
-                  >
-                    <Key size={14} />
-                    <span>تخصيص ({user.effective_permissions?.length || 0})</span>
-                  </button>
+                  {hasPermission('users:permissions') ? (
+                    <button
+                      onClick={() => handleOpenPermModal(user)}
+                      className="btn btn-secondary"
+                      style={{ width: '100%', padding: '0.35rem 0.5rem', fontSize: '0.78rem', gap: '0.3rem', color: 'var(--color-gold-light)' }}
+                    >
+                      <Key size={14} />
+                      <span>تخصيص ({user.effective_permissions?.length || 0})</span>
+                    </button>
+                  ) : (
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                      {user.effective_permissions?.length || 0} صلاحية
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -400,7 +553,7 @@ export const UserManagement = () => {
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-subtle)' }}>
                   تاريخ الإنشاء: {new Date(user.created_at).toLocaleDateString('ar-EG')}
                 </div>
-                {user.role !== 'Super Admin' && user.user_id !== currentUser?.user_id && (
+                {hasPermission('users:delete') && user.role !== 'Super Admin' && user.user_id !== currentUser?.user_id && (
                   <button
                     onClick={() => handleDeleteUser(user)}
                     className="btn btn-secondary"
@@ -502,71 +655,245 @@ export const UserManagement = () => {
       )}
 
       {/* Custom Granular Permissions Matrix Modal */}
-      {selectedUser && (
-        <div className="modal-overlay">
-          <div className="modal-card" style={{ maxWidth: '750px' }}>
-            <div className="modal-header">
-              <div>
-                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--color-gold-light)', margin: 0 }}>
-                  تخصيص الصلاحيات الفردية للمستخدم: {selectedUser.full_name}
-                </h3>
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>
-                  الصلاحيات الفعلية = (صلاحيات الدور {selectedUser.role} + المضافة) - المسترجعة
-                </p>
-              </div>
-              <button onClick={() => setSelectedUser(null)} className="btn-secondary" style={{ padding: '0.3rem', borderRadius: '50%' }}>
-                <X size={18} />
-              </button>
-            </div>
+      {selectedUser && (() => {
+        const basePerms = ROLE_BASE_PERMISSIONS[selectedUser.role] || [];
+        const isSuperAdminUser = selectedUser.role === 'Super Admin' || selectedUser.username === 'superadmin';
 
-            <div className="modal-body" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
-              {AVAILABLE_PERMISSIONS.map(p => {
-                const isCustom = customPerms.includes(p.key);
-                const isRevoked = revokedPerms.includes(p.key);
+        // Filter permissions based on category
+        const categoriesToDisplay = permFilterCategory === 'all'
+          ? PERMISSION_CATEGORIES
+          : PERMISSION_CATEGORIES.filter(cat => cat.id === permFilterCategory);
 
-                return (
-                  <div key={p.key} style={{ padding: '0.75rem', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-main)' }}>{p.label}</div>
-                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>{p.key}</span>
-                    </div>
+        // Count how many are effective
+        const totalPermsCount = ALL_DEFINED_PERMISSIONS.length;
+        const effectivePermsCount = ALL_DEFINED_PERMISSIONS.filter(p => {
+          if (isSuperAdminUser) return true;
+          const isBase = basePerms.includes(p.key);
+          const isCustom = customPerms.includes(p.key);
+          const isRevoked = revokedPerms.includes(p.key);
+          return (isBase || isCustom) && !isRevoked;
+        }).length;
 
-                    <div style={{ display: 'flex', gap: '0.4rem' }}>
-                      <button
-                        type="button"
-                        onClick={() => handleToggleCustomPerm(p.key)}
-                        style={{
-                          padding: '0.2rem 0.5rem', fontSize: '0.72rem', borderRadius: '4px', border: 'none', cursor: 'pointer',
-                          background: isCustom ? '#34d399' : 'rgba(255,255,255,0.1)', color: isCustom ? '#000' : '#fff', fontWeight: 800
-                        }}
-                      >
-                        + منح
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleToggleRevokedPerm(p.key)}
-                        style={{
-                          padding: '0.2rem 0.5rem', fontSize: '0.72rem', borderRadius: '4px', border: 'none', cursor: 'pointer',
-                          background: isRevoked ? '#ef4444' : 'rgba(255,255,255,0.1)', color: isRevoked ? '#fff' : '#fff', fontWeight: 800
-                        }}
-                      >
-                        - سحب
-                      </button>
-                    </div>
+        return (
+          <div className="modal-overlay">
+            <div className="modal-card" style={{ maxWidth: '880px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+              <div className="modal-header" style={{ paddingBottom: '0.75rem' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.25rem' }}>
+                    <Key size={20} style={{ color: 'var(--color-gold)' }} />
+                    <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>
+                      تخصيص الصلاحيات الفردية: {selectedUser.full_name}
+                    </h3>
+                    <span className="badge" style={{ background: 'rgba(212, 175, 55, 0.2)', color: 'var(--color-gold-light)', fontSize: '0.78rem' }}>
+                      {selectedUser.role}
+                    </span>
                   </div>
-                );
-              })}
-            </div>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>
+                    الصلاحيات الفعالة: <strong style={{ color: '#38bdf8' }}>{effectivePermsCount}</strong> من أصل {totalPermsCount} | أي صلاحية ملغاة تختفي شاشتها وأزرارها بالكامل من حساب الخادم
+                  </p>
+                </div>
+                <button onClick={() => setSelectedUser(null)} className="btn-secondary" style={{ padding: '0.3rem', borderRadius: '50%' }}>
+                  <X size={18} />
+                </button>
+              </div>
 
-            <div className="modal-footer">
-              <button type="button" onClick={() => setSelectedUser(null)} className="btn btn-secondary">إلغاء</button>
-              <button type="button" onClick={handleSavePermissions} disabled={permSaving} className="btn btn-primary">
-                {permSaving ? 'جاري الحفظ...' : 'حفظ الصلاحيات المخصصة 💾'}
-              </button>
+              {/* Batch Action Toolbar */}
+              {!isSuperAdminUser && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: '0.5rem',
+                  padding: '0.65rem 1rem',
+                  background: 'rgba(0,0,0,0.25)',
+                  borderBottom: '1px solid var(--border-subtle)'
+                }}>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                    إجراءات سريعة:
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={handleGrantAll}
+                      className="btn btn-secondary"
+                      style={{ padding: '0.25rem 0.6rem', fontSize: '0.78rem', color: '#34d399', borderColor: 'rgba(52, 211, 153, 0.4)' }}
+                    >
+                      منح وتفعيل كافة الصلاحيات ⚡
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleResetToDefault}
+                      className="btn btn-secondary"
+                      style={{ padding: '0.25rem 0.6rem', fontSize: '0.78rem', color: '#38bdf8', borderColor: 'rgba(56, 189, 248, 0.4)' }}
+                    >
+                      استعادة الافتراضي للرتبة 🔄
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleRevokeAll}
+                      className="btn btn-secondary"
+                      style={{ padding: '0.25rem 0.6rem', fontSize: '0.78rem', color: '#f87171', borderColor: 'rgba(239, 68, 68, 0.4)' }}
+                    >
+                      تعطيل وسحب الكل 🚫
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Category Filter Tabs */}
+              <div style={{
+                display: 'flex',
+                gap: '0.4rem',
+                overflowX: 'auto',
+                padding: '0.65rem 1rem',
+                borderBottom: '1px solid var(--border-subtle)',
+                background: 'rgba(255, 255, 255, 0.02)'
+              }}>
+                <button
+                  type="button"
+                  onClick={() => setPermFilterCategory('all')}
+                  className={`btn ${permFilterCategory === 'all' ? 'btn-primary' : 'btn-secondary'}`}
+                  style={{ padding: '0.3rem 0.75rem', fontSize: '0.78rem', whiteSpace: 'nowrap' }}
+                >
+                  الكل ({totalPermsCount})
+                </button>
+                {PERMISSION_CATEGORIES.map(cat => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setPermFilterCategory(cat.id)}
+                    className={`btn ${permFilterCategory === cat.id ? 'btn-primary' : 'btn-secondary'}`}
+                    style={{ padding: '0.3rem 0.75rem', fontSize: '0.78rem', whiteSpace: 'nowrap' }}
+                  >
+                    {cat.label} ({cat.items.length})
+                  </button>
+                ))}
+              </div>
+
+              {/* Permissions Items List */}
+              <div className="modal-body" style={{ overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                {isSuperAdminUser ? (
+                  <div style={{ padding: '2rem', textAlign: 'center', background: 'rgba(212, 175, 55, 0.08)', borderRadius: '12px', border: '1px solid rgba(212, 175, 55, 0.3)' }}>
+                    <Shield size={36} style={{ color: 'var(--color-gold)', margin: '0 auto 0.75rem' }} />
+                    <h4 style={{ color: 'var(--color-gold-light)', margin: '0 0 0.4rem', fontSize: '1.05rem' }}>
+                      مسؤول النظام الأكبر (Super Admin)
+                    </h4>
+                    <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                      حساب مسؤول النظام يتمتع بكافة الصلاحيات تلقائياً ودون قيود لأسباب أمنية وتشغيلية.
+                    </p>
+                  </div>
+                ) : (
+                  categoriesToDisplay.map(cat => (
+                    <div key={cat.id} style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '10px', padding: '0.85rem', border: '1px solid rgba(255,255,255,0.06)' }}>
+                      <div style={{ fontSize: '0.88rem', fontWeight: 800, color: 'var(--color-gold-light)', marginBottom: '0.65rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <span>📂</span>
+                        <span>{cat.label}</span>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '0.65rem' }}>
+                        {cat.items.map(p => {
+                          const isBase = basePerms.includes(p.key);
+                          const isCustom = customPerms.includes(p.key);
+                          const isRevoked = revokedPerms.includes(p.key);
+                          const isEffective = (isBase || isCustom) && !isRevoked;
+
+                          return (
+                            <div
+                              key={p.key}
+                              style={{
+                                padding: '0.75rem',
+                                background: isEffective ? 'rgba(34, 197, 94, 0.05)' : 'rgba(239, 68, 68, 0.05)',
+                                borderRadius: '8px',
+                                border: `1px solid ${isEffective ? 'rgba(34, 197, 94, 0.25)' : 'rgba(239, 68, 68, 0.25)'}`,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                gap: '0.75rem'
+                              }}
+                            >
+                              <div style={{ flex: 1 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '2px' }}>
+                                  <span style={{ fontSize: '0.84rem', fontWeight: 700, color: isEffective ? 'var(--text-main)' : 'var(--text-muted)' }}>
+                                    {p.label}
+                                  </span>
+                                  {isRevoked ? (
+                                    <span className="badge" style={{ background: 'rgba(239, 68, 68, 0.2)', color: '#fca5a5', fontSize: '0.68rem', padding: '1px 5px' }}>
+                                      مسحوبة ⛔
+                                    </span>
+                                  ) : isCustom ? (
+                                    <span className="badge" style={{ background: 'rgba(52, 211, 153, 0.2)', color: '#86efac', fontSize: '0.68rem', padding: '1px 5px' }}>
+                                      ممنوحة يدويًا ➕
+                                    </span>
+                                  ) : isBase ? (
+                                    <span className="badge" style={{ background: 'rgba(56, 189, 248, 0.15)', color: '#7dd3fc', fontSize: '0.68rem', padding: '1px 5px' }}>
+                                      افتراضية
+                                    </span>
+                                  ) : null}
+                                </div>
+                                <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', lineHeight: 1.3 }}>
+                                  {p.desc}
+                                </div>
+                                <div style={{ fontSize: '0.68rem', color: 'var(--text-subtle)', fontFamily: 'monospace', marginTop: '2px' }}>
+                                  {p.key}
+                                </div>
+                              </div>
+
+                              <div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleTogglePerm(p.key)}
+                                  className={`btn ${isEffective ? 'btn-primary' : 'btn-secondary'}`}
+                                  style={{
+                                    padding: '0.35rem 0.75rem',
+                                    fontSize: '0.78rem',
+                                    fontWeight: 800,
+                                    borderRadius: '6px',
+                                    gap: '0.3rem',
+                                    background: isEffective
+                                      ? 'linear-gradient(135deg, #059669 0%, #10b981 100%)'
+                                      : 'rgba(255, 255, 255, 0.06)',
+                                    borderColor: isEffective ? 'transparent' : 'rgba(239, 68, 68, 0.3)',
+                                    color: isEffective ? '#ffffff' : '#f87171'
+                                  }}
+                                  title={isEffective ? 'انقر لتعطيل هذه الصلاحية عن المستخدم' : 'انقر لتفعيل هذه الصلاحية للمستخدم'}
+                                >
+                                  {isEffective ? (
+                                    <>
+                                      <Check size={14} />
+                                      <span>مفعّلة ✓</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <X size={14} />
+                                      <span>معطلة ✗</span>
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="modal-footer" style={{ borderTop: '1px solid var(--border-subtle)', padding: '0.85rem 1rem' }}>
+                <button type="button" onClick={() => setSelectedUser(null)} className="btn btn-secondary">
+                  إلغاء
+                </button>
+                {!isSuperAdminUser && (
+                  <button type="button" onClick={handleSavePermissions} disabled={permSaving} className="btn btn-primary" style={{ fontWeight: 800 }}>
+                    {permSaving ? 'جاري الحفظ...' : 'حفظ الصلاحيات المخصصة 💾'}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 };

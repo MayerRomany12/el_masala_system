@@ -21,7 +21,7 @@ import {
 
 export const ClassManagement = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
 
   // ─── Data State ──────────────────────────────────────────────────────────
   const [classes, setClasses] = useState([]);
@@ -210,7 +210,7 @@ export const ClassManagement = () => {
         </div>
 
         <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
-          {(user?.role === 'Super Admin' || user?.role === 'Admin') && (
+          {(user?.role === 'Super Admin' || user?.role === 'Admin') && hasPermission('classes:manage') && (
             <button
               className="btn btn-secondary"
               onClick={handleWipeAllClassesAndAttendance}
@@ -233,14 +233,16 @@ export const ClassManagement = () => {
             <span>تحديث</span>
           </button>
 
-          <button
-            className="btn btn-primary"
-            onClick={() => navigate('/classes/new')}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 700, fontSize: '0.85rem' }}
-          >
-            <Plus size={16} />
-            <span>إنشاء فصل جديد</span>
-          </button>
+          {hasPermission('classes:manage') && (
+            <button
+              className="btn btn-primary"
+              onClick={() => navigate('/classes/new')}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 700, fontSize: '0.85rem' }}
+            >
+              <Plus size={16} />
+              <span>إنشاء فصل جديد</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -409,14 +411,16 @@ export const ClassManagement = () => {
           <p style={{ color: 'var(--text-muted)', margin: '0 0 1rem', fontSize: '0.85rem' }}>
             لم يتم العثور على فصول تطابق معايير البحث أو التصفية المختارة.
           </p>
-          <button
-            className="btn btn-primary"
-            onClick={() => navigate('/classes/new')}
-            style={{ fontSize: '0.85rem' }}
-          >
-            <Plus size={15} />
-            <span>إنشاء فصل جديد الآن</span>
-          </button>
+          {hasPermission('classes:manage') && (
+            <button
+              className="btn btn-primary"
+              onClick={() => navigate('/classes/new')}
+              style={{ fontSize: '0.85rem' }}
+            >
+              <Plus size={15} />
+              <span>إنشاء فصل جديد الآن</span>
+            </button>
+          )}
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.25rem' }}>
@@ -525,19 +529,21 @@ export const ClassManagement = () => {
                       عرض التفاصيل والأعضاء 📋
                     </button>
 
-                    <button
-                      className="btn btn-secondary"
-                      style={{ padding: '0.5rem 0.65rem', color: 'var(--color-primary-light)', borderColor: 'rgba(56, 189, 248, 0.35)' }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleOpenEdit(cls);
-                      }}
-                      title="تعديل اسم وبيانات الفصل ✏️"
-                    >
-                      <Edit3 size={15} />
-                    </button>
+                    {hasPermission('classes:manage') && (
+                      <button
+                        className="btn btn-secondary"
+                        style={{ padding: '0.5rem 0.65rem', color: 'var(--color-primary-light)', borderColor: 'rgba(56, 189, 248, 0.35)' }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenEdit(cls);
+                        }}
+                        title="تعديل اسم وبيانات الفصل ✏️"
+                      >
+                        <Edit3 size={15} />
+                      </button>
+                    )}
 
-                    {(user?.role === 'Super Admin' || user?.role === 'Admin') && (
+                    {hasPermission('classes:manage') && (user?.role === 'Super Admin' || user?.role === 'Admin') && (
                       <button
                         className="btn btn-secondary"
                         style={{ padding: '0.5rem 0.65rem', color: '#f87171', borderColor: 'rgba(239, 68, 68, 0.35)' }}

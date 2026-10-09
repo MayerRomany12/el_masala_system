@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { apiClient } from '../api/client';
 import { birthdaysApi } from '../api/birthdays';
 import { getWaUrl, getGmailUrl } from '../utils/phone';
@@ -41,6 +42,7 @@ const MONTH_OPTIONS = [
 ];
 
 export const BirthdayManagement = () => {
+  const { hasPermission } = useAuth();
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -521,7 +523,7 @@ export const BirthdayManagement = () => {
                             </a>
                           )}
 
-                          {!isDelivered && (
+                          {!isDelivered && hasPermission('birthdays:gift') && (
                             <button
                               onClick={() => setActiveDeliverMember(m)}
                               className="btn btn-primary"

@@ -8,7 +8,16 @@ export const AuthProvider = ({ children }) => {
     const saved = localStorage.getItem('almasalla_user');
     return saved ? JSON.parse(saved) : null;
   });
-  const [permissions, setPermissions] = useState([]);
+  const [permissions, setPermissions] = useState(() => {
+    try {
+      const saved = localStorage.getItem('almasalla_user');
+      if (saved) {
+        const u = JSON.parse(saved);
+        return Array.isArray(u.effective_permissions) ? u.effective_permissions : [];
+      }
+    } catch (e) {}
+    return [];
+  });
   const [token, setToken] = useState(() => localStorage.getItem('almasalla_token') || null);
   const [loading, setLoading] = useState(true);
 
@@ -21,9 +30,11 @@ export const AuthProvider = ({ children }) => {
       }
       const response = await apiClient.get('/auth/me');
       if (response.data.success) {
-        setUser(response.data.data.user);
-        setPermissions(response.data.data.permissions || []);
-        localStorage.setItem('almasalla_user', JSON.stringify(response.data.data.user));
+        const fetchedUser = response.data.data.user;
+        const fetchedPerms = response.data.data.permissions || fetchedUser?.effective_permissions || [];
+        setUser(fetchedUser);
+        setPermissions(fetchedPerms);
+        localStorage.setItem('almasalla_user', JSON.stringify({ ...fetchedUser, effective_permissions: fetchedPerms }));
       }
     } catch (err) {
       console.error('Failed to fetch user context:', err);
@@ -45,21 +56,23 @@ export const AuthProvider = ({ children }) => {
       const response = await apiClient.post('/auth/login', { username, password });
       if (response.data && response.data.success) {
         const { access_token, user: userData } = response.data.data;
+        const userPerms = Array.isArray(userData?.effective_permissions) ? userData.effective_permissions : [];
         localStorage.setItem('almasalla_token', access_token);
         localStorage.setItem('almasalla_user', JSON.stringify(userData));
         setToken(access_token);
         setUser(userData);
+        setPermissions(userPerms);
 
         // Fetch user permissions immediately upon login
         try {
           const meRes = await apiClient.get('/auth/me');
           if (meRes.data && meRes.data.success) {
-            setPermissions(meRes.data.data.permissions || []);
+            const finalPerms = meRes.data.data.permissions || userPerms;
+            setPermissions(finalPerms);
+            localStorage.setItem('almasalla_user', JSON.stringify({ ...userData, effective_permissions: finalPerms }));
           }
         } catch (e) {
-          if (userData?.effective_permissions) {
-            setPermissions(userData.effective_permissions);
-          }
+          // fallback is already set
         }
         return userData;
       } else {
@@ -92,12 +105,19 @@ export const AuthProvider = ({ children }) => {
 
   const hasPermission = (permission) => {
     if (!permission) return true;
-    if (user?.role === 'Super Admin' || user?.role === 'Admin') return true;
-    return permissions.includes(permission);
+    // Only Super Admin bypasses individual permission revocations
+    if (user?.role === 'Super Admin' || user?.username === 'superadmin') return true;
+    return Array.isArray(permissions) && permissions.includes(permission);
+  };
+
+  const hasAnyPermission = (permList = []) => {
+    if (!permList || permList.length === 0) return true;
+    if (user?.role === 'Super Admin' || user?.username === 'superadmin') return true;
+    return permList.some(p => hasPermission(p));
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, permissions, loading, login, logout, hasPermission }}>
+    <AuthContext.Provider value={{ user, token, permissions, loading, login, logout, hasPermission, hasAnyPermission }}>
       {children}
     </AuthContext.Provider>
   );

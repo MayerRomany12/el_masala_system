@@ -13,7 +13,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token")
 ROLE_PERMISSIONS = {
     RoleEnum.SUPER_ADMIN: list(ALL_PERMISSIONS),
     RoleEnum.ADMIN: [
-        "users:read", "users:write", "users:delete",
+        "users:read", "users:write", "users:delete", "users:permissions",
         "classes:read", "classes:manage",
         "members:read", "members:write", "members:archive",
         "cards:issue", "cards:revoke",
@@ -24,17 +24,17 @@ ROLE_PERMISSIONS = {
         "rewards:read", "rewards:manage", "discounts:manage",
         "birthdays:read", "birthdays:gift",
         "reports:read", "reports:export", "audit:read",
-        "messages:send", "messages:manage"
+        "messages:send", "messages:manage",
+        "settings:read"
     ],
     RoleEnum.SERVANT: [
-        "users:read",
-        "classes:read", "classes:manage",
+        "classes:read",
         "members:read", "members:write",
         "events:read",
         "attendance:session", "attendance:scan",
         "followup:read", "followup:write",
         "birthdays:read",
-        "reports:read", "reports:export",
+        "reports:read",
         "messages:send"
     ]
 }

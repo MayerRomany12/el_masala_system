@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import QRCode from 'qrcode';
+import { useAuth } from '../context/AuthContext';
 import { membersApi } from '../api/members';
 import { apiClient } from '../api/client';
 import { getPhotoUrl } from '../utils/photo';
@@ -36,6 +37,7 @@ import {
 export const MemberProfilePage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { hasPermission } = useAuth();
 
   const [member, setMember] = useState(null);
   const [history, setHistory] = useState(null);
@@ -267,32 +269,36 @@ export const MemberProfilePage = () => {
         </button>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
-          <button
-            onClick={handlePrintComprehensiveProfile}
-            disabled={printing}
-            className="btn btn-primary"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              fontSize: '0.9rem',
-              fontWeight: 800,
-              background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
-              boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)'
-            }}
-          >
-            <Printer size={17} />
-            <span>{printing ? 'جاري التجهيز للطباعة...' : 'طباعة استمارة المخدوم الشاملة (PDF)'}</span>
-          </button>
+          {hasPermission('reports:export') && (
+            <button
+              onClick={handlePrintComprehensiveProfile}
+              disabled={printing}
+              className="btn btn-primary"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                fontSize: '0.9rem',
+                fontWeight: 800,
+                background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+                boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)'
+              }}
+            >
+              <Printer size={17} />
+              <span>{printing ? 'جاري التجهيز للطباعة...' : 'طباعة استمارة المخدوم الشاملة (PDF)'}</span>
+            </button>
+          )}
 
-          <Link
-            to={`/members/${id}/edit`}
-            className="btn btn-secondary"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}
-          >
-            <Edit size={16} />
-            <span>تعديل البيانات</span>
-          </Link>
+          {hasPermission('members:write') && (
+            <Link
+              to={`/members/${id}/edit`}
+              className="btn btn-secondary"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}
+            >
+              <Edit size={16} />
+              <span>تعديل البيانات</span>
+            </Link>
+          )}
         </div>
       </div>
 
@@ -912,56 +918,58 @@ export const MemberProfilePage = () => {
           </div>
 
           {/* Standalone QR Code Display & Download */}
-          <div className="glass-card" style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem', padding: '1.25rem' }}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              width: '100%',
-              paddingBottom: '0.5rem',
-              borderBottom: '1px solid var(--border-subtle)',
-              color: '#38bdf8',
-              fontSize: '0.92rem',
-              fontWeight: 700
-            }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <QrCode size={17} />
-                <span>رمز الـ QR المخصص للحضور</span>
-              </span>
-            </div>
-
-            <div style={{
-              background: '#ffffff',
-              padding: '12px',
-              borderRadius: '12px',
-              display: 'inline-flex',
-              boxShadow: '0 4px 15px rgba(0,0,0,0.25)'
-            }}>
-              <canvas ref={qrCanvasRef} style={{ width: '160px', height: '160px', display: 'block' }} />
-            </div>
-
-            <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-              كود مشفر لمسح حضور وغياب التلميذ بالكاميرا
-            </p>
-
-            <button
-              type="button"
-              onClick={downloadPureQR}
-              className="btn btn-primary"
-              style={{
+          {hasPermission('cards:issue') && (
+            <div className="glass-card" style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem', padding: '1.25rem' }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
                 width: '100%',
-                fontSize: '0.85rem',
-                fontWeight: 700,
-                justifyContent: 'center',
-                gap: '6px',
-                padding: '0.55rem',
-                background: 'linear-gradient(135deg, #0284c7, #0369a1)'
-              }}
-            >
-              <Download size={15} />
-              <span>تحميل رمز الـ QR منفصلاً (PNG)</span>
-            </button>
-          </div>
+                paddingBottom: '0.5rem',
+                borderBottom: '1px solid var(--border-subtle)',
+                color: '#38bdf8',
+                fontSize: '0.92rem',
+                fontWeight: 700
+              }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <QrCode size={17} />
+                  <span>رمز الـ QR المخصص للحضور</span>
+                </span>
+              </div>
+
+              <div style={{
+                background: '#ffffff',
+                padding: '12px',
+                borderRadius: '12px',
+                display: 'inline-flex',
+                boxShadow: '0 4px 15px rgba(0,0,0,0.25)'
+              }}>
+                <canvas ref={qrCanvasRef} style={{ width: '160px', height: '160px', display: 'block' }} />
+              </div>
+
+              <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                كود مشفر لمسح حضور وغياب التلميذ بالكاميرا
+              </p>
+
+              <button
+                type="button"
+                onClick={downloadPureQR}
+                className="btn btn-primary"
+                style={{
+                  width: '100%',
+                  fontSize: '0.85rem',
+                  fontWeight: 700,
+                  justifyContent: 'center',
+                  gap: '6px',
+                  padding: '0.55rem',
+                  background: 'linear-gradient(135deg, #0284c7, #0369a1)'
+                }}
+              >
+                <Download size={15} />
+                <span>تحميل رمز الـ QR منفصلاً (PNG)</span>
+              </button>
+            </div>
+          )}
         </div>
 
       </div>

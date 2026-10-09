@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { reportsApi } from '../api/reports';
 import { apiClient } from '../api/client';
 import { getWaUrl } from '../utils/phone';
@@ -31,6 +32,8 @@ const STAGE_OPTIONS = [
 ];
 
 export const ReportManagement = () => {
+  const { hasPermission, hasAnyPermission } = useAuth();
+
   // Active Report Tab: 'members', 'who_attended', 'who_absent', 'attendance', 'financials', 'followup', 'birthdays'
   const [reportType, setReportType] = useState('members');
 
@@ -218,38 +221,42 @@ export const ReportManagement = () => {
 
         {/* Unified Export Buttons */}
         <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          <button
-            onClick={() => handleExport('excel')}
-            disabled={exporting}
-            className="btn btn-secondary"
-            style={{ color: '#34d399', borderColor: 'rgba(52, 211, 153, 0.4)', gap: '0.4rem' }}
-            title="تحميل ملف إكسل منسق عربي RTL"
-          >
-            <FileSpreadsheet size={17} />
-            <span>{exporting ? 'جاري التصدير...' : 'تحميل Excel 📊'}</span>
-          </button>
+          {hasPermission('reports:export') && (
+            <>
+              <button
+                onClick={() => handleExport('excel')}
+                disabled={exporting}
+                className="btn btn-secondary"
+                style={{ color: '#34d399', borderColor: 'rgba(52, 211, 153, 0.4)', gap: '0.4rem' }}
+                title="تحميل ملف إكسل منسق عربي RTL"
+              >
+                <FileSpreadsheet size={17} />
+                <span>{exporting ? 'جاري التصدير...' : 'تحميل Excel 📊'}</span>
+              </button>
 
-          <button
-            onClick={() => handleExport('pdf')}
-            disabled={exporting}
-            className="btn btn-primary"
-            style={{ gap: '0.4rem' }}
-            title="معاينة وتصدير تقرير رسمي مروس بشعار الكنيسة جاهز للطباعة"
-          >
-            <Printer size={17} />
-            <span>معاينة / طباعة التقرير (Print / PDF) 📄</span>
-          </button>
+              <button
+                onClick={() => handleExport('pdf')}
+                disabled={exporting}
+                className="btn btn-primary"
+                style={{ gap: '0.4rem' }}
+                title="معاينة وتصدير تقرير رسمي مروس بشعار الكنيسة جاهز للطباعة"
+              >
+                <Printer size={17} />
+                <span>معاينة / طباعة التقرير (Print / PDF) 📄</span>
+              </button>
 
-          <button
-            onClick={() => handleExport('csv')}
-            disabled={exporting}
-            className="btn btn-secondary"
-            style={{ color: '#38bdf8', borderColor: 'rgba(56, 189, 248, 0.4)', gap: '0.4rem' }}
-            title="تحميل ملف بيانات CSV خام بترميز UTF-8 BOM"
-          >
-            <Download size={17} />
-            <span>تحميل CSV 📁</span>
-          </button>
+              <button
+                onClick={() => handleExport('csv')}
+                disabled={exporting}
+                className="btn btn-secondary"
+                style={{ color: '#38bdf8', borderColor: 'rgba(56, 189, 248, 0.4)', gap: '0.4rem' }}
+                title="تحميل ملف بيانات CSV خام بترميز UTF-8 BOM"
+              >
+                <Download size={17} />
+                <span>تحميل CSV 📁</span>
+              </button>
+            </>
+          )}
 
           <button onClick={fetchReportData} className="btn btn-secondary" disabled={loading} title="تحديث البيانات">
             <RefreshCw size={16} className={loading ? 'pulse-gold' : ''} />
@@ -259,61 +266,75 @@ export const ReportManagement = () => {
 
       {/* 2. Report Type Tabs */}
       <div className="glass-card" style={{ padding: '0.75rem', display: 'flex', gap: '0.5rem', overflowX: 'auto' }}>
-        <button
-          onClick={() => setReportType('members')}
-          className={`btn ${reportType === 'members' ? 'btn-primary' : 'btn-secondary'}`}
-          style={{ fontSize: '0.88rem', whiteSpace: 'nowrap' }}
-        >
-          سجل المخدومين الشامل 📜
-        </button>
+        {hasPermission('members:read') && (
+          <button
+            onClick={() => setReportType('members')}
+            className={`btn ${reportType === 'members' ? 'btn-primary' : 'btn-secondary'}`}
+            style={{ fontSize: '0.88rem', whiteSpace: 'nowrap' }}
+          >
+            سجل المخدومين الشامل 📜
+          </button>
+        )}
 
-        <button
-          onClick={() => setReportType('who_attended')}
-          className={`btn ${reportType === 'who_attended' ? 'btn-primary' : 'btn-secondary'}`}
-          style={{ fontSize: '0.88rem', whiteSpace: 'nowrap', color: reportType === 'who_attended' ? '#fff' : '#34d399' }}
-        >
-          كشف الحاضرين (مين حضر) ✅
-        </button>
+        {hasAnyPermission(['attendance:scan', 'attendance:session']) && (
+          <button
+            onClick={() => setReportType('who_attended')}
+            className={`btn ${reportType === 'who_attended' ? 'btn-primary' : 'btn-secondary'}`}
+            style={{ fontSize: '0.88rem', whiteSpace: 'nowrap', color: reportType === 'who_attended' ? '#fff' : '#34d399' }}
+          >
+            كشف الحاضرين (مين حضر) ✅
+          </button>
+        )}
 
-        <button
-          onClick={() => setReportType('who_absent')}
-          className={`btn ${reportType === 'who_absent' ? 'btn-primary' : 'btn-secondary'}`}
-          style={{ fontSize: '0.88rem', whiteSpace: 'nowrap', color: reportType === 'who_absent' ? '#fff' : '#f87171' }}
-        >
-          كشف الغائبين (مين غاب) ❌
-        </button>
+        {hasAnyPermission(['attendance:scan', 'attendance:session']) && (
+          <button
+            onClick={() => setReportType('who_absent')}
+            className={`btn ${reportType === 'who_absent' ? 'btn-primary' : 'btn-secondary'}`}
+            style={{ fontSize: '0.88rem', whiteSpace: 'nowrap', color: reportType === 'who_absent' ? '#fff' : '#f87171' }}
+          >
+            كشف الغائبين (مين غاب) ❌
+          </button>
+        )}
 
-        <button
-          onClick={() => setReportType('attendance')}
-          className={`btn ${reportType === 'attendance' ? 'btn-primary' : 'btn-secondary'}`}
-          style={{ fontSize: '0.88rem', whiteSpace: 'nowrap' }}
-        >
-          تقرير الحضور والانتظام 📊
-        </button>
+        {hasAnyPermission(['attendance:scan', 'attendance:session']) && (
+          <button
+            onClick={() => setReportType('attendance')}
+            className={`btn ${reportType === 'attendance' ? 'btn-primary' : 'btn-secondary'}`}
+            style={{ fontSize: '0.88rem', whiteSpace: 'nowrap' }}
+          >
+            تقرير الحضور والانتظام 📊
+          </button>
+        )}
 
-        <button
-          onClick={() => setReportType('financials')}
-          className={`btn ${reportType === 'financials' ? 'btn-primary' : 'btn-secondary'}`}
-          style={{ fontSize: '0.88rem', whiteSpace: 'nowrap' }}
-        >
-          التقرير المالي للرحلات والأنشطة 💳
-        </button>
+        {hasPermission('reports:read') && (
+          <button
+            onClick={() => setReportType('financials')}
+            className={`btn ${reportType === 'financials' ? 'btn-primary' : 'btn-secondary'}`}
+            style={{ fontSize: '0.88rem', whiteSpace: 'nowrap' }}
+          >
+            التقرير المالي للرحلات والأنشطة 💳
+          </button>
+        )}
 
-        <button
-          onClick={() => setReportType('followup')}
-          className={`btn ${reportType === 'followup' ? 'btn-primary' : 'btn-secondary'}`}
-          style={{ fontSize: '0.88rem', whiteSpace: 'nowrap' }}
-        >
-          تقرير متابعة الغياب والافتقاد 🤝
-        </button>
+        {hasPermission('followup:read') && (
+          <button
+            onClick={() => setReportType('followup')}
+            className={`btn ${reportType === 'followup' ? 'btn-primary' : 'btn-secondary'}`}
+            style={{ fontSize: '0.88rem', whiteSpace: 'nowrap' }}
+          >
+            تقرير متابعة الغياب والافتقاد 🤝
+          </button>
+        )}
 
-        <button
-          onClick={() => setReportType('birthdays')}
-          className={`btn ${reportType === 'birthdays' ? 'btn-primary' : 'btn-secondary'}`}
-          style={{ fontSize: '0.88rem', whiteSpace: 'nowrap' }}
-        >
-          تقرير أعياد الميلاد وتوزيع الهدايا 🎁
-        </button>
+        {hasPermission('birthdays:read') && (
+          <button
+            onClick={() => setReportType('birthdays')}
+            className={`btn ${reportType === 'birthdays' ? 'btn-primary' : 'btn-secondary'}`}
+            style={{ fontSize: '0.88rem', whiteSpace: 'nowrap' }}
+          >
+            تقرير أعياد الميلاد وتوزيع الهدايا 🎁
+          </button>
+        )}
       </div>
 
       {/* 3. Filters Toolbar */}

@@ -15,6 +15,7 @@ import {
   UserCog,
   Settings,
   Cake,
+  Shield,
   X
 } from 'lucide-react';
 
@@ -36,30 +37,31 @@ const navGroups = [
     label: 'الخدمة والفصول',
     items: [
       { title: 'الفصول والمجموعات', path: '/classes', icon: <FolderKanban size={18} />, permission: 'classes:read' },
-      { title: 'النشاط الصيفي', path: '/summer-activities', icon: <Calendar size={18} />, permission: 'classes:manage' },
+      { title: 'النشاط الصيفي', path: '/summer-activities', icon: <Calendar size={18} />, permission: 'classes:read' },
       { title: 'الأنشطة والرحلات', path: '/events', icon: <QrCode size={18} />, permission: 'events:read' }
     ]
   },
   {
     label: 'الحضور والمتابعة',
     items: [
-      { title: 'تسجيل الحضور', path: '/attendance', icon: <UserCheck size={18} />, permission: 'attendance:scan' },
+      { title: 'تسجيل الحضور', path: '/attendance', icon: <UserCheck size={18} />, anyPermissions: ['attendance:scan', 'attendance:session'] },
       { title: 'الافتقاد والغياب', path: '/followup', icon: <HeartHandshake size={18} />, permission: 'followup:read' },
-      { title: 'المكافآت', path: '/rewards', icon: <Award size={18} />, permission: 'rewards:manage' }
+      { title: 'المكافآت', path: '/rewards', icon: <Award size={18} />, permission: 'rewards:read' }
     ]
   },
   {
     label: 'النظام',
     items: [
       { title: 'المستخدمين', path: '/users', icon: <UserCog size={18} />, permission: 'users:read' },
-      { title: 'الإعدادات', path: '/settings', icon: <Settings size={18} />, permission: 'settings:write' },
-      { title: 'التقارير', path: '/reports', icon: <FileBarChart size={18} />, permission: 'reports:export' }
+      { title: 'التقارير', path: '/reports', icon: <FileBarChart size={18} />, permission: 'reports:read' },
+      { title: 'سجل العمليات', path: '/audit-logs', icon: <Shield size={18} />, permission: 'audit:read' },
+      { title: 'الإعدادات', path: '/settings', icon: <Settings size={18} />, permission: 'settings:read' }
     ]
   }
 ];
 
 export const Sidebar = ({ mobileOpen, setMobileOpen }) => {
-  const { hasPermission } = useAuth();
+  const { hasPermission, hasAnyPermission } = useAuth();
 
   const handleNavClick = () => {
     if (setMobileOpen) {
@@ -101,9 +103,11 @@ export const Sidebar = ({ mobileOpen, setMobileOpen }) => {
 
         <nav style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
           {navGroups.map((group) => {
-            const visibleItems = group.items.filter(
-              item => !item.permission || hasPermission(item.permission)
-            );
+            const visibleItems = group.items.filter(item => {
+              if (item.anyPermissions) return hasAnyPermission(item.anyPermissions);
+              if (item.permission) return hasPermission(item.permission);
+              return true;
+            });
             if (visibleItems.length === 0) return null;
 
             return (

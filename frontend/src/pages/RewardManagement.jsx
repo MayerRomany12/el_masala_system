@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { rewardsApi } from '../api/rewards';
 import { membersApi } from '../api/members';
 import { eventsApi } from '../api/events';
@@ -41,6 +42,7 @@ const STAGE_OPTIONS = [
 ];
 
 export const RewardManagement = () => {
+  const { hasPermission } = useAuth();
   // Leaderboard state
   const [leaderboard, setLeaderboard] = useState([]);
   const [lbLoading, setLbLoading] = useState(true);
@@ -224,10 +226,12 @@ export const RewardManagement = () => {
         </div>
 
         <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <button onClick={() => setIsAwardModalOpen(true)} className="btn btn-primary" style={{ gap: '0.4rem', background: 'linear-gradient(135deg, #d97706 0%, #fbbf24 100%)' }}>
-            <Gift size={18} />
-            <span>منح نقاط تشجيعية 🎁</span>
-          </button>
+          {hasPermission('rewards:manage') && (
+            <button onClick={() => setIsAwardModalOpen(true)} className="btn btn-primary" style={{ gap: '0.4rem', background: 'linear-gradient(135deg, #d97706 0%, #fbbf24 100%)' }}>
+              <Gift size={18} />
+              <span>منح نقاط تشجيعية 🎁</span>
+            </button>
+          )}
           <button onClick={fetchLeaderboard} className="btn btn-secondary">
             <RefreshCw size={16} />
             <span>تحديث</span>
@@ -447,7 +451,7 @@ export const RewardManagement = () => {
               </strong>
             </div>
 
-            {calcResult.available_points >= 100 && (
+            {calcResult.available_points >= 100 && hasPermission('rewards:manage') && (
               <div>
                 <button onClick={handleRedeemPointsSubmit} className="btn btn-secondary" style={{ color: '#fbbf24', borderColor: '#fbbf24', fontSize: '0.82rem' }}>
                   استبدال 100 نقطة بخصم 25 جم 💳

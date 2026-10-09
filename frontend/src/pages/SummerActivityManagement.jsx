@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { apiClient } from '../api/client';
 import {
   Sun,
@@ -15,6 +16,7 @@ import {
 
 export const SummerActivityManagement = () => {
   const navigate = useNavigate();
+  const { hasPermission } = useAuth();
   const [seasons, setSeasons] = useState([]);
   const [selectedSeason, setSelectedSeason] = useState('');
   const [summerGroups, setSummerGroups] = useState([]);
@@ -101,10 +103,12 @@ export const SummerActivityManagement = () => {
           </p>
         </div>
 
-        <button className="btn btn-primary" onClick={() => setShowCreateModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700 }}>
-          <Plus size={18} />
-          إضافة نشاط / مجموعة صيفية
-        </button>
+        {hasPermission('classes:manage') && (
+          <button className="btn btn-primary" onClick={() => setShowCreateModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700 }}>
+            <Plus size={18} />
+            إضافة نشاط / مجموعة صيفية
+          </button>
+        )}
       </div>
 
       {/* Alerts */}

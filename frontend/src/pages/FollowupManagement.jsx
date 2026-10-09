@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { apiClient } from '../api/client';
 import { followupApi } from '../api/followup';
 import { getWaUrl, getGmailUrl, getMapsUrl } from '../utils/phone';
@@ -33,6 +34,7 @@ import {
 } from 'lucide-react';
 
 export const FollowupManagement = () => {
+  const { hasPermission } = useAuth();
   const [tasks, setTasks] = useState([]);
   const [tasksByArea, setTasksByArea] = useState([]);
   const [classesList, setClassesList] = useState([]);
@@ -370,15 +372,17 @@ export const FollowupManagement = () => {
         </div>
 
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <button
-            onClick={handleRunDetector}
-            className="btn btn-primary"
-            disabled={detecting}
-            style={{ gap: '0.5rem', background: 'linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)', fontWeight: 700 }}
-          >
-            <Sparkles size={17} />
-            <span>{detecting ? 'جاري فحص الجلسات...' : 'تشغيل كاشف الغائبين 🔍'}</span>
-          </button>
+          {hasPermission('followup:manage') && (
+            <button
+              onClick={handleRunDetector}
+              className="btn btn-primary"
+              disabled={detecting}
+              style={{ gap: '0.5rem', background: 'linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)', fontWeight: 700 }}
+            >
+              <Sparkles size={17} />
+              <span>{detecting ? 'جاري فحص الجلسات...' : 'تشغيل كاشف الغائبين 🔍'}</span>
+            </button>
+          )}
 
           <button onClick={() => viewMode === 'list' ? fetchTasks() : fetchTasksByArea()} className="btn btn-secondary">
             <RefreshCw size={16} />
@@ -849,14 +853,16 @@ export const FollowupManagement = () => {
                             {/* Actions */}
                             <td style={{ textAlign: 'center' }}>
                               <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
-                                <button
-                                  onClick={() => { setActiveLogTask(t); setLogFormData({ contact_method: 'Phone', outcome: 'Promised', notes: '' }); }}
-                                  className="btn btn-primary"
-                                  style={{ padding: '0.25rem 0.6rem', fontSize: '0.78rem' }}
-                                  title="تسجيل نتيجة الافتقاد"
-                                >
-                                  <span>توثيق 📝</span>
-                                </button>
+                                {hasPermission('followup:write') && (
+                                  <button
+                                    onClick={() => { setActiveLogTask(t); setLogFormData({ contact_method: 'Phone', outcome: 'Promised', notes: '' }); }}
+                                    className="btn btn-primary"
+                                    style={{ padding: '0.25rem 0.6rem', fontSize: '0.78rem' }}
+                                    title="تسجيل نتيجة الافتقاد"
+                                  >
+                                    <span>توثيق 📝</span>
+                                  </button>
+                                )}
 
                                 <button
                                   onClick={() => handleOpenHistory(t)}
@@ -867,7 +873,7 @@ export const FollowupManagement = () => {
                                   <span>السجل 📋</span>
                                 </button>
 
-                                {t.status !== 'Escalated' && t.status !== 'Completed' && (
+                                {hasPermission('followup:write') && t.status !== 'Escalated' && t.status !== 'Completed' && (
                                   <button
                                     onClick={() => handleEscalateTask(t.task_id)}
                                     className="btn btn-secondary"
@@ -1047,28 +1053,30 @@ export const FollowupManagement = () => {
                     </div>
 
                     {/* Bottom Actions Row */}
-                    <div style={{ display: 'grid', gridTemplateColumns: t.status !== 'Escalated' && t.status !== 'Completed' ? '1fr 1fr 1fr' : '1fr 1fr', gap: '0.4rem', marginTop: '0.25rem' }}>
-                      <button
-                        onClick={() => { setActiveLogTask(t); setLogFormData({ contact_method: 'Phone', outcome: 'Promised', notes: '' }); }}
-                        className="btn btn-primary"
-                        style={{ padding: '0.45rem 0.5rem', fontSize: '0.82rem', justifyContent: 'center' }}
-                      >
-                        توثيق 📝
-                      </button>
+                    <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.25rem' }}>
+                      {hasPermission('followup:write') && (
+                        <button
+                          onClick={() => { setActiveLogTask(t); setLogFormData({ contact_method: 'Phone', outcome: 'Promised', notes: '' }); }}
+                          className="btn btn-primary"
+                          style={{ flex: 1, padding: '0.45rem 0.5rem', fontSize: '0.82rem', justifyContent: 'center' }}
+                        >
+                          توثيق 📝
+                        </button>
+                      )}
 
                       <button
                         onClick={() => handleOpenHistory(t)}
                         className="btn btn-secondary"
-                        style={{ padding: '0.45rem 0.5rem', fontSize: '0.82rem', justifyContent: 'center' }}
+                        style={{ flex: 1, padding: '0.45rem 0.5rem', fontSize: '0.82rem', justifyContent: 'center' }}
                       >
                         السجل 📋
                       </button>
 
-                      {t.status !== 'Escalated' && t.status !== 'Completed' && (
+                      {hasPermission('followup:write') && t.status !== 'Escalated' && t.status !== 'Completed' && (
                         <button
                           onClick={() => handleEscalateTask(t.task_id)}
                           className="btn btn-secondary"
-                          style={{ padding: '0.45rem 0.5rem', fontSize: '0.82rem', color: '#f87171', justifyContent: 'center' }}
+                          style={{ flex: 1, padding: '0.45rem 0.5rem', fontSize: '0.82rem', color: '#f87171', justifyContent: 'center' }}
                         >
                           تصعيد ⚡
                         </button>
@@ -1112,14 +1120,16 @@ export const FollowupManagement = () => {
                     </div>
                   </div>
 
-                  <button
-                    onClick={() => handlePrintAreaSheet(grp)}
-                    className="btn btn-secondary"
-                    style={{ fontSize: '0.82rem', gap: '6px', color: '#a855f7', borderColor: 'rgba(168, 85, 247, 0.3)' }}
-                  >
-                    <Printer size={15} />
-                    <span>طباعة كشف زيارات {grp.area} (PDF)</span>
-                  </button>
+                  {hasPermission('reports:export') && (
+                    <button
+                      onClick={() => handlePrintAreaSheet(grp)}
+                      className="btn btn-secondary"
+                      style={{ fontSize: '0.82rem', gap: '6px', color: '#a855f7', borderColor: 'rgba(168, 85, 247, 0.3)' }}
+                    >
+                      <Printer size={15} />
+                      <span>طباعة كشف زيارات {grp.area} (PDF)</span>
+                    </button>
+                  )}
                 </div>
 
                 {/* Area Children Cards Grid */}
@@ -1206,13 +1216,15 @@ export const FollowupManagement = () => {
                           )}
                         </div>
 
-                        <button
-                          onClick={() => { setActiveLogTask(t); setLogFormData({ contact_method: 'Visit', outcome: 'Promised', notes: '' }); }}
-                          className="btn btn-primary"
-                          style={{ padding: '0.3rem 0.7rem', fontSize: '0.8rem' }}
-                        >
-                          توثيق الزيارة 📝
-                        </button>
+                        {hasPermission('followup:write') && (
+                          <button
+                            onClick={() => { setActiveLogTask(t); setLogFormData({ contact_method: 'Visit', outcome: 'Promised', notes: '' }); }}
+                            className="btn btn-primary"
+                            style={{ padding: '0.3rem 0.7rem', fontSize: '0.8rem' }}
+                          >
+                            توثيق الزيارة 📝
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}
