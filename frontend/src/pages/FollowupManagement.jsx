@@ -510,7 +510,7 @@ export const FollowupManagement = () => {
               <option value="">كل الأولويات</option>
               <option value="Urgent">عاجل (4+ أسابيع) 🔴</option>
               <option value="High">عالي (3 أسابيع) 🟡</option>
-              <option value="Normal">عادي (أسبوعين) 🔵</option>
+              <option value="Normal">عادي (غياب أسبوع فأكثر) 🔵</option>
             </select>
           </div>
         )}
@@ -570,7 +570,7 @@ export const FollowupManagement = () => {
 
               <button
                 onClick={handleDistributeTasks}
-                disabled={distributing || classStats.pending_tasks === 0}
+                disabled={distributing}
                 className="btn btn-primary"
                 style={{
                   fontSize: '0.84rem',
@@ -580,10 +580,10 @@ export const FollowupManagement = () => {
                   fontWeight: 700,
                   gap: '0.5rem'
                 }}
-                title={classStats.pending_tasks === 0 ? 'لا توجد مهام معلقة للتوزيع' : 'توزيع المهام المعلقة بالتساوي على خدام الفصل'}
+                title="كشف حالات الغياب وتوزيع المهام بالتساوي على خدام الفصل"
               >
                 <Sparkles size={16} />
-                <span>{distributing ? 'جاري التوزيع...' : '⚡ توزيع مهام الافتقاد بالتساوي على الخدام'}</span>
+                <span>{distributing ? 'جاري الكشف والتوزيع...' : '⚡ كشف وتوزيع مهام الافتقاد على خدام الفصل'}</span>
               </button>
             </div>
           </div>

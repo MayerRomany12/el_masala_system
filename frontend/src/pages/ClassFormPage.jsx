@@ -1,10 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { apiClient } from '../api/client';
 import { ArrowRight, Plus, Save, AlertCircle, CheckCircle, Layers } from 'lucide-react';
 
 export const ClassFormPage = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (user && user.role === 'Servant') {
+      navigate('/classes', { replace: true });
+    }
+  }, [user, navigate]);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -21,6 +29,11 @@ export const ClassFormPage = () => {
     e.preventDefault();
     setError('');
     setSuccessMsg('');
+
+    if (user?.role === 'Servant') {
+      setError('غير مصرح للخادم بإنشاء فصول جديدة');
+      return;
+    }
 
     if (!formData.name.trim()) {
       setError('يرجى إدخال اسم الفصل أو المجموعة الخدمية');

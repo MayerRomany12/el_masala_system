@@ -2,7 +2,7 @@ import secrets
 from typing import Optional, List, Tuple, Dict, Any
 from datetime import datetime, date, timezone
 
-from sqlalchemy import select, update, func, or_, String, Date
+from sqlalchemy import select, update, func, or_, and_, exists, String, Date
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 
@@ -155,23 +155,31 @@ class FollowupRepository:
         class_id: Optional[str] = None
     ) -> Tuple[int, Optional[str]]:
         """
-        حساب الغياب المتتالي بناءً على جلسات فصل المخدوم الأساسية.
+        حساب الغياب المتتالي بناءً على جلسات فصل المخدوم الأساسية (الجلسات المنتهية أو المفتوحة حتى تاريخ اليوم).
         """
         from app.models.class_group import ClassGroupMember
-        if not class_id:
+        clean_cid = class_id.strip().upper() if (class_id and isinstance(class_id, str) and class_id.strip()) else None
+        if not clean_cid:
             c_res = await self.db.execute(
                 select(ClassGroupMember.class_id).where(
-                    ClassGroupMember.member_id == member_id,
+                    func.upper(ClassGroupMember.member_id) == member_id.strip().upper(),
                     ClassGroupMember.is_active == True
                 )
             )
             c_row = c_res.first()
             if c_row:
-                class_id = c_row[0]
+                clean_cid = c_row[0].strip().upper()
 
-        query = select(AttendanceSession).order_by(AttendanceSession.session_date.desc(), AttendanceSession.created_at.desc())
-        if class_id:
-            query = query.where(AttendanceSession.class_id == class_id)
+        query = (
+            select(AttendanceSession)
+            .where(
+                AttendanceSession.status.in_(["Completed", "Closed", "Open"]),
+                AttendanceSession.session_date <= date.today()
+            )
+            .order_by(AttendanceSession.session_date.desc(), AttendanceSession.created_at.desc())
+        )
+        if clean_cid:
+            query = query.where(func.upper(AttendanceSession.class_id) == clean_cid)
         elif member_stage:
             stage_prefix = member_stage.split('-')[0].strip()
             query = query.where(or_(AttendanceSession.stage == "ALL", AttendanceSession.stage.ilike(f"%{stage_prefix}%")))
@@ -186,7 +194,7 @@ class FollowupRepository:
         for s in sessions:
             rec_q = select(AttendanceRecord).where(
                 AttendanceRecord.session_id == s.session_id,
-                AttendanceRecord.member_id == member_id,
+                func.upper(AttendanceRecord.member_id) == member_id.strip().upper(),
                 AttendanceRecord.status == "Valid"
             )
             rec = (await self.db.execute(rec_q)).scalar_one_or_none()
@@ -202,18 +210,28 @@ class FollowupRepository:
 
     async def run_absence_detector(self, stage: Optional[str] = None, class_id: Optional[str] = None) -> Dict[str, Any]:
         """
-        محرك الكشف التلقائي عن الغائبين وتحديث مهام الافتقاد بحسب الفصل أو المرحلة
+        محرك الكشف التلقائي عن الغائبين وتحديث مهام الافتقاد بحسب الفصل أو المرحلة:
+        أي مخدوم غاب مرة واحدة متتالية أو أكثر يحتاج افتقاداً فورياً.
         """
         from app.settings.repository import SettingsRepository
         from app.models.class_group import ClassGroupMember
         settings_repo = SettingsRepository(self.db)
-        threshold_str = await settings_repo.get_setting_value("absence_threshold_weeks", "2")
-        threshold = int(threshold_str)
+        threshold_str = await settings_repo.get_setting_value("absence_threshold_weeks", "1")
+        try:
+            threshold = int(threshold_str)
+        except (ValueError, TypeError):
+            threshold = 1
+        threshold = max(1, threshold)
+
+        clean_cid = class_id.strip().upper() if (class_id and isinstance(class_id, str) and class_id.strip()) else None
 
         mem_query = select(Member).where(Member.status == "Active", Member.is_archived == False)
-        if class_id:
-            mem_query = mem_query.join(ClassGroupMember, Member.member_id == ClassGroupMember.member_id).where(
-                ClassGroupMember.class_id == class_id,
+        if clean_cid:
+            mem_query = mem_query.join(
+                ClassGroupMember,
+                func.upper(Member.member_id) == func.upper(ClassGroupMember.member_id)
+            ).where(
+                func.upper(ClassGroupMember.class_id) == clean_cid,
                 ClassGroupMember.is_active == True
             )
         elif stage and stage != "ALL":
@@ -227,9 +245,9 @@ class FollowupRepository:
         tasks_updated = 0
 
         for m in members:
-            consecutive, last_session_id = await self.calculate_consecutive_absences_for_member(m.member_id, m.stage, class_id=class_id)
+            consecutive, last_session_id = await self.calculate_consecutive_absences_for_member(m.member_id, m.stage, class_id=clean_cid)
 
-            # Dynamic Threshold Rule from SystemSettings
+            # Any member with at least `threshold` (default 1) absence needs followup
             if consecutive >= threshold:
                 detected_count += 1
                 priority = "Normal"
@@ -253,7 +271,7 @@ class FollowupRepository:
             "detected_count": detected_count,
             "tasks_created": tasks_created,
             "tasks_updated": tasks_updated,
-            "message": f"تم كشف {detected_count} طفل غائب لـ 2+ جلسات متتالية (تم إنشاء {tasks_created} جديدة وتحديث {tasks_updated} قائمة)."
+            "message": f"تم كشف {detected_count} طفل غائب لـ {threshold}+ جلسات (تم إنشاء {tasks_created} جديدة وتحديث {tasks_updated} قائمة)."
         }
 
     # ─── Logs & Tasks Queries ──────────────────────────────────────────────────
@@ -438,42 +456,50 @@ class FollowupRepository:
 
     async def distribute_class_tasks(self, class_id: str) -> Dict[str, Any]:
         """
-        توزيع مهام الافتقاد الخاصة بأعضاء الفصل بالتساوي على الخدام النشطين المسكنين فيه (Round-Robin)
-        مع استبعاد السوبر أدمن تلقائياً (السوبر أدمن يتابع فقط ولا يفتقد).
+        توزيع مهام الافتقاد الخاصة بأعضاء الفصل بالتساوي على الخدام النشطين المسكنين فيه (Round-Robin).
+        أي طفل غاب مرة واحدة يتم كشفه وإدراجه في الافتقاد وتوزيعه.
         """
         from app.models.class_group import ClassGroupServant, ClassGroupMember, ClassGroup
         from app.models.user import User
 
+        clean_cid = class_id.strip().upper()
+
         # Fetch class info
-        c_res = await self.db.execute(select(ClassGroup.name).where(ClassGroup.class_id == class_id))
+        c_res = await self.db.execute(select(ClassGroup.name).where(func.upper(ClassGroup.class_id) == clean_cid))
         class_name = c_res.scalar_one_or_none() or class_id
 
-        # 1. Fetch active servants in this class (EXCLUDING SUPER ADMIN)
+        # 0. Auto-run absence detector for this class first (consecutive >= 1) to ensure all absentees have active tasks
+        await self.run_absence_detector(class_id=clean_cid)
+
+        # 1. Fetch active servants in this class
         s_query = (
-            select(User.user_id, User.full_name)
+            select(User.user_id, User.full_name, User.role, User.phone)
             .join(ClassGroupServant, User.user_id == ClassGroupServant.servant_id)
             .where(
-                ClassGroupServant.class_id == class_id,
+                func.upper(ClassGroupServant.class_id) == clean_cid,
                 ClassGroupServant.is_active == True,
-                User.is_active == True,
-                ~User.role.in_(["SuperAdmin", "Super Admin"])
+                User.is_active == True
             )
             .order_by(User.full_name)
         )
-        servants = (await self.db.execute(s_query)).all()
-        if not servants:
-            raise AppException(f"لا يوجد خدام (غير السوبر أدمن) مسجلون بنشاط في فصل '{class_name}' لتوزيع المهام عليهم")
+        all_servants = (await self.db.execute(s_query)).all()
+        if not all_servants:
+            raise AppException(f"لا يوجد خدام مسجلون بنشاط في فصل '{class_name}' لتوزيع المهام عليهم")
+
+        # Exclude super admins if regular servants exist, but fall back gracefully if only admins are assigned
+        regular_servants = [s for s in all_servants if s[2] not in ["SuperAdmin", "Super Admin"]]
+        servants = regular_servants if regular_servants else all_servants
 
         # 2. Fetch active members of this class
         m_query = select(ClassGroupMember.member_id).where(
-            ClassGroupMember.class_id == class_id,
+            func.upper(ClassGroupMember.class_id) == clean_cid,
             ClassGroupMember.is_active == True
         )
         class_member_ids = (await self.db.execute(m_query)).scalars().all()
         if not class_member_ids:
-            return {"distributed_count": 0, "message": "لا يوجد مخدومين في هذا الفصل", "per_servant": []}
+            return {"distributed_count": 0, "total_tasks": 0, "message": "لا يوجد مخدومين في هذا الفصل", "per_servant": []}
 
-        # 3. Fetch pending/unassigned or pending tasks for these members
+        # 3. Fetch pending/escalated tasks for these members
         t_query = select(FollowupTask).where(
             FollowupTask.member_id.in_(class_member_ids),
             FollowupTask.status.in_(["Pending", "Escalated"])
@@ -481,7 +507,15 @@ class FollowupRepository:
 
         tasks = (await self.db.execute(t_query)).scalars().all()
         if not tasks:
-            return {"distributed_count": 0, "message": "لا توجد مهام افتقاد معلقة لهذا الفصل", "per_servant": []}
+            return {
+                "class_id": class_id,
+                "class_name": class_name,
+                "total_tasks": 0,
+                "distributed_count": 0,
+                "servants_count": len(servants),
+                "message": "لا توجد حالات غياب أو مهام افتقاد معلقة لهذا الفصل",
+                "per_servant": []
+            }
 
         per_servant_counts = {s[0]: {"servant_id": s[0], "servant_name": s[1], "count": 0} for s in servants}
         for idx, task in enumerate(tasks):
@@ -496,8 +530,10 @@ class FollowupRepository:
             "class_id": class_id,
             "class_name": class_name,
             "total_tasks": len(tasks),
+            "distributed_count": len(tasks),
             "servants_count": len(servants),
-            "distribution": list(per_servant_counts.values())
+            "distribution": list(per_servant_counts.values()),
+            "message": f"تم توزيع {len(tasks)} مهمة افتقاد بالتساوي على {len(servants)} من خدام الفصل بنجاح"
         }
 
     async def detect_and_distribute_class(self, class_id: str) -> Dict[str, Any]:
@@ -524,16 +560,18 @@ class FollowupRepository:
         from app.models.class_group import ClassGroupServant, ClassGroupMember, ClassGroup
         from app.models.user import User
 
+        clean_cid = class_id.strip().upper()
+
         # Class Info
-        c_row = (await self.db.execute(select(ClassGroup).where(ClassGroup.class_id == class_id))).scalar_one_or_none()
-        class_name = c_row.name if c_row else "الفصل"
+        c_row = (await self.db.execute(select(ClassGroup).where(func.upper(ClassGroup.class_id) == clean_cid))).scalar_one_or_none()
+        class_name = c_row.name if c_row else class_id
 
         # Servants in class
         s_query = (
             select(User.user_id, User.full_name, User.phone, ClassGroupServant.role)
             .join(ClassGroupServant, User.user_id == ClassGroupServant.servant_id)
             .where(
-                ClassGroupServant.class_id == class_id,
+                func.upper(ClassGroupServant.class_id) == clean_cid,
                 ClassGroupServant.is_active == True,
                 User.is_active == True
             )
@@ -543,7 +581,7 @@ class FollowupRepository:
 
         # Members in class
         m_query = select(ClassGroupMember.member_id).where(
-            ClassGroupMember.class_id == class_id,
+            func.upper(ClassGroupMember.class_id) == clean_cid,
             ClassGroupMember.is_active == True
         )
         class_member_ids = (await self.db.execute(m_query)).scalars().all()
@@ -556,7 +594,8 @@ class FollowupRepository:
                 "total_tasks": 0,
                 "pending_tasks": 0,
                 "completed_tasks": 0,
-                "servants_progress": []
+                "servants_progress": [],
+                "servants": []
             }
 
         # Tasks for class members
@@ -575,16 +614,20 @@ class FollowupRepository:
             s_completed = sum(1 for t in servant_tasks if t.status == "Completed")
             rate = round((s_completed / len(servant_tasks) * 100), 1) if servant_tasks else 100.0
 
-            servants_progress.append({
+            item = {
                 "servant_id": s_id,
                 "servant_name": s_name,
                 "phone": s_phone,
+                "servant_phone": s_phone,
                 "role": s_role,
+                "servant_role": s_role,
                 "total_tasks": len(servant_tasks),
+                "assigned_tasks": len(servant_tasks),
                 "pending_tasks": s_pending,
                 "completed_tasks": s_completed,
                 "completion_rate": rate
-            })
+            }
+            servants_progress.append(item)
 
         # Unassigned tasks
         unassigned = [t for t in all_tasks if not t.assigned_servant_id and t.status in ["Pending", "Escalated"]]
@@ -597,6 +640,7 @@ class FollowupRepository:
             "pending_tasks": pending_count,
             "completed_tasks": completed_count,
             "unassigned_pending_count": len(unassigned),
-            "servants_progress": servants_progress
+            "servants_progress": servants_progress,
+            "servants": servants_progress
         }
 

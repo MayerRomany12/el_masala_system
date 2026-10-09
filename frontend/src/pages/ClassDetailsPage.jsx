@@ -27,7 +27,7 @@ import {
 export const ClassDetailsPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { hasPermission } = useAuth();
+  const { hasPermission, user } = useAuth();
 
   const [classData, setClassData] = useState(null);
   const [allClasses, setAllClasses] = useState([]);
@@ -72,7 +72,7 @@ export const ClassDetailsPage = () => {
   const [savingEdit, setSavingEdit] = useState(false);
 
   const handleOpenEdit = () => {
-    if (!classData) return;
+    if (!classData || user?.role === 'Servant') return;
     setEditForm({
       name: classData.name || '',
       stage: classData.stage || '',
@@ -86,6 +86,10 @@ export const ClassDetailsPage = () => {
 
   const handleSaveEdit = async (e) => {
     e.preventDefault();
+    if (user?.role === 'Servant') {
+      alert('غير مصرح للخادم بتعديل بيانات الفصل');
+      return;
+    }
     if (!editForm.name.trim()) {
       alert('يرجى كتابة اسم الفصل');
       return;
@@ -198,6 +202,10 @@ export const ClassDetailsPage = () => {
 
   const handleAddServant = async (e) => {
     e.preventDefault();
+    if (user?.role === 'Servant') {
+      alert('غير مصرح للخادم بتعيين خدام للفصل');
+      return;
+    }
     if (!selectedServantId) return;
     setAddingServant(true);
     try {
@@ -228,6 +236,10 @@ export const ClassDetailsPage = () => {
   };
 
   const handleRemoveServant = async (servantId, servantName) => {
+    if (user?.role === 'Servant') {
+      alert('غير مصرح للخادم بإلغاء إشراف الخدام');
+      return;
+    }
     if (!window.confirm(`هل أنت متأكد من إلغاء إشراف الخادم (${servantName})؟`)) return;
     try {
       await apiClient.delete(`/classes/${id}/servants/${servantId}`);
@@ -326,7 +338,7 @@ export const ClassDetailsPage = () => {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
-            {hasPermission('classes:manage') && (
+            {hasPermission('classes:manage') && user?.role !== 'Servant' && (
               <button
                 onClick={handleOpenEdit}
                 className="btn btn-secondary"
@@ -437,7 +449,7 @@ export const ClassDetailsPage = () => {
           <span>خدام الفصل ({servants.length})</span>
         </button>
 
-        {hasPermission('classes:manage') && (
+        {(hasPermission('classes:manage') || hasPermission('members:write')) && (
           <button
             onClick={() => setActiveTab('addMember')}
             className={`btn ${activeTab === 'addMember' ? 'btn-primary' : 'btn-secondary'}`}
@@ -448,7 +460,7 @@ export const ClassDetailsPage = () => {
           </button>
         )}
 
-        {hasPermission('classes:manage') && (
+        {hasPermission('classes:manage') && user?.role !== 'Servant' && (
           <button
             onClick={() => setActiveTab('addServant')}
             className={`btn ${activeTab === 'addServant' ? 'btn-primary' : 'btn-secondary'}`}
@@ -723,7 +735,7 @@ export const ClassDetailsPage = () => {
           {servants.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '2.5rem 1rem', color: 'var(--text-muted)' }}>
               <p>لم يتم تعيين خدام مشرفين لهذا الفصل حتى الآن</p>
-              {hasPermission('classes:manage') && (
+              {hasPermission('classes:manage') && user?.role !== 'Servant' && (
                 <button onClick={() => setActiveTab('addServant')} className="btn btn-secondary" style={{ fontSize: '0.85rem', marginTop: '0.5rem' }}>
                   <Plus size={15} />
                   <span>تعيين خادم مشرف</span>
@@ -762,7 +774,7 @@ export const ClassDetailsPage = () => {
                       )}
                     </div>
 
-                    {hasPermission('classes:manage') && (
+                    {hasPermission('classes:manage') && user?.role !== 'Servant' && (
                       <button
                         onClick={() => handleRemoveServant(servantId, s.full_name || s.username)}
                         className="btn btn-secondary"

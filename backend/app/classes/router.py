@@ -12,6 +12,7 @@ from app.classes.schemas import (
     TransferMemberRequest
 )
 from app.classes.service import ClassService
+from app.users.schemas import RoleEnum
 from app.shared.response import success_response
 
 router = APIRouter(prefix="/classes", tags=["Classes & Groups Management"])
@@ -49,6 +50,12 @@ async def create_class_group(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(require_permission("classes:manage"))
 ):
+    if current_user.get("role") in ["Servant", RoleEnum.SERVANT]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="غير مصرح: لا يمتلك الخادم صلاحية إنشاء فصول جديدة"
+        )
+
     service = ClassService(db)
     class_group = await service.create_class_group(data)
 
@@ -89,6 +96,12 @@ async def update_class_group(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(require_permission("classes:manage"))
 ):
+    if current_user.get("role") in ["Servant", RoleEnum.SERVANT]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="غير مصرح: لا يمتلك الخادم صلاحية تعديل بيانات الفصل"
+        )
+
     service = ClassService(db)
     class_group = await service.update_class_group(class_id, data)
 
@@ -114,6 +127,12 @@ async def delete_class_group(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(require_permission("classes:manage"))
 ):
+    if current_user.get("role") in ["Servant", RoleEnum.SERVANT]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="غير مصرح: لا يمتلك الخادم صلاحية حذف الفصل"
+        )
+
     service = ClassService(db)
     await service.delete_class_group(class_id)
 
@@ -138,6 +157,12 @@ async def wipe_all_classes_and_attendance(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(require_permission("classes:manage"))
 ):
+    if current_user.get("role") in ["Servant", RoleEnum.SERVANT]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="غير مصرح: لا يمتلك الخادم صلاحية مسح الفصول"
+        )
+
     service = ClassService(db)
     result = await service.wipe_all_classes_and_attendance()
     return success_response(data=result, message=result["message"])
@@ -166,6 +191,12 @@ async def assign_servant(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(require_permission("classes:manage"))
 ):
+    if current_user.get("role") in ["Servant", RoleEnum.SERVANT]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="غير مصرح: لا يمتلك الخادم صلاحية تعيين أو إضافة خادم للفصل"
+        )
+
     service = ClassService(db)
     result = await service.assign_servant(class_id, data)
 
@@ -192,6 +223,12 @@ async def unassign_servant(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(require_permission("classes:manage"))
 ):
+    if current_user.get("role") in ["Servant", RoleEnum.SERVANT]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="غير مصرح: لا يمتلك الخادم صلاحية إخراج أو حذف خادم من الفصل"
+        )
+
     service = ClassService(db)
     await service.unassign_servant(class_id, servant_id)
 

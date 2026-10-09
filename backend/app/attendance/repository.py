@@ -197,19 +197,18 @@ class AttendanceRepository:
 
         if s_row.class_id:
             from app.models.class_group import ClassGroupMember
+            clean_cid = s_row.class_id.strip().upper()
             target_q = (
                 select(func.count(ClassGroupMember.membership_id))
+                .join(Member, func.upper(ClassGroupMember.member_id) == func.upper(Member.member_id))
                 .where(
-                    ClassGroupMember.class_id == s_row.class_id,
-                    ClassGroupMember.joined_at <= session_ts,
-                    or_(
-                        ClassGroupMember.left_at == None,
-                        ClassGroupMember.left_at > session_ts
-                    )
+                    func.upper(ClassGroupMember.class_id) == clean_cid,
+                    ClassGroupMember.is_active == True,
+                    Member.is_archived == False
                 )
             )
         else:
-            target_q = select(func.count(Member.member_id)).where(Member.status == "Active")
+            target_q = select(func.count(Member.member_id)).where(Member.status == "Active", Member.is_archived == False)
             if s_row.stage and s_row.stage != "ALL":
                 target_q = target_q.where(Member.stage.ilike(f"%{s_row.stage.split('-')[0].strip()}%"))
 
@@ -496,6 +495,7 @@ class AttendanceRepository:
         from app.models.class_group import ClassGroupMember
 
         if session_info.get("class_id"):
+            clean_cid = session_info["class_id"].strip().upper()
             mem_q = (
                 select(
                     Member.member_id,
@@ -506,9 +506,9 @@ class AttendanceRepository:
                     Member.stage,
                     Member.photo_url
                 )
-                .join(ClassGroupMember, Member.member_id == ClassGroupMember.member_id)
+                .join(ClassGroupMember, func.upper(Member.member_id) == func.upper(ClassGroupMember.member_id))
                 .where(
-                    ClassGroupMember.class_id == session_info["class_id"],
+                    func.upper(ClassGroupMember.class_id) == clean_cid,
                     ClassGroupMember.is_active == True,
                     Member.is_archived == False
                 )
@@ -565,6 +565,7 @@ class AttendanceRepository:
                 "stage": row.stage,
                 "photo_url": row.photo_url,
                 "is_present": is_present,
+                "attended": is_present,
                 "record_id": rec.record_id if rec else None,
                 "method": rec.method if rec else None,
                 "scanned_at": rec.scanned_at.isoformat() if rec and rec.scanned_at else None
@@ -574,16 +575,41 @@ class AttendanceRepository:
         absent_count = total_members - present_count
         rate = round((present_count / total_members * 100), 1) if total_members > 0 else 0.0
 
+        stats_dict = {
+            "total_members": total_members,
+            "present_count": present_count,
+            "absent_count": absent_count,
+            "attendance_rate": rate
+        }
+
         return {
             "session": session_info,
-            "summary": {
-                "total_members": total_members,
-                "present_count": present_count,
-                "absent_count": absent_count,
-                "attendance_rate": rate
-            },
-            "members": members_list
+            "summary": stats_dict,
+            "stats": stats_dict,
+            "members": members_list,
+            "items": members_list
         }
+
+    async def close_all_open_sessions(
+        self,
+        class_id: Optional[str] = None,
+        allowed_class_ids: Optional[List[str]] = None
+    ) -> int:
+        now_ts = datetime.now(timezone.utc)
+        stmt = (
+            update(AttendanceSession)
+            .where(AttendanceSession.status == "Open")
+        )
+        if class_id:
+            stmt = stmt.where(func.upper(AttendanceSession.class_id) == class_id.strip().upper())
+        elif allowed_class_ids is not None:
+            clean_allowed = [cid.strip().upper() for cid in allowed_class_ids]
+            stmt = stmt.where(func.upper(AttendanceSession.class_id).in_(clean_allowed))
+
+        stmt = stmt.values(status="Completed", closed_at=now_ts, updated_at=now_ts)
+        res = await self.db.execute(stmt)
+        await self.db.flush()
+        return res.rowcount
 
     async def toggle_member_attendance(
         self,

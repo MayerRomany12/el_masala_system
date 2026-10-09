@@ -121,6 +121,7 @@ export const ClassManagement = () => {
   const [savingEdit, setSavingEdit] = useState(false);
 
   const handleOpenEdit = (cls) => {
+    if (user?.role === 'Servant') return;
     setEditingClass(cls);
     setEditForm({
       name: cls.name || '',
@@ -134,6 +135,10 @@ export const ClassManagement = () => {
 
   const handleSaveEdit = async (e) => {
     e.preventDefault();
+    if (user?.role === 'Servant') {
+      notifyError('غير مصرح للخادم بتعديل بيانات الفصل');
+      return;
+    }
     if (!editForm.name.trim()) {
       notifyError('يرجى كتابة اسم الفصل');
       return;
@@ -233,7 +238,7 @@ export const ClassManagement = () => {
             <span>تحديث</span>
           </button>
 
-          {hasPermission('classes:manage') && (
+          {(user?.role === 'Super Admin' || user?.role === 'Admin') && hasPermission('classes:manage') && (
             <button
               className="btn btn-primary"
               onClick={() => navigate('/classes/new')}
@@ -529,7 +534,7 @@ export const ClassManagement = () => {
                       عرض التفاصيل والأعضاء 📋
                     </button>
 
-                    {hasPermission('classes:manage') && (
+                    {hasPermission('classes:manage') && user?.role !== 'Servant' && (
                       <button
                         className="btn btn-secondary"
                         style={{ padding: '0.5rem 0.65rem', color: 'var(--color-primary-light)', borderColor: 'rgba(56, 189, 248, 0.35)' }}

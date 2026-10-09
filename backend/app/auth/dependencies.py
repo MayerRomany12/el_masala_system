@@ -85,6 +85,9 @@ def compute_effective_permissions(user: dict) -> Set[str]:
     revoked_perms = {p for p in revoked_perms if is_valid_permission(p)}
 
     effective = (base_perms | custom_perms) - revoked_perms
+    # Servants can never have classes:manage (cannot create/edit classes or manage servants)
+    if role in [RoleEnum.SERVANT, "Servant"]:
+        effective.discard("classes:manage")
     return effective
 
 

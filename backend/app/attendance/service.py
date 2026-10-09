@@ -141,6 +141,22 @@ class AttendanceService:
 
         return updated
 
+    async def close_all_open_sessions(
+        self,
+        class_id: Optional[str] = None,
+        allowed_class_ids: Optional[List[str]] = None
+    ) -> Dict[str, Any]:
+        count = await self.repo.close_all_open_sessions(class_id=class_id, allowed_class_ids=allowed_class_ids)
+        # Also run absence detector if any sessions were closed
+        if count > 0:
+            try:
+                from app.followup.service import FollowupService
+                followup_service = FollowupService(self.db)
+                await followup_service.run_absence_detector(class_id=class_id)
+            except Exception:
+                pass
+        return {"closed_count": count}
+
     # ─── UNIFIED ATTENDANCE MOTOR (QR & Manual Entrance) ─────────────────────
 
     async def record_attendance(

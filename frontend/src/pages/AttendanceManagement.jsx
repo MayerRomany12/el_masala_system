@@ -211,9 +211,10 @@ export const AttendanceManagement = () => {
     try {
       const res = await attendanceApi.getSessionSheet(sessionId, search);
       if (res.success) {
-        setSheetItems(res.data.items || []);
-        if (res.data.stats) {
-          setSheetStats(res.data.stats);
+        const items = res.data.items || res.data.members || [];
+        setSheetItems(items);
+        if (res.data.stats || res.data.summary) {
+          setSheetStats(res.data.stats || res.data.summary);
         }
       }
     } catch (err) {
@@ -553,6 +554,34 @@ export const AttendanceManagement = () => {
     }
   };
 
+  const [closingAllSessions, setClosingAllSessions] = useState(false);
+
+  const handleCloseAllOpenSessions = async () => {
+    const classObj = classesList.find(c => c.class_id === selectedClassId);
+    const confirmMsg = selectedClassId && classObj
+      ? `هل أنت متأكد من رغبتك في إغلاق جميع جلسات الحضور المفتوحة لفصل "${classObj.name}"؟`
+      : 'هل أنت متأكد من رغبتك في إغلاق كافة جلسات الحضور المفتوحة حالياً في النظام؟';
+
+    if (!window.confirm(confirmMsg)) return;
+
+    setClosingAllSessions(true);
+    try {
+      const res = await attendanceApi.closeAllOpenSessions(selectedClassId || null);
+      if (res.success) {
+        alert(res.message || 'تم إغلاق جميع الجلسات المفتوحة بنجاح');
+        if (selectedClassId) {
+          await fetchSessions(selectedClassId);
+        } else if (classesList[0]) {
+          await fetchSessions(classesList[0].class_id);
+        }
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || err.response?.data?.detail || 'تعذر إغلاق الجلسات المفتوحة');
+    } finally {
+      setClosingAllSessions(false);
+    }
+  };
+
   // Filter items based on tab
   const filteredItems = sheetItems.filter(item => {
     if (filterTab === 'PRESENT') return item.attended;
@@ -577,23 +606,45 @@ export const AttendanceManagement = () => {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
           {hasPermission('attendance:session') && (
-            <button
-              onClick={() => {
-                const todayStr = new Date().toISOString().split('T')[0];
-                setSessionFormData({
-                  selected_class_ids: selectedClassId ? [selectedClassId] : (classesList[0] ? [classesList[0].class_id] : []),
-                  session_date: todayStr,
-                  title: formatArabicSessionTitle(todayStr),
-                  recurrence: 'Weekly'
-                });
-                setIsSessionModalOpen(true);
-              }}
-              className="btn btn-primary"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.88rem', fontWeight: 700 }}
-            >
-              <Plus size={16} />
-              <span>فتح جلسة حضور جديدة</span>
-            </button>
+            <>
+              <button
+                onClick={() => {
+                  const todayStr = new Date().toISOString().split('T')[0];
+                  setSessionFormData({
+                    selected_class_ids: selectedClassId ? [selectedClassId] : (classesList[0] ? [classesList[0].class_id] : []),
+                    session_date: todayStr,
+                    title: formatArabicSessionTitle(todayStr),
+                    recurrence: 'Weekly'
+                  });
+                  setIsSessionModalOpen(true);
+                }}
+                className="btn btn-primary"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.88rem', fontWeight: 700 }}
+              >
+                <Plus size={16} />
+                <span>فتح جلسة حضور جديدة</span>
+              </button>
+
+              <button
+                onClick={handleCloseAllOpenSessions}
+                disabled={closingAllSessions}
+                className="btn btn-secondary"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  fontSize: '0.88rem',
+                  fontWeight: 700,
+                  color: '#f87171',
+                  borderColor: 'rgba(239, 68, 68, 0.35)',
+                  background: 'rgba(239, 68, 68, 0.08)'
+                }}
+                title="إغلاق جميع جلسات الحضور المفتوحة دفعة واحدة"
+              >
+                <Lock size={16} />
+                <span>{closingAllSessions ? 'جاري الإغلاق...' : 'إغلاق كل الجلسات المفتوحة 🔒'}</span>
+              </button>
+            </>
           )}
 
           {hasPermission('attendance:scan') && (

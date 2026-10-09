@@ -80,5 +80,13 @@ export const attendanceApi = {
       member_id: memberId
     });
     return response.data;
+  },
+
+  // POST /attendance/sessions/close-all — Close all open sessions
+  closeAllOpenSessions: async (classId = null) => {
+    const params = classId ? { class_id: classId } : {};
+    const response = await apiClient.post('/attendance/sessions/close-all', null, { params });
+    return response.data;
   }
 };
+

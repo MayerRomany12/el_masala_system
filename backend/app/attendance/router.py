@@ -112,62 +112,6 @@ async def get_attendance_session(
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="ليس لديك صلاحية للوصول لجلسة هذا الفصل")
     return success_response(data=session, message="تم جلب تفاصيل الجلسة والإحصائيات")
 
-
-@router.get("/sessions/{session_id}/sheet", response_model=dict)
-async def get_session_sheet(
-    session_id: str,
-    search: Optional[str] = Query(None),
-    db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_permission("attendance:session"))
-):
-    service = AttendanceService(db)
-    session = await service.get_session_by_id(session_id)
-    if session.get("class_id"):
-        allowed = await get_servant_class_ids(current_user, db)
-        if allowed is not None and session["class_id"] not in allowed:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="ليس لديك صلاحية لعرض كشف هذا الفصل")
-    sheet = await service.get_session_sheet(session_id, search=search)
-    return success_response(data=sheet, message="تم جلب كشف حضور وغياب الفصل بنجاح")
-
-
-@router.post("/sessions/{session_id}/toggle", response_model=dict)
-async def toggle_member_attendance(
-    session_id: str,
-    body: AttendanceToggleRequest,
-    db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_permission("attendance:scan"))
-):
-    service = AttendanceService(db)
-    session = await service.get_session_by_id(session_id)
-    if session.get("class_id"):
-        allowed = await get_servant_class_ids(current_user, db)
-        if allowed is not None and session["class_id"] not in allowed:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="ليس لديك صلاحية لتسجيل الحضور في هذا الفصل")
-    result = await service.toggle_member_attendance(
-        session_id=session_id,
-        member_id=body.member_id,
-        user_id=current_user.get("user_id")
-    )
-    is_pres = result.get("is_present")
-    msg = "تم تسجيل الحضور 🟢" if is_pres else "تم تسجيل الغياب 🔴"
-
-    try:
-        from app.audit.service import AuditService
-        audit_svc = AuditService(db)
-        await audit_svc.log_event(
-            action="TOGGLE_ATTENDANCE",
-            resource_type="Attendance",
-            resource_id=session_id,
-            current_user=current_user,
-            details=f"قام بتسجيل {'حضور' if is_pres else 'غياب'} المخدوم {body.member_id} في الجلسة {session_id}"
-        )
-    except Exception:
-        pass
-
-    return success_response(data=result, message=msg)
-
-
-
 @router.patch("/sessions/{session_id}/status", response_model=dict)
 async def update_session_status(
     session_id: str,
@@ -251,3 +195,96 @@ async def cancel_attendance_record(
         reason=cancel_in.cancellation_reason
     )
     return success_response(data=cancelled, message="تم إلغاء وتسوية تسجيل الحضور بنجاح")
+
+
+# ─── BULK CLOSE & NUMBERED CLASS SHEET ─────────────────────────────────────────
+
+@router.post("/sessions/close-all", response_model=dict)
+async def close_all_open_sessions(
+    class_id: Optional[str] = Query(None, description="إغلاق جلسات فصل محدد أو الكل"),
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_permission("attendance:session"))
+):
+    """
+    إغلاق جميع جلسات الحضور المفتوحة دفعة واحدة بنقرة زر واحدة.
+    """
+    allowed_class_ids = await get_servant_class_ids(current_user, db)
+    if class_id and allowed_class_ids is not None and class_id not in allowed_class_ids:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="ليس لديك صلاحية لإغلاق جلسات هذا الفصل")
+
+    service = AttendanceService(db)
+    result = await service.close_all_open_sessions(class_id=class_id, allowed_class_ids=allowed_class_ids)
+
+    try:
+        from app.audit.service import AuditService
+        audit_svc = AuditService(db)
+        await audit_svc.log_event(
+            action="CLOSE_ALL_ATTENDANCE_SESSIONS",
+            resource_type="Attendance",
+            resource_id=class_id or "ALL",
+            current_user=current_user,
+            details=f"قام بإغلاق جميع جلسات الحضور المفتوحة ({result.get('closed_count', 0)} جلسة)"
+        )
+    except Exception:
+        pass
+
+    return success_response(
+        data=result,
+        message=f"تم إغلاق جميع جلسات الحضور المفتوحة بنجاح ({result.get('closed_count', 0)} جلسة) 🔒"
+    )
+
+
+@router.get("/sessions/{session_id}/sheet", response_model=dict)
+async def get_session_sheet(
+    session_id: str,
+    search: Optional[str] = Query(None, description="بحث في كشف الفصل"),
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    """
+    كشف حضور وغياب مخدومي الفصل المرقم مع رصد فوري للبيانات والحضور.
+    """
+    service = AttendanceService(db)
+    session = await service.get_session_by_id(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="جلسة الحضور غير موجودة")
+
+    allowed_class_ids = await get_servant_class_ids(current_user, db)
+    if session.get("class_id") and allowed_class_ids is not None and session["class_id"] not in allowed_class_ids:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="ليس لديك صلاحية للوصول لكشف هذا الفصل")
+
+    sheet = await service.get_session_sheet(session_id, search=search)
+    return success_response(data=sheet, message="تم جلب كشف حضور الفصل بنجاح")
+
+
+@router.post("/sessions/{session_id}/toggle", response_model=dict)
+async def toggle_member_attendance(
+    session_id: str,
+    body: Optional[AttendanceToggleRequest] = None,
+    member_id: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_permission("attendance:scan"))
+):
+    """
+    التبديل الفوري لحالة حضور الطفل بنقرة واحدة (حاضر <-> غائب) في كشف الفصل.
+    """
+    target_member_id = (body.member_id if body and body.member_id else member_id)
+    if not target_member_id:
+        raise HTTPException(status_code=400, detail="يرجى تحديد رمز العضوية للطفل member_id")
+
+    service = AttendanceService(db)
+    session = await service.get_session_by_id(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="جلسة الحضور غير موجودة")
+
+    allowed_class_ids = await get_servant_class_ids(current_user, db)
+    if session.get("class_id") and allowed_class_ids is not None and session["class_id"] not in allowed_class_ids:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="ليس لديك صلاحية لتسجيل الحضور في هذا الفصل")
+
+    result = await service.toggle_member_attendance(
+        session_id=session_id,
+        member_id=target_member_id.strip().upper(),
+        user_id=current_user.get("user_id")
+    )
+    return success_response(data=result, message=result.get("message", "تم تحديث حالة الحضور بنجاح"))
+

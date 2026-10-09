@@ -105,3 +105,7 @@ class AttendanceRecordResponse(BaseModel):
     cancelled_at: Optional[datetime] = None
     cancellation_reason: Optional[str] = None
     scanned_at: datetime
+
+
+class AttendanceToggleRequest(BaseModel):
+    member_id: str = Field(..., description="رمز العضوية K-XXXXXX")
