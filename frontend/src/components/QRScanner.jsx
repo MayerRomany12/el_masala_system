@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { cardsApi } from '../api/cards';
 import {
@@ -130,12 +130,19 @@ export const QRScanner = ({ onBack }) => {
       isScanLockedRef.current = false;
       return;
     }
+    let cleanToken = token.trim().replace(/^["']|["']$/g, '');
+    if (cleanToken.startsWith('{') && cleanToken.endsWith('}')) {
+      try {
+        const parsed = JSON.parse(cleanToken);
+        cleanToken = parsed.qr_token || parsed.token || parsed.member_id || cleanToken;
+      } catch (e) {}
+    }
     setLoading(true);
     setError('');
     setScannedMember(null);
 
     try {
-      const res = await cardsApi.scanQRToken(token.trim());
+      const res = await cardsApi.scanQRToken(cleanToken);
       if (res.success) {
         playSound('success');
         setScannedMember(res.data);

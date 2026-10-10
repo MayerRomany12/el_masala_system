@@ -82,8 +82,11 @@ class AttendanceSessionResponse(BaseModel):
 
 class AttendanceScanRequest(BaseModel):
     session_id: str = Field(..., description="رمز جلسة الحضور المفتوحة")
-    token_or_id: str = Field(..., description="QR Token أو رمز العضوية K-XXXXXX أو اسم الطفل")
+    token_or_id: Optional[str] = Field(default=None, description="QR Token أو رمز العضوية K-XXXXXX أو اسم الطفل")
+    qr_token: Optional[str] = Field(default=None, description="QR Token أو رمز العضوية في حال إرساله بهذا الاسم")
     method: str = Field(default="QR", description="طريقة التسجيل (QR أو Manual)")
+
+    model_config = {"extra": "ignore"}
 
 
 class AttendanceCancelRequest(BaseModel):

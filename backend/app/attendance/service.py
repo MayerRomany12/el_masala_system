@@ -170,7 +170,24 @@ class AttendanceService:
         (جلسة مفتوحة Open + خادم مصرح له Servant + جهاز معتمد Header X-Device-Token + طفل نشط Active)
         """
         session_id = data.session_id
-        token_or_id = data.token_or_id.strip()
+        raw_token = (data.token_or_id or getattr(data, "qr_token", None) or "").strip().strip('"').strip("'")
+        if not raw_token:
+            raise BadRequestException("يرجى تزويد رمز الـ QR أو رمز العضوية للطفل")
+        
+        # Clean JSON or URL if encoded by QR scanner
+        token_or_id = raw_token
+        if token_or_id.startswith("{") and token_or_id.endswith("}"):
+            try:
+                import json
+                parsed = json.loads(token_or_id)
+                extracted = parsed.get("qr_token") or parsed.get("token") or parsed.get("member_id")
+                if extracted:
+                    token_or_id = str(extracted).strip().strip('"').strip("'")
+            except Exception:
+                pass
+        if "/" in token_or_id and len(token_or_id) != 64:
+            token_or_id = token_or_id.split("/")[-1].strip()
+
         method = data.method
 
         # 1. Check Session Status
@@ -203,6 +220,8 @@ class AttendanceService:
         if not member:
             # Try Member ID
             member = await self.member_repo.get_by_member_id(token_or_id)
+        if not member and token_or_id.upper() != token_or_id:
+            member = await self.member_repo.get_by_member_id(token_or_id.upper())
 
         if not member:
             raise NotFoundException(f"تعذر العثور على بيانات المخدوم بالرمز المدخل ({token_or_id}). يرجى التأكد من بطاقة الـ QR أو رمز K-XXXXXX.")

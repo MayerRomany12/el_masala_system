@@ -298,11 +298,29 @@ class MemberService:
 
     async def scan_qr_token(self, token: str) -> Dict[str, Any]:
         """
-        استلام الـ QR Token من الـ Scanner وإرجاع بيانات المخدوم.
+        استلام الـ QR Token أو رمز العضوية من الـ Scanner وإرجاع بيانات المخدوم.
         لا يُسجَّل أي حضور هنا — M5 هو المسؤول عن ذلك.
         """
         clean_token = token.strip().strip('"').strip("'")
+        # Clean JSON or URL if encoded by QR scanner
+        if clean_token.startswith("{") and clean_token.endswith("}"):
+            try:
+                import json
+                parsed = json.loads(clean_token)
+                extracted = parsed.get("qr_token") or parsed.get("token") or parsed.get("member_id")
+                if extracted:
+                    clean_token = str(extracted).strip().strip('"').strip("'")
+            except Exception:
+                pass
+        if "/" in clean_token and len(clean_token) != 64:
+            clean_token = clean_token.split("/")[-1].strip()
+
         member = await self.repository.get_by_qr_token(clean_token)
+        if not member:
+            member = await self.repository.get_by_member_id(clean_token)
+        if not member and clean_token.upper() != clean_token:
+            member = await self.repository.get_by_member_id(clean_token.upper())
+
         if not member:
             raise NotFoundException("رمز QR غير معروف أو غير مسجل بالنظام")
         return member

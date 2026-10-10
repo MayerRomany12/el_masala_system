@@ -32,12 +32,13 @@ export const MemberCard = ({ member, activeSide = 'front' }) => {
 
   const theme = getStageTheme(member?.stage);
 
-  // Render QR Code onto canvas (Opaque Token ONLY)
+  // Render QR Code onto canvas (Opaque Token or Member ID)
   useEffect(() => {
-    if (canvasRef.current && member?.qr_token) {
+    const qrValue = member?.qr_token || member?.member_id;
+    if (canvasRef.current && qrValue) {
       QRCode.toCanvas(
         canvasRef.current,
-        member.qr_token, // Pure opaque token string
+        qrValue,
         {
           width: 140,
           margin: 1,
@@ -51,7 +52,7 @@ export const MemberCard = ({ member, activeSide = 'front' }) => {
         }
       );
     }
-  }, [member?.qr_token]);
+  }, [member?.qr_token, member?.member_id, activeSide]);
 
   if (!member) return null;
 

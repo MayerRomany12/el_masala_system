@@ -94,6 +94,7 @@ export const AttendanceManagement = () => {
   const [scanFeedback, setScanFeedback] = useState(null);
   const [recentScanResult, setRecentScanResult] = useState(null);
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
+  const [manualScanInput, setManualScanInput] = useState('');
 
   const scannerContainerId = 'qr-attendance-viewfinder';
   const html5QrcodeRef = useRef(null);
@@ -344,6 +345,7 @@ export const AttendanceManagement = () => {
           try {
             const res = await attendanceApi.scanAttendance({
               session_id: selectedSession.session_id,
+              token_or_id: token,
               qr_token: token,
               method: 'QR'
             });
@@ -411,6 +413,39 @@ export const AttendanceManagement = () => {
     }
     setCameraActive(false);
     setIsScannerOpen(false);
+  };
+
+  // 6b. Manual / Barcode Scanner Input
+  const handleManualScanSubmit = async (e) => {
+    e.preventDefault();
+    if (!manualScanInput.trim() || !selectedSession) return;
+    const token = manualScanInput.trim();
+    setManualScanInput('');
+
+    try {
+      const res = await attendanceApi.scanAttendance({
+        session_id: selectedSession.session_id,
+        token_or_id: token,
+        qr_token: token,
+        method: 'Manual'
+      });
+
+      playFeedbackSound('success');
+      setRecentScanResult({
+        status: 'success',
+        title: 'تم تسجيل الحضور بنجاح ✓',
+        name: res.data?.member_name || token
+      });
+      fetchSessionSheet(selectedSession.session_id, sheetSearch);
+    } catch (scanErr) {
+      playFeedbackSound('warning');
+      const msg = scanErr.response?.data?.detail || scanErr.response?.data?.message || 'كارت أو رمز غير صالح';
+      setRecentScanResult({
+        status: 'warning',
+        title: 'تنبيه مسح الكارت',
+        name: msg
+      });
+    }
   };
 
   // 7. Print Official Attendance Sheet
@@ -945,6 +980,26 @@ export const AttendanceManagement = () => {
                   <strong style={{ fontSize: '1.4rem', color: '#fca5a5', fontWeight: 800 }}>{sheetStats.absent_count}</strong>
                 </div>
               </div>
+
+              {/* Manual Barcode / Member Code Input */}
+              <form onSubmit={handleManualScanSubmit} style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
+                <input
+                  type="text"
+                  className="form-input"
+                  style={{ fontSize: '0.85rem', padding: '0.45rem 0.75rem' }}
+                  placeholder="أو أدخل كود الطفل (K-XXXXXX) / امسح بمسدس الباركود..."
+                  value={manualScanInput}
+                  onChange={(e) => setManualScanInput(e.target.value)}
+                />
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  style={{ padding: '0.45rem 0.85rem', fontSize: '0.85rem', whiteSpace: 'nowrap' }}
+                  disabled={!manualScanInput.trim()}
+                >
+                  تسجيل ✓
+                </button>
+              </form>
             </div>
           </div>
         </div>
