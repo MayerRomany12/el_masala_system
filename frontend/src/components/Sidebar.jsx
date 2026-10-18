@@ -90,7 +90,7 @@ export const Sidebar = ({ mobileOpen, setMobileOpen }) => {
           marginBottom: '0.5rem'
         }}>
           <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)' }}>
-            نظام المسلة
+            نظام الكرور
           </span>
           <button
             onClick={() => setMobileOpen && setMobileOpen(false)}

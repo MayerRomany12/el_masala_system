@@ -52,7 +52,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    description="نظام إدارة أطفال وخدمة مدارس الأحد - كنيسة السيدة العذراء مريم والأنبا بولا بالمسلة",
+    description="نظام إدارة أطفال وخدمة مدارس الأحد - كنيسة مارجرجس والأنبا شنودة بالكرور (نظام الكرور)",
     version="1.0.0",
     lifespan=lifespan,
     docs_url="/docs",

@@ -101,10 +101,10 @@ export const ReportManagement = () => {
         }
       } else if (reportType === 'who_attended') {
         const res = await reportsApi.getWhoAttendedReport({
-          class_id: selectedClassId || null,
-          stage: selectedStage && selectedStage !== 'ALL' ? selectedStage : null,
-          from_date: fromDate || null,
-          to_date: toDate || null
+          class_id: selectedClassId || undefined,
+          stage: selectedStage && selectedStage !== 'ALL' ? selectedStage : undefined,
+          from_date: fromDate || undefined,
+          to_date: toDate || undefined
         });
         if (res.success) {
           setDataList(res.data.items || []);
@@ -112,10 +112,10 @@ export const ReportManagement = () => {
         }
       } else if (reportType === 'who_absent') {
         const res = await reportsApi.getWhoAbsentReport({
-          class_id: selectedClassId || null,
-          stage: selectedStage && selectedStage !== 'ALL' ? selectedStage : null,
-          from_date: fromDate || null,
-          to_date: toDate || null
+          class_id: selectedClassId || undefined,
+          stage: selectedStage && selectedStage !== 'ALL' ? selectedStage : undefined,
+          from_date: fromDate || undefined,
+          to_date: toDate || undefined
         });
         if (res.success) {
           setDataList(res.data.items || []);
@@ -123,10 +123,10 @@ export const ReportManagement = () => {
         }
       } else if (reportType === 'attendance') {
         const res = await reportsApi.getAttendanceReport({
-          class_id: selectedClassId || null,
-          stage: selectedStage && selectedStage !== 'ALL' ? selectedStage : null,
-          from_date: fromDate || null,
-          to_date: toDate || null
+          class_id: selectedClassId || undefined,
+          stage: selectedStage && selectedStage !== 'ALL' ? selectedStage : undefined,
+          from_date: fromDate || undefined,
+          to_date: toDate || undefined
         });
         if (res.success) {
           setDataList(res.data.items);
@@ -379,7 +379,7 @@ export const ReportManagement = () => {
             >
               <option value="">جميع الفصول 🏫</option>
               {classesList.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
+                <option key={c.class_id} value={c.class_id}>{c.name}</option>
               ))}
             </select>
           </div>

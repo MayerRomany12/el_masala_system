@@ -152,22 +152,23 @@ class MemberRepository:
             query = query.where(Member.area == area)
 
         if class_id:
+            clean_cid = class_id.strip().upper()
             query = query.where(
                 exists(
                     select(1).select_from(ClassGroupMember).where(
-                        ClassGroupMember.member_id == Member.member_id,
-                        ClassGroupMember.class_id == class_id,
+                        func.upper(func.trim(ClassGroupMember.member_id)) == func.upper(func.trim(Member.member_id)),
+                        func.upper(func.trim(ClassGroupMember.class_id)) == clean_cid,
                         ClassGroupMember.is_active == True
                     )
                 )
             )
         elif allowed_class_ids is not None:
-            # Servant / scoped admin: only see members belonging to assigned classes
+            clean_allowed = [c.strip().upper() for c in allowed_class_ids]
             query = query.where(
                 exists(
                     select(1).select_from(ClassGroupMember).where(
-                        ClassGroupMember.member_id == Member.member_id,
-                        ClassGroupMember.class_id.in_(allowed_class_ids),
+                        func.upper(func.trim(ClassGroupMember.member_id)) == func.upper(func.trim(Member.member_id)),
+                        func.upper(func.trim(ClassGroupMember.class_id)).in_(clean_allowed),
                         ClassGroupMember.is_active == True
                     )
                 )

@@ -220,7 +220,7 @@ export const MemberProfilePage = () => {
     // Footer
     ctx.fillStyle = '#64748b';
     ctx.font = '14px Cairo, system-ui, sans-serif';
-    ctx.fillText('نظام المسلة الكنسي لإدارة المخدومين والافتقاد', 300, 640);
+    ctx.fillText('نظام الكرور الكنسي لإدارة المخدومين والافتقاد', 300, 640);
 
     const link = document.createElement('a');
     link.download = `بطاقة_${member.full_name.replace(/\s+/g, '_')}_${member.member_id}.png`;

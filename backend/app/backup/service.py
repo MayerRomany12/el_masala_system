@@ -70,7 +70,7 @@ class BackupService:
             backup_data[table_name] = table_rows
 
         metadata = {
-            "system_name": "نظام المسلة - كنيسة السيدة العذراء مريم والأنبا بولا بالمسلة",
+            "system_name": "نظام الكرور - كنيسة الشهيد العظيم مارجرجس والأنبا شنودة بالكرور",
             "version": "1.0.0",
             "schema_version": "1.1",
             "created_at": datetime.now(timezone.utc).isoformat(),

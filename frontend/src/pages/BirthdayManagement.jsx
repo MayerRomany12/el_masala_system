@@ -94,10 +94,10 @@ export const BirthdayManagement = () => {
     try {
       const res = await birthdaysApi.getBirthdays({
         period: selectedMonth ? 'all' : activePeriod,
-        class_id: selectedClassId || null,
-        stage: selectedStage || null,
-        gift_status: selectedGiftStatus || null,
-        month: selectedMonth ? Number(selectedMonth) : null
+        class_id: selectedClassId || undefined,
+        stage: selectedStage || undefined,
+        gift_status: selectedGiftStatus || undefined,
+        month: selectedMonth ? Number(selectedMonth) : undefined
       });
       if (res.success) {
         setMembers(res.data.items);
@@ -315,7 +315,7 @@ export const BirthdayManagement = () => {
           >
             <option value="">جميع الفصول 🏫</option>
             {classesList.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
+              <option key={c.class_id} value={c.class_id}>{c.name}</option>
             ))}
           </select>
 
@@ -336,8 +336,9 @@ export const BirthdayManagement = () => {
             value={selectedStage}
             onChange={(e) => setSelectedStage(e.target.value)}
           >
-            {STAGE_OPTIONS.map((stg) => (
-              <option key={stg.code} value={stg.code === 'ALL' ? '' : stg.label}>{stg.label}</option>
+            <option value="">جميع المراحل الدراسية</option>
+            {['حضانة', 'ابتدائي', 'إعدادي', 'ثانوي', 'جامعيين', 'خريجين'].map((stg) => (
+              <option key={stg} value={stg}>{stg}</option>
             ))}
           </select>
 
@@ -479,7 +480,7 @@ export const BirthdayManagement = () => {
                               const name = m.full_name;
                               const stage = m.stage;
                               const ageStr = m.age !== null && m.age !== undefined ? ` الـ ${m.age}` : '';
-                              setWaMessageText(`🎉🎂 كل سنة وانت طيب يا ${name}! 🎂🎉\n\nأسرة ${stage} بكنيسة المسلة تهنئك بعيد ميلادك${ageStr} سنة ✨\n\nربنا يبارك حياتك وتفضل دايماً منور الكنيسة والخدمة ✝️❤️`);
+                              setWaMessageText(`🎉🎂 كل سنة وانت طيب يا ${name}! 🎂🎉\n\nأسرة ${stage} بكنيسة الشهيد مارجرجس والأنبا شنودة بالكرور تهنئك بعيد ميلادك${ageStr} سنة ✨\n\nربنا يبارك حياتك وتفضل دايماً منور الكنيسة والخدمة ✝️❤️`);
                             }}
                             className="btn btn-secondary"
                             style={{
@@ -500,8 +501,8 @@ export const BirthdayManagement = () => {
                             <a
                               href={getGmailUrl(
                                 m.email,
-                                `🎂 كل سنة وانت طيب يا ${m.full_name} - تهنئة عيد ميلاد من كنيسة المسلة`,
-                                `🎉🎂 كل سنة وانت طيب يا ${m.full_name}! 🎂🎉\n\nأسرة ${m.stage || 'الخدمة'} بكنيسة المسلة تهنئك بعيد ميلادك المبارك ✨\n\nربنا يبارك حياتك وتفضل دايماً منور الكنيسة والخدمة ✝️❤️`
+                                `🎂 كل سنة وانت طيب يا ${m.full_name} - تهنئة عيد ميلاد من كنيسة الشهيد مارجرجس والأنبا شنودة بالكرور`,
+                                `🎉🎂 كل سنة وانت طيب يا ${m.full_name}! 🎂🎉\n\nأسرة ${m.stage || 'الخدمة'} بكنيسة الشهيد مارجرجس والأنبا شنودة بالكرور تهنئك بعيد ميلادك المبارك ✨\n\nربنا يبارك حياتك وتفضل دايماً منور الكنيسة والخدمة ✝️❤️`
                               )}
                               target="_blank"
                               rel="noopener noreferrer"

@@ -831,7 +831,7 @@ export const FollowupManagement = () => {
                                 )}
                                 {t.member_email && (
                                   <a
-                                    href={getGmailUrl(t.member_email, `افتقاد واطمئنان - كنيسة المسلة`, `سلام ونعمة يا ${t.member_name}، بنطمن عليك واشتقنا لوجودك معانا في الكنيسة.`)}
+                                    href={getGmailUrl(t.member_email, `افتقاد واطمئنان - كنيسة الشهيد مارجرجس والأنبا شنودة بالكرور`, `سلام ونعمة يا ${t.member_name}، بنطمن عليك واشتقنا لوجودك معانا في الكنيسة.`)}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="btn btn-secondary"
@@ -1034,7 +1034,7 @@ export const FollowupManagement = () => {
 
                         {t.member_email && (
                           <a
-                            href={getGmailUrl(t.member_email, `افتقاد واطمئنان - كنيسة المسلة`, `سلام ونعمة يا ${t.member_name}، بنطمن عليك واشتقنا لوجودك معانا في الكنيسة.`)}
+                            href={getGmailUrl(t.member_email, `افتقاد واطمئنان - كنيسة الشهيد مارجرجس والأنبا شنودة بالكرور`, `سلام ونعمة يا ${t.member_name}، بنطمن عليك واشتقنا لوجودك معانا في الكنيسة.`)}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="btn btn-secondary"
@@ -1192,7 +1192,7 @@ export const FollowupManagement = () => {
                           )}
                           {t.member_email && (
                             <a
-                              href={getGmailUrl(t.member_email, `افتقاد واطمئنان - كنيسة المسلة`, `سلام ونعمة يا ${t.member_name}، بنطمن عليك واشتقنا لوجودك معانا.`)}
+                              href={getGmailUrl(t.member_email, `افتقاد واطمئنان - كنيسة الشهيد مارجرجس والأنبا شنودة بالكرور`, `سلام ونعمة يا ${t.member_name}، بنطمن عليك واشتقنا لوجودك معانا.`)}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="btn btn-secondary"

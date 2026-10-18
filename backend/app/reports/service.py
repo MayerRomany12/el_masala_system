@@ -194,7 +194,11 @@ class ReportsService:
 
         elif report_type == "members":
             title = "سجل المخدومين الشامل والفصول الخدمية"
-            data_list = await self.repo.get_members_master_report(stage=stage)
+            data_list = await self.repo.get_members_master_report(
+                stage=stage,
+                class_id=class_id,
+                allowed_class_ids=allowed_class_ids
+            )
             headers_map = {
                 "member_id": "رمز المخدوم",
                 "full_name": "الاسم الكامل",

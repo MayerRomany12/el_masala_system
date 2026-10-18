@@ -2,7 +2,7 @@ import secrets
 from typing import Optional, List, Dict, Any
 from datetime import datetime, date, timedelta, timezone
 
-from sqlalchemy import select, or_
+from sqlalchemy import select, or_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 
@@ -61,19 +61,21 @@ class BirthdayRepository:
         )
 
         if class_id:
+            clean_cid = class_id.strip().upper()
             query = query.where(
-                Member.member_id.in_(
-                    select(ClassGroupMember.member_id).where(
-                        ClassGroupMember.class_id == class_id,
+                func.upper(func.trim(Member.member_id)).in_(
+                    select(func.upper(func.trim(ClassGroupMember.member_id))).where(
+                        func.upper(func.trim(ClassGroupMember.class_id)) == clean_cid,
                         ClassGroupMember.is_active == True
                     )
                 )
             )
         elif allowed_class_ids is not None:
+            clean_allowed = [c.strip().upper() for c in allowed_class_ids]
             query = query.where(
-                Member.member_id.in_(
-                    select(ClassGroupMember.member_id).where(
-                        ClassGroupMember.class_id.in_(allowed_class_ids),
+                func.upper(func.trim(Member.member_id)).in_(
+                    select(func.upper(func.trim(ClassGroupMember.member_id))).where(
+                        func.upper(func.trim(ClassGroupMember.class_id)).in_(clean_allowed),
                         ClassGroupMember.is_active == True
                     )
                 )

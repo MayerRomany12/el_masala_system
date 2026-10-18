@@ -347,7 +347,7 @@ export const CommunicationHubModal = ({ isOpen, onClose, usersList = [] }) => {
                               <span>اتصال</span>
                             </a>
                             <a
-                              href={getWaUrl(cleanPhone, `سلام ونعمة يا ${target.full_name}، بخصوص الخدمة بكنيسة المسلة`)}
+                              href={getWaUrl(cleanPhone, `سلام ونعمة يا ${target.full_name}، بخصوص الخدمة بكنيسة الشهيد مارجرجس والأنبا شنودة بالكرور`)}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="btn btn-secondary"
@@ -361,7 +361,7 @@ export const CommunicationHubModal = ({ isOpen, onClose, usersList = [] }) => {
                         )}
                         {target.email && (
                           <a
-                            href={getGmailUrl(target.email, `متابعة وتنسيق خدمي - كنيسة المسلة`, `سلام ونعمة يا ${target.full_name}،\n\nتحية طيبة وبعد...`)}
+                            href={getGmailUrl(target.email, `متابعة وتنسيق خدمي - كنيسة الشهيد مارجرجس والأنبا شنودة بالكرور`, `سلام ونعمة يا ${target.full_name}،\n\nتحية طيبة وبعد...`)}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="btn btn-secondary"
@@ -525,7 +525,7 @@ export const CommunicationHubModal = ({ isOpen, onClose, usersList = [] }) => {
                           )}
                           {cleanPhone && (
                             <a
-                              href={getWaUrl(cleanPhone, `سلام ونعمة يا ${u.full_name}، بخصوص الخدمة بكنيسة المسلة`)}
+                              href={getWaUrl(cleanPhone, `سلام ونعمة يا ${u.full_name}، بخصوص الخدمة بكنيسة الشهيد مارجرجس والأنبا شنودة بالكرور`)}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="btn btn-secondary"
@@ -538,7 +538,7 @@ export const CommunicationHubModal = ({ isOpen, onClose, usersList = [] }) => {
                           )}
                           {u.email && (
                             <a
-                              href={getGmailUrl(u.email, `متابعة وتنسيق خدمي - كنيسة المسلة`, `سلام ونعمة يا ${u.full_name}،\n\nتحية طيبة وبعد...`)}
+                              href={getGmailUrl(u.email, `متابعة وتنسيق خدمي - كنيسة الشهيد مارجرجس والأنبا شنودة بالكرور`, `سلام ونعمة يا ${u.full_name}،\n\nتحية طيبة وبعد...`)}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="btn btn-secondary"

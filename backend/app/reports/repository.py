@@ -340,10 +340,43 @@ class ReportsRepository:
             "total": total_members
         }
 
-    async def get_members_master_report(self, stage: Optional[str] = None) -> List[Dict[str, Any]]:
+    async def get_members_master_report(
+        self,
+        stage: Optional[str] = None,
+        class_id: Optional[str] = None,
+        allowed_class_ids: Optional[List[str]] = None
+    ) -> List[Dict[str, Any]]:
+        from app.models.class_group import ClassGroup, ClassGroupMember
+        from sqlalchemy import exists
+
         query = select(Member).where(Member.is_archived == False)
+
+        if class_id:
+            clean_cid = class_id.strip().upper()
+            query = query.where(
+                exists(
+                    select(1).select_from(ClassGroupMember).where(
+                        func.upper(func.trim(ClassGroupMember.member_id)) == func.upper(func.trim(Member.member_id)),
+                        func.upper(func.trim(ClassGroupMember.class_id)) == clean_cid,
+                        ClassGroupMember.is_active == True
+                    )
+                )
+            )
+        elif allowed_class_ids is not None:
+            clean_allowed = [c.strip().upper() for c in allowed_class_ids]
+            query = query.where(
+                exists(
+                    select(1).select_from(ClassGroupMember).where(
+                        func.upper(func.trim(ClassGroupMember.member_id)) == func.upper(func.trim(Member.member_id)),
+                        func.upper(func.trim(ClassGroupMember.class_id)).in_(clean_allowed),
+                        ClassGroupMember.is_active == True
+                    )
+                )
+            )
+
         if stage and stage != "ALL":
-            query = query.where(Member.stage == stage)
+            stage_prefix = stage.split('-')[0].strip()
+            query = query.where(Member.stage.ilike(f"%{stage_prefix}%"))
         query = query.order_by(Member.stage.asc(), Member.full_name.asc())
         members = (await self.db.execute(query)).scalars().all()
 

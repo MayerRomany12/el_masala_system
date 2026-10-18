@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Html5Qrcode } from 'html5-qrcode';
 import { useAuth } from '../context/AuthContext';
 import { apiClient } from '../api/client';
@@ -66,10 +67,12 @@ const formatArabicSessionTitle = (dateStr) => {
 
 export const AttendanceManagement = () => {
   const { hasPermission, hasAnyPermission } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlClassId = searchParams.get('class_id') || '';
 
   // Classes & Sessions states
   const [classesList, setClassesList] = useState([]);
-  const [selectedClassId, setSelectedClassId] = useState('');
+  const [selectedClassId, setSelectedClassId] = useState(urlClassId);
   const [sessions, setSessions] = useState([]);
   const [selectedSession, setSelectedSession] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -160,13 +163,15 @@ export const AttendanceManagement = () => {
       const res = await apiClient.get('/classes?limit=200');
       const items = res?.data?.data?.items || res?.data?.items || [];
       setClassesList(items);
-      if (items.length > 0 && !selectedClassId) {
+      if (urlClassId) {
+        setSelectedClassId(urlClassId);
+      } else if (items.length > 0 && !selectedClassId) {
         setSelectedClassId(items[0].class_id);
       }
     } catch (err) {
       console.error('Failed to load classes', err);
     }
-  }, [selectedClassId]);
+  }, [selectedClassId, urlClassId]);
 
   // 2. Fetch Sessions for the selected class
   const fetchSessions = useCallback(async (classId) => {
@@ -200,9 +205,7 @@ export const AttendanceManagement = () => {
   }, [fetchClasses]);
 
   useEffect(() => {
-    if (selectedClassId) {
-      fetchSessions(selectedClassId);
-    }
+    fetchSessions(selectedClassId);
   }, [selectedClassId, fetchSessions]);
 
   // 3. Fetch Numbered Sheet for the selected session
@@ -802,8 +805,17 @@ export const AttendanceManagement = () => {
               className="form-input"
               style={{ fontWeight: 700 }}
               value={selectedClassId}
-              onChange={(e) => setSelectedClassId(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                setSelectedClassId(val);
+                if (val) {
+                  setSearchParams({ class_id: val });
+                } else {
+                  setSearchParams({});
+                }
+              }}
             >
+              <option value="">— جميع الفصول والاجتماعات العامة —</option>
               {classesList.map((cls) => (
                 <option key={cls.class_id} value={cls.class_id}>
                   {cls.name} ({cls.stage || 'عام'})

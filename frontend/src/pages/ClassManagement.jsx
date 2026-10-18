@@ -192,14 +192,14 @@ export const ClassManagement = () => {
         filterType === 'ALL' ||
         cls.group_type === filterType ||
         (filterType === 'SundaySchool' && (cls.group_type === 'Regular' || cls.group_type === 'Standard'));
-      const matchesStage = !filterStage || cls.stage === filterStage;
+      const matchesStage = !filterStage || filterStage === 'الكل (ALL)' || filterStage === 'ALL' || cls.stage === filterStage;
       const matchesSeason = !filterSeason || cls.season_id === filterSeason;
 
       return matchesSearch && matchesType && matchesStage && matchesSeason;
     });
   }, [classes, searchTerm, filterType, filterStage, filterSeason]);
 
-  const stageOptions = ['الكل (ALL)', 'حضانة', 'ابتدائي', 'إعدادي', 'ثانوي', 'جامعيين', 'خريجين'];
+  const stageOptions = ['حضانة', 'ابتدائي', 'إعدادي', 'ثانوي', 'جامعيين', 'خريجين'];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', paddingBottom: '2.5rem' }}>
