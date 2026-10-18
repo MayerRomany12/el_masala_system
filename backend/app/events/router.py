@@ -35,7 +35,7 @@ async def list_events(
     search: Optional[str] = Query(None),
     event_type: Optional[str] = Query(None),
     stage: Optional[str] = Query(None),
-    status: Optional[str] = Query(None),
+    status_filter: Optional[str] = Query(None, alias="status"),
     page: int = Query(1, ge=1),
     limit: int = Query(50, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
@@ -43,7 +43,7 @@ async def list_events(
 ):
     service = EventService(db)
     result = await service.list_events(
-        search=search, event_type=event_type, stage=stage, status=status, page=page, limit=limit
+        search=search, event_type=event_type, stage=stage, status=status_filter, page=page, limit=limit
     )
     return success_response(data=result, message="تم جلب قائمة الفعاليات والرحلات بنجاح")
 

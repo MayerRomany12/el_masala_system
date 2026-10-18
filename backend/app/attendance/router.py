@@ -80,7 +80,7 @@ async def list_attendance_sessions(
     search: Optional[str] = Query(None),
     stage: Optional[str] = Query(None),
     class_id: Optional[str] = Query(None, description="تصفية بحسب الفصل الخدمي"),
-    status: Optional[str] = Query(None),
+    status_filter: Optional[str] = Query(None, alias="status"),
     page: int = Query(1, ge=1),
     limit: int = Query(50, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
@@ -92,7 +92,7 @@ async def list_attendance_sessions(
 
     service = AttendanceService(db)
     result = await service.list_sessions(
-        search=search, stage=stage, class_id=class_id, status=status,
+        search=search, stage=stage, class_id=class_id, status=status_filter,
         allowed_class_ids=allowed_class_ids, page=page, limit=limit
     )
     return success_response(data=result, message="تم جلب جلسات الحضور بنجاح")
@@ -168,13 +168,13 @@ async def record_attendance_scan(
 @router.get("/sessions/{session_id}/records", response_model=dict)
 async def get_session_attendance_records(
     session_id: str,
-    status: Optional[str] = Query("Valid"),
+    status_filter: Optional[str] = Query("Valid", alias="status"),
     search: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user=Depends(require_permission("attendance:session"))
 ):
     service = AttendanceService(db)
-    records = await service.get_session_records(session_id=session_id, status=status, search=search)
+    records = await service.get_session_records(session_id=session_id, status=status_filter, search=search)
     return success_response(data=records, message="تم جلب كشف الحضور اللحظي للجلسة")
 
 

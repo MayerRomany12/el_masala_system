@@ -74,7 +74,7 @@ export const ReportManagement = () => {
 
   // Load Classes for Class-centric filtering
   useEffect(() => {
-    apiClient.get('/classes/?status=Active&limit=100')
+    apiClient.get('/classes?status=Active&limit=100')
       .then((res) => {
         const items = res?.data?.data?.items || res?.data?.items || [];
         setClassesList(items);

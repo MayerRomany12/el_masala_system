@@ -9,8 +9,10 @@ from app.core.errors import (
     AppException,
     app_exception_handler,
     validation_exception_handler,
+    pydantic_validation_exception_handler,
     generic_exception_handler
 )
+from pydantic import ValidationError
 import os
 from fastapi.staticfiles import StaticFiles
 
@@ -89,15 +91,6 @@ except Exception:
         app.mount("/uploads", StaticFiles(directory=tmp_uploads), name="uploads")
     except Exception:
         pass
-
-from app.core.errors import (
-    AppException,
-    app_exception_handler,
-    validation_exception_handler,
-    pydantic_validation_exception_handler,
-    generic_exception_handler
-)
-from pydantic import ValidationError
 
 # Exception Handlers
 app.add_exception_handler(AppException, app_exception_handler)

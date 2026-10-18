@@ -107,7 +107,7 @@ async def list_members(
     stage: Optional[str] = Query(None),
     class_id: Optional[str] = Query(None, description="تصفية بحسب الفصل الخدمي"),
     area: Optional[str] = Query(None, description="تصفية بحسب المنطقة السكنية"),
-    status: Optional[str] = Query(None),
+    status_filter: Optional[str] = Query(None, alias="status"),
     page: int = Query(1, ge=1),
     limit: int = Query(50, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
@@ -119,7 +119,7 @@ async def list_members(
 
     service = MemberService(db)
     result = await service.list_members(
-        search=search, stage=stage, class_id=class_id, area=area, status=status,
+        search=search, stage=stage, class_id=class_id, area=area, status=status_filter,
         allowed_class_ids=allowed_class_ids, page=page, limit=limit
     )
     return success_response(data=result, message="تم جلب قائمة المخدومين بنجاح")

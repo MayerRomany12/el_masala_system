@@ -13,12 +13,14 @@ router = APIRouter(prefix="/seasons", tags=["Seasons Management"])
 
 @router.get("", response_model=dict)
 async def list_seasons(
-    active_only: bool = Query(False, description="عرض المواسم النشطة فقط"),
+    active_only: Optional[bool] = Query(None, description="عرض المواسم النشطة فقط"),
+    status: Optional[str] = Query(None, description="تصفية بالحالة (Active)"),
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
     service = SeasonService(db)
-    items = await service.list_seasons(active_only=active_only)
+    is_active_filter = bool(active_only or (status and status.lower() == "active"))
+    items = await service.list_seasons(active_only=is_active_filter)
     return success_response(data={"items": items, "total": len(items)}, message="تم جلب قائمة المواسم الخدمية بنجاح")
 
 

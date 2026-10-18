@@ -30,7 +30,7 @@ async def run_absence_detector(
 @router.get("/tasks/by-area", response_model=dict)
 async def get_tasks_by_area(
     class_id: Optional[str] = Query(None),
-    status: Optional[str] = Query(None),
+    status_filter: Optional[str] = Query(None, alias="status"),
     db: AsyncSession = Depends(get_db),
     current_user=Depends(require_permission("followup:read"))
 ):
@@ -42,7 +42,7 @@ async def get_tasks_by_area(
     result = await service.get_tasks_grouped_by_area(
         class_id=class_id,
         allowed_class_ids=allowed_class_ids,
-        status=status
+        status=status_filter
     )
     return success_response(data=result, message="تم تجميع مهام الافتقاد بحسب المناطق السكنية بنجاح")
 
@@ -51,7 +51,7 @@ async def get_tasks_by_area(
 async def list_followup_tasks(
     servant_id: Optional[str] = Query(None),
     priority: Optional[str] = Query(None),
-    status: Optional[str] = Query(None),
+    status_filter: Optional[str] = Query(None, alias="status"),
     search: Optional[str] = Query(None),
     class_id: Optional[str] = Query(None),
     area: Optional[str] = Query(None),
@@ -70,7 +70,7 @@ async def list_followup_tasks(
 
     service = FollowupService(db)
     result = await service.list_tasks(
-        servant_id=resolved_servant_id, priority=priority, status=status, search=search,
+        servant_id=resolved_servant_id, priority=priority, status=status_filter, search=search,
         class_id=class_id, area=area, allowed_class_ids=allowed_class_ids,
         page=page, limit=limit
     )

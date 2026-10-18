@@ -16,6 +16,11 @@ export const membersApi = {
     return response.data;
   },
 
+  getMemberCard: async (memberId) => {
+    const response = await apiClient.get(`/members/${memberId}/card`);
+    return response.data;
+  },
+
   createMember: async (memberData) => {
     const response = await apiClient.post('/members', memberData);
     return response.data;

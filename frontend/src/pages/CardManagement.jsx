@@ -62,7 +62,7 @@ export const CardManagement = () => {
   const [activeSide, setActiveSide] = useState('front'); // 'front' or 'back'
 
   useEffect(() => {
-    apiClient.get('/classes/?status=Active&limit=50')
+    apiClient.get('/classes?status=Active&limit=50')
       .then(res => {
         const data = res?.data?.data?.items || res?.data?.items || [];
         setClasses(data);

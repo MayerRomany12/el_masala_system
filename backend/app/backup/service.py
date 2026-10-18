@@ -9,7 +9,8 @@ from app.models import (
     User, Member, Event, EventRegistration, AuthorizedDevice,
     AttendanceSession, AttendanceSessionServant, AttendanceRecord,
     FollowupTask, FollowupLog, PointsTransaction, SystemSetting,
-    BirthdayGiftDelivery, InternalMessage, MessageRecipient, AuditLog
+    BirthdayGiftDelivery, InternalMessage, MessageRecipient, AuditLog,
+    ClassGroup, ClassGroupServant, ClassGroupMember, Season, ResidentialArea
 )
 from app.audit.service import AuditService
 from app.core.errors import BadRequestException, AppException
@@ -43,7 +44,12 @@ class BackupService:
             "birthday_gift_deliveries": BirthdayGiftDelivery,
             "internal_messages": InternalMessage,
             "message_recipients": MessageRecipient,
-            "system_settings": SystemSetting
+            "system_settings": SystemSetting,
+            "seasons": Season,
+            "class_groups": ClassGroup,
+            "class_group_servants": ClassGroupServant,
+            "class_group_members": ClassGroupMember,
+            "residential_areas": ResidentialArea
         }
 
         backup_data = {}
@@ -139,6 +145,35 @@ class BackupService:
                     else:
                         m_copy = {k: v for k, v in m.items() if k not in ["created_at", "updated_at"]}
                         self.db.add(Member(**m_copy))
+
+            # 3. Restore Residential Areas
+            if "residential_areas" in data and isinstance(data["residential_areas"], list):
+                for a in data["residential_areas"]:
+                    if not a.get("name"):
+                        continue
+                    q = await self.db.execute(select(ResidentialArea).where(ResidentialArea.name == a["name"].strip()))
+                    if not q.scalar_one_or_none():
+                        self.db.add(ResidentialArea(name=a["name"].strip()))
+
+            # 4. Restore Seasons
+            if "seasons" in data and isinstance(data["seasons"], list):
+                for s in data["seasons"]:
+                    q = await self.db.execute(select(Season).where(Season.season_id == s.get("season_id")))
+                    if not q.scalar_one_or_none():
+                        s_copy = {k: v for k, v in s.items() if k not in ["created_at"]}
+                        if isinstance(s_copy.get("start_date"), str) and s_copy["start_date"]:
+                            s_copy["start_date"] = datetime.fromisoformat(s_copy["start_date"]).date()
+                        if isinstance(s_copy.get("end_date"), str) and s_copy["end_date"]:
+                            s_copy["end_date"] = datetime.fromisoformat(s_copy["end_date"]).date()
+                        self.db.add(Season(**s_copy))
+
+            # 5. Restore Class Groups
+            if "class_groups" in data and isinstance(data["class_groups"], list):
+                for cg in data["class_groups"]:
+                    q = await self.db.execute(select(ClassGroup).where(ClassGroup.class_id == cg.get("class_id")))
+                    if not q.scalar_one_or_none():
+                        cg_copy = {k: v for k, v in cg.items() if k not in ["created_at", "updated_at"]}
+                        self.db.add(ClassGroup(**cg_copy))
 
             await self.db.commit()
 

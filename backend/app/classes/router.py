@@ -23,7 +23,7 @@ async def list_classes(
     group_type: Optional[str] = Query(None, description="نوع المجموعة: Regular أو Summer"),
     season_id: Optional[str] = Query(None, description="تصفية بحسب الموسم الخدمي"),
     stage: Optional[str] = Query(None, description="تصفية بالمرحلة الدراسية"),
-    status: Optional[str] = Query(None, description="تصفية بالحالة: Active, Inactive, Archived"),
+    status_filter: Optional[str] = Query(None, alias="status", description="تصفية بالحالة: Active, Inactive, Archived"),
     is_active: Optional[bool] = Query(None, description="تصفية بالحالة النشطة"),
     limit: Optional[int] = Query(100, description="الحد الأقصى للنتائج"),
     db: AsyncSession = Depends(get_db),
@@ -35,7 +35,7 @@ async def list_classes(
         group_type=group_type,
         season_id=season_id,
         stage=stage,
-        status=status,
+        status=status_filter,
         is_active=is_active,
         allowed_class_ids=allowed_class_ids,
         limit=limit

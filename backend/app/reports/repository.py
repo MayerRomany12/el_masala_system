@@ -1,5 +1,5 @@
 from typing import Optional, List, Dict, Any
-from datetime import date
+from datetime import date, datetime
 from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 

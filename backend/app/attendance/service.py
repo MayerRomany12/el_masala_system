@@ -1,4 +1,5 @@
 from typing import Optional, List, Dict, Any
+from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.attendance.repository import AttendanceRepository
@@ -23,7 +24,7 @@ class AttendanceService:
     async def register_device(self, data: AuthorizedDeviceCreate, current_user_id: str) -> Dict[str, Any]:
         return await self.repo.create_device(device_name=data.device_name, user_id=current_user_id)
 
-    async def list_devices() -> List[Dict[str, Any]]:
+    async def list_devices(self) -> List[Dict[str, Any]]:
         return await self.repo.list_devices()
 
     # ─── Sessions ─────────────────────────────────────────────────────────────

@@ -45,22 +45,24 @@ export const DashboardOverview = () => {
     const fetchMetrics = async () => {
       try {
         const [membersRes, sessionsRes, followupsRes, birthdaysRes, classesRes] = await Promise.allSettled([
-          membersApi.getStats ? membersApi.getStats() : membersApi.getMembers({ limit: 1 }),
-          attendanceApi.listSessions({ limit: 1 }),
-          followupApi.getStats(),
-          birthdaysApi.getUpcoming({ days: 30 }),
-          apiClient.get('/classes/?status=Active&limit=100')
+          membersApi.getStats(),
+          attendanceApi.getSessions({ limit: 1 }),
+          followupApi.getTasks({ status: 'Pending', limit: 1 }),
+          birthdaysApi.getBirthdays({ period: 'month' }),
+          apiClient.get('/classes?status=Active&limit=100')
         ]);
 
         const totalM = membersRes.status === 'fulfilled'
-          ? (membersRes.value?.data?.total || membersRes.value?.total || membersRes.value?.data?.items?.length || 0)
+          ? (membersRes.value?.data?.total_members ?? membersRes.value?.data?.total ?? 0)
           : 0;
 
         setMetrics({
           totalMembers: totalM,
-          activeSessions: sessionsRes.status === 'fulfilled' ? (sessionsRes.value?.data?.length || 0) : 0,
-          pendingFollowups: followupsRes.status === 'fulfilled' ? (followupsRes.value?.data?.total_open || 0) : 0,
-          upcomingBirthdays: birthdaysRes.status === 'fulfilled' ? (birthdaysRes.value?.data?.length || 0) : 0
+          activeSessions: sessionsRes.status === 'fulfilled' ? (sessionsRes.value?.data?.total || 0) : 0,
+          pendingFollowups: followupsRes.status === 'fulfilled' ? (followupsRes.value?.data?.total || 0) : 0,
+          upcomingBirthdays: birthdaysRes.status === 'fulfilled'
+            ? (birthdaysRes.value?.data?.total ?? birthdaysRes.value?.data?.items?.length ?? 0)
+            : 0
         });
 
         if (classesRes.status === 'fulfilled') {
@@ -98,7 +100,7 @@ export const DashboardOverview = () => {
       iconColor: 'var(--color-success)',
       bgColor: 'rgba(52, 211, 153, 0.12)',
       link: '/attendance',
-      desc: 'الجلسات المسجلة حديثاً'
+      desc: 'إجمالي جلسات الحضور المسجلة'
     },
     {
       id: 'followup',
@@ -120,7 +122,7 @@ export const DashboardOverview = () => {
       iconColor: '#f472b6',
       bgColor: 'rgba(244, 114, 182, 0.12)',
       link: '/birthdays',
-      desc: 'خلال 30 يوماً القادمة'
+      desc: 'خلال الشهر الحالي'
     }
   ];
 
