@@ -1,7 +1,8 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List, Set, Optional
+from typing import List, Set, Optional, Dict, Tuple
+import time
 
 from app.core.security import decode_access_token
 from app.core.database import get_db
@@ -9,6 +10,18 @@ from app.core.permissions import ALL_PERMISSIONS, is_valid_permission
 from app.users.schemas import RoleEnum
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token")
+
+# ⚡ Short-lived in-process cache of authenticated users (avoids 1 DB round-trip per request).
+# Permission/role changes propagate within USER_CACHE_TTL seconds.
+USER_CACHE_TTL = 30.0
+_user_cache: Dict[str, Tuple[float, dict]] = {}
+
+
+def invalidate_user_cache(user_id: Optional[str] = None) -> None:
+    if user_id is None:
+        _user_cache.clear()
+    else:
+        _user_cache.pop(user_id, None)
 
 ROLE_PERMISSIONS = {
     RoleEnum.SUPER_ADMIN: list(ALL_PERMISSIONS),
@@ -109,14 +122,21 @@ async def get_current_user(
         if user_id is None:
             raise credentials_exception
 
+        now = time.monotonic()
+        cached = _user_cache.get(user_id)
+        if cached and (now - cached[0]) < USER_CACHE_TTL:
+            return dict(cached[1])
+
         from app.users.repository import UserRepository
         repo = UserRepository(db)
         user = await repo.get_by_user_id(user_id)
         if user is None or not user.get("is_active", True):
+            _user_cache.pop(user_id, None)
             raise credentials_exception
 
         # Compute effective permissions on user dictionary
         user["effective_permissions"] = list(compute_effective_permissions(user))
+        _user_cache[user_id] = (now, dict(user))
         return user
     except HTTPException:
         raise
@@ -143,6 +163,25 @@ def require_permission(required_permission: str):
             )
         return current_user
     return permission_checker
+
+
+def require_any_permission(permissions: List[str]):
+    """Dependency guard passing if the user holds at least one of the given permissions."""
+    async def any_permission_checker(
+        current_user: dict = Depends(get_current_user)
+    ):
+        role = current_user.get("role", RoleEnum.SERVANT)
+        if role == RoleEnum.SUPER_ADMIN or role == "Super Admin":
+            return current_user
+
+        effective_perms = set(current_user.get("effective_permissions") or [])
+        if not effective_perms.intersection(permissions):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"ليس لديك الصلاحية الكافية ({' / '.join(permissions)}) لإتمام هذه العملية"
+            )
+        return current_user
+    return any_permission_checker
 
 
 def require_role(allowed_roles: List[str]):

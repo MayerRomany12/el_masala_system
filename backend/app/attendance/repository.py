@@ -165,6 +165,29 @@ class AttendanceRepository:
         await self.db.execute(stmt)
         await self.db.flush()
 
+    async def get_session_status_fast(self, session_id: str) -> Optional[Dict[str, Any]]:
+        """
+        ⚡ Fast session check for high-speed scanning motor.
+        Single indexed query on attendance_sessions.
+        """
+        res = await self.db.execute(
+            select(
+                AttendanceSession.session_id,
+                AttendanceSession.status,
+                AttendanceSession.class_id,
+                AttendanceSession.stage
+            ).where(AttendanceSession.session_id == session_id)
+        )
+        row = res.first()
+        if not row:
+            return None
+        return {
+            "session_id": row.session_id,
+            "status": row.status,
+            "class_id": row.class_id,
+            "stage": row.stage
+        }
+
     async def get_session_by_id(self, session_id: str) -> Optional[Dict[str, Any]]:
         await self._evaluate_lazy_void()
         res = await self.db.execute(select(AttendanceSession).where(AttendanceSession.session_id == session_id))
@@ -386,9 +409,12 @@ class AttendanceRepository:
         member_id: str,
         user_id: Optional[str] = None,
         device_id: Optional[str] = None,
-        method: str = "QR"
+        method: str = "QR",
+        member_name: Optional[str] = None,
+        member_stage: Optional[str] = None
     ) -> Dict[str, Any]:
         max_retries = 10
+        now_ts = datetime.now(timezone.utc)
         for _ in range(max_retries):
             rand_num = secrets.randbelow(1_000_000)
             candidate_id = f"ATT-{rand_num:06d}"
@@ -400,15 +426,38 @@ class AttendanceRepository:
                 scanned_by_user=user_id,
                 scanned_device_id=device_id,
                 method=method,
-                status="Valid"
+                status="Valid",
+                scanned_at=now_ts
             )
             self.db.add(record)
             try:
                 await self.db.flush()
+                if member_name:
+                    return {
+                        "record_id": record.record_id,
+                        "session_id": record.session_id,
+                        "member_id": record.member_id,
+                        "member_name": member_name,
+                        "member_stage": member_stage or "",
+                        "scanned_by_user": record.scanned_by_user,
+                        "scanned_by_name": None,
+                        "scanned_device_name": None,
+                        "method": record.method,
+                        "status": record.status,
+                        "cancelled_by_name": None,
+                        "cancelled_at": None,
+                        "cancellation_reason": None,
+                        "scanned_at": now_ts,
+                    }
                 await self.db.refresh(record)
                 return await self.get_record_by_id(candidate_id)
-            except IntegrityError:
+            except IntegrityError as e:
                 await self.db.rollback()
+                err_str = str(e).lower()
+                if "uq_session_member_attendance" in err_str or "unique constraint" in err_str:
+                    from app.core.exceptions import BadRequestException
+                    name_display = f" ({member_name})" if member_name else ""
+                    raise BadRequestException(f"الطفل{name_display} مسجل حضوره بالفعل في هذه الجلسة.")
                 continue
 
         raise AppException(message="تعذر تسجيل الحضور، يرجى إعادة المحاولة")

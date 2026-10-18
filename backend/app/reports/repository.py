@@ -296,30 +296,48 @@ class ReportsRepository:
             "outcomes_breakdown": outcomes
         }
 
-    async def get_birthday_report(self, year: Optional[int] = None) -> Dict[str, Any]:
+    async def get_birthday_report(
+        self,
+        year: Optional[int] = None,
+        month: Optional[int] = None,
+        stage: Optional[str] = None,
+        class_id: Optional[str] = None,
+        allowed_class_ids: Optional[List[str]] = None,
+        gift_status: Optional[str] = None
+    ) -> Dict[str, Any]:
         target_year = year or date.today().year
 
-        # Count Active members who have a date_of_birth recorded
-        total_q = select(func.count(Member.member_id)).where(
-            Member.status == "Active",
-            Member.date_of_birth.isnot(None)  # column is date_of_birth (String), not dob
+        items = await self.get_birthdays_detailed_report(
+            year=target_year,
+            month=month,
+            stage=stage,
+            class_id=class_id,
+            allowed_class_ids=allowed_class_ids,
+            gift_status=gift_status
         )
-        total_members = (await self.db.execute(total_q)).scalar_one()
 
-        deliv_q = select(func.count(BirthdayGiftDelivery.delivery_id)).where(
-            BirthdayGiftDelivery.year == target_year
-        )
-        delivered = (await self.db.execute(deliv_q)).scalar_one()
-
+        total_members = len(items)
+        delivered = sum(1 for it in items if "تم التسليم" in str(it.get("gift_status", "")))
         pending = max(0, total_members - delivered)
         rate = round((delivered / total_members) * 100.0, 1) if total_members > 0 else 0.0
 
-        return {
+        summary_dict = {
             "year": target_year,
             "total_eligible_children": total_members,
             "delivered_gifts_count": delivered,
             "pending_gifts_count": pending,
             "delivery_rate_pct": rate
+        }
+
+        return {
+            "summary": summary_dict,
+            "year": target_year,
+            "total_eligible_children": total_members,
+            "delivered_gifts_count": delivered,
+            "pending_gifts_count": pending,
+            "delivery_rate_pct": rate,
+            "items": items,
+            "total": total_members
         }
 
     async def get_members_master_report(self, stage: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -398,9 +416,20 @@ class ReportsRepository:
             })
         return results
 
-    async def get_birthdays_detailed_report(self, year: Optional[int] = None) -> List[Dict[str, Any]]:
+    async def get_birthdays_detailed_report(
+        self,
+        year: Optional[int] = None,
+        month: Optional[int] = None,
+        stage: Optional[str] = None,
+        class_id: Optional[str] = None,
+        allowed_class_ids: Optional[List[str]] = None,
+        gift_status: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
         target_year = year or date.today().year
         from app.models.user import User
+        from app.models.class_group import ClassGroup, ClassGroupMember
+        from app.birthdays.repository import _parse_dob_string
+
         query = (
             select(
                 Member,
@@ -413,21 +442,88 @@ class ReportsRepository:
                 (BirthdayGiftDelivery.member_id == Member.member_id) & (BirthdayGiftDelivery.year == target_year)
             )
             .outerjoin(User, BirthdayGiftDelivery.delivered_by == User.user_id)
-            .where(Member.status == "Active", Member.date_of_birth.isnot(None))
-            .order_by(Member.full_name.asc())
+            .where(Member.status == "Active", Member.is_archived == False, Member.date_of_birth.isnot(None))
         )
+
+        if class_id:
+            query = query.where(
+                Member.member_id.in_(
+                    select(ClassGroupMember.member_id).where(
+                        ClassGroupMember.class_id == class_id,
+                        ClassGroupMember.is_active == True
+                    )
+                )
+            )
+        elif allowed_class_ids is not None:
+            query = query.where(
+                Member.member_id.in_(
+                    select(ClassGroupMember.member_id).where(
+                        ClassGroupMember.class_id.in_(allowed_class_ids),
+                        ClassGroupMember.is_active == True
+                    )
+                )
+            )
+
+        if stage and stage != "ALL":
+            stage_prefix = stage.split('-')[0].strip()
+            query = query.where(Member.stage.ilike(f"%{stage_prefix}%"))
+
         res = await self.db.execute(query)
+        rows = res.all()
+
+        # Batch load active class names
+        member_ids = [r[0].member_id for r in rows]
+        class_map = {}
+        if member_ids:
+            c_res = await self.db.execute(
+                select(ClassGroupMember.member_id, ClassGroup.name)
+                .join(ClassGroup, ClassGroupMember.class_id == ClassGroup.class_id)
+                .where(ClassGroupMember.member_id.in_(member_ids), ClassGroupMember.is_active == True)
+            )
+            for m_id, c_name in c_res.all():
+                if m_id not in class_map:
+                    class_map[m_id] = c_name
+
         results = []
-        for mem, deliv_id, deliv_at, srv_name in res.all():
+        for mem, deliv_id, deliv_at, srv_name in rows:
+            dob_val = _parse_dob_string(mem.date_of_birth)
+            if not dob_val:
+                continue
+
+            b_month, b_day = dob_val.month, dob_val.day
+            if month is not None and b_month != month:
+                continue
+
+            is_delivered = deliv_id is not None
+            status_label = "تم التسليم 🎁" if is_delivered else "معلق لم يستلم ⏳"
+
+            if gift_status and gift_status != "ALL":
+                if gift_status in ("Delivered", "تم التسليم") and not is_delivered:
+                    continue
+                if gift_status in ("Pending", "معلق") and is_delivered:
+                    continue
+
             results.append({
+                "index": 1,
                 "member_id": mem.member_id,
                 "full_name": mem.full_name,
-                "date_of_birth": str(mem.date_of_birth) if mem.date_of_birth else "—",
+                "class_name": class_map.get(mem.member_id, mem.stage or "—"),
+                "date_of_birth": dob_val.isoformat() if isinstance(dob_val, (date, datetime)) else str(dob_val),
+                "birthday_day": b_day,
+                "birthday_month": b_month,
                 "stage": mem.stage or "—",
-                "gift_status": "تم التسليم 🎁" if deliv_id else "معلق لم يستلم ⏳",
+                "area": getattr(mem, "area", None) or "غير محدد",
+                "gift_status": status_label,
                 "delivered_at": deliv_at.strftime("%Y/%m/%d") if deliv_at else "—",
                 "delivered_by": srv_name or "—",
-                "phone": mem.phone or "—"
+                "phone": mem.phone or "—",
+                "whatsapp_phone": getattr(mem, "whatsapp_phone", None) or mem.phone or ""
             })
+
+        # Sort chronologically by birthday month and day
+        results.sort(key=lambda x: (x.get("birthday_month", 0), x.get("birthday_day", 0), x.get("full_name", "")))
+        for i, item in enumerate(results, 1):
+            item["index"] = i
+
         return results
 

@@ -61,8 +61,23 @@ class ReportsService:
     async def get_followup_report(self) -> Dict[str, Any]:
         return await self.repo.get_followup_report()
 
-    async def get_birthday_report(self, year: Optional[int] = None) -> Dict[str, Any]:
-        return await self.repo.get_birthday_report(year=year)
+    async def get_birthday_report(
+        self,
+        year: Optional[int] = None,
+        month: Optional[int] = None,
+        stage: Optional[str] = None,
+        class_id: Optional[str] = None,
+        allowed_class_ids: Optional[List[str]] = None,
+        gift_status: Optional[str] = None
+    ) -> Dict[str, Any]:
+        return await self.repo.get_birthday_report(
+            year=year,
+            month=month,
+            stage=stage,
+            class_id=class_id,
+            allowed_class_ids=allowed_class_ids,
+            gift_status=gift_status
+        )
 
     async def export_report(
         self,
@@ -74,7 +89,10 @@ class ReportsService:
         allowed_class_ids: Optional[List[str]] = None,
         event_type: Optional[str] = None,
         from_date: Optional[date] = None,
-        to_date: Optional[date] = None
+        to_date: Optional[date] = None,
+        month: Optional[int] = None,
+        year: Optional[int] = None,
+        gift_status: Optional[str] = None
     ) -> Tuple[Any, str, str]:
         """
         توليد التصدير الموحد بنفس Dataset ونفس الفلاتر
@@ -216,13 +234,23 @@ class ReportsService:
             ]
 
         elif report_type == "birthdays":
-            title = "تقرير أعياد الميلاد وتوزيع الهدايا"
-            data_list = await self.repo.get_birthdays_detailed_report()
+            title = f"تقرير أعياد الميلاد وتوزيع الهدايا لسنة {year or datetime.now().year}"
+            data_list = await self.repo.get_birthdays_detailed_report(
+                year=year,
+                month=month,
+                stage=stage,
+                class_id=class_id,
+                allowed_class_ids=allowed_class_ids,
+                gift_status=gift_status
+            )
             headers_map = {
+                "index": "م",
                 "member_id": "رمز المخدوم",
                 "full_name": "اسم الطفل",
+                "class_name": "الفصل الخدمي",
                 "date_of_birth": "تاريخ الميلاد",
                 "stage": "المرحلة",
+                "area": "المنطقة",
                 "gift_status": "حالة تسليم الهدية",
                 "delivered_at": "تاريخ الاستلام",
                 "delivered_by": "المستلم بواسطة",

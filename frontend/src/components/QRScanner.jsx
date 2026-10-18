@@ -26,6 +26,8 @@ export const QRScanner = ({ onBack }) => {
 
   const isScanLockedRef = useRef(false);
   const html5QrcodeRef = useRef(null);
+  const lastScannedTokenRef = useRef('');
+  const lastScanTimeRef = useRef(0);
   const scannerContainerId = 'qr-reader-container';
 
   // Audio Synthesizer Feedback
@@ -137,6 +139,16 @@ export const QRScanner = ({ onBack }) => {
         cleanToken = parsed.qr_token || parsed.token || parsed.member_id || cleanToken;
       } catch (e) {}
     }
+
+    const now = Date.now();
+    // Prevent duplicate triggers of the exact same token within 1.5 seconds
+    if (cleanToken === lastScannedTokenRef.current && now - lastScanTimeRef.current < 1500) {
+      isScanLockedRef.current = false;
+      return;
+    }
+    lastScannedTokenRef.current = cleanToken;
+    lastScanTimeRef.current = now;
+
     setLoading(true);
     setError('');
     setScannedMember(null);
@@ -149,6 +161,10 @@ export const QRScanner = ({ onBack }) => {
       } else {
         playSound('error');
         setError(res.message || 'رمز QR غير مسجل في النظام');
+        // Auto-unlock quickly after error so camera doesn't freeze
+        setTimeout(() => {
+          isScanLockedRef.current = false;
+        }, 1200);
       }
     } catch (err) {
       playSound('error');
@@ -158,6 +174,10 @@ export const QRScanner = ({ onBack }) => {
       else if (!err.response || rawMsg.includes('Network')) concise = 'تعذر الاتصال بالسيرفر، تحقق من الشبكة';
       else if (rawMsg.length > 0 && rawMsg.length < 50) concise = rawMsg;
       setError(concise);
+      // Auto-unlock quickly after error so next scan is ready
+      setTimeout(() => {
+        isScanLockedRef.current = false;
+      }, 1200);
     } finally {
       setLoading(false);
     }
@@ -174,6 +194,7 @@ export const QRScanner = ({ onBack }) => {
     setScannedMember(null);
     setError('');
     setManualToken('');
+    lastScannedTokenRef.current = '';
     isScanLockedRef.current = false;
     if (!scanning) {
       startCamera();
@@ -285,8 +306,13 @@ export const QRScanner = ({ onBack }) => {
               <ShieldCheck size={24} />
               <span style={{ fontSize: '1.1rem' }}>تم التحقق من بطاقة المخدوم بنجاح 🟢</span>
             </div>
-            <button onClick={handleReset} className="btn btn-secondary" style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }}>
-              مسح بطاقة أخرى
+            <button
+              onClick={handleReset}
+              className="btn btn-primary"
+              style={{ padding: '0.4rem 0.9rem', fontSize: '0.88rem', gap: '0.35rem' }}
+            >
+              <RefreshCw size={15} />
+              <span>مسح الطفل التالي 🔄</span>
             </button>
           </div>
 

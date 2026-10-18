@@ -190,8 +190,8 @@ class AttendanceService:
 
         method = data.method
 
-        # 1. Check Session Status
-        session = await self.repo.get_session_by_id(session_id)
+        # 1. ⚡ Fast Session Check (Single indexed query, no lazy void overhead or member counts)
+        session = await self.repo.get_session_status_fast(session_id)
         if not session:
             raise NotFoundException(f"جلسة الحضور برقم {session_id} غير موجودة")
 
@@ -201,9 +201,10 @@ class AttendanceService:
         # 2. Check Authorized Servant for this Session
         user_id = current_user.get("user_id")
         user_role = current_user.get("role", "Servant")
-        is_auth = await self.repo.is_user_authorized_for_session(session_id, user_id, user_role)
-        if not is_auth:
-            raise BadRequestException("عذراً، الخادم الحالي غير مصرح له بتسجيل الحضور في هذه الجلسة المحددة لخدام آخرين.")
+        if user_role not in ("Super Admin", "Admin"):
+            is_auth = await self.repo.is_user_authorized_for_session(session_id, user_id, user_role)
+            if not is_auth:
+                raise BadRequestException("عذراً، الخادم الحالي غير مصرح له بتسجيل الحضور في هذه الجلسة المحددة لخدام آخرين.")
 
         # 3. Check Authorized Device (via X-Device-Token Header)
         device_id = None
@@ -213,44 +214,91 @@ class AttendanceService:
                 device_id = device["device_id"]
                 await self.repo.update_device_last_used(device_id)
 
-        # 4. Resolve Member by QR Token OR Member ID (K-XXXXXX)
-        member = None
-        # Try QR token first
-        member = await self.member_repo.get_by_qr_token(token_or_id)
-        if not member:
-            # Try Member ID
-            member = await self.member_repo.get_by_member_id(token_or_id)
-        if not member and token_or_id.upper() != token_or_id:
-            member = await self.member_repo.get_by_member_id(token_or_id.upper())
+        # 4. ⚡ Fast Single-Query Member Lookup (Indexed on both qr_token and member_id)
+        from sqlalchemy import select, or_
+        from app.models.member import Member
+        from app.models.attendance import AttendanceRecord
+        from app.models.rewards import PointsTransaction
+        import secrets
+
+        clean_token = token_or_id
+        mem_q = select(Member).where(
+            or_(
+                Member.qr_token == clean_token,
+                Member.member_id == clean_token.upper(),
+                Member.member_id == clean_token
+            )
+        )
+        mem_res = await self.db.execute(mem_q)
+        member = mem_res.scalar_one_or_none()
 
         if not member:
-            raise NotFoundException(f"تعذر العثور على بيانات المخدوم بالرمز المدخل ({token_or_id}). يرجى التأكد من بطاقة الـ QR أو رمز K-XXXXXX.")
+            raise NotFoundException(f"تعذر العثور على بيانات المخدوم بالرمز المدخل ({clean_token}). يرجى التأكد من بطاقة الـ QR أو رمز K-XXXXXX.")
 
         # 5. Check Member Active Status
-        if member["status"] != "Active":
-            raise BadRequestException(f"تعذر تسجيل حضور الطفل ({member['full_name']}) لأن حسابه غير نشط (حالة الحساب الحالية: {member['status']}).")
+        if member.status != "Active":
+            raise BadRequestException(f"تعذر تسجيل حضور الطفل ({member.full_name}) لأن حسابه غير نشط (حالة الحساب الحالية: {member.status}).")
 
         # 6. Check Duplicate Attendance in this Session
-        existing_rec = await self.repo.get_record_by_session_and_member(session_id, member["member_id"])
-        if existing_rec and existing_rec["status"] == "Valid":
-            scanned_time = existing_rec["scanned_at"]
-            time_str = scanned_time.strftime("%I:%M %p") if hasattr(scanned_time, "strftime") else str(scanned_time)
-            raise BadRequestException(f"الطفل ({member['full_name']}) مسجل حضوره بالفعل في هذه الجلسة (الساعة {time_str}).")
-
-        # 7. Record Attendance
-        rec = await self.repo.create_record(
-            session_id=session_id,
-            member_id=member["member_id"],
-            user_id=user_id,
-            device_id=device_id,
-            method=method
+        existing_q = select(AttendanceRecord).where(
+            AttendanceRecord.session_id == session_id,
+            AttendanceRecord.member_id == member.member_id
         )
+        existing_res = await self.db.execute(existing_q)
+        existing_rec = existing_res.scalar_one_or_none()
 
-        # 8. Auto-Award +10 Attendance Points to Member Ledger
+        if existing_rec and existing_rec.status == "Valid":
+            scanned_time = existing_rec.scanned_at
+            time_str = scanned_time.strftime("%I:%M %p") if hasattr(scanned_time, "strftime") else str(scanned_time)
+            raise BadRequestException(f"الطفل ({member.full_name}) مسجل حضوره بالفعل في هذه الجلسة (الساعة {time_str}).")
+
+        # 7. Record Attendance (Insert new or reactivate cancelled)
+        if existing_rec and existing_rec.status == "Cancelled":
+            now_ts = datetime.now(timezone.utc)
+            existing_rec.status = "Valid"
+            existing_rec.scanned_by_user = user_id
+            existing_rec.method = method
+            existing_rec.scanned_at = now_ts
+            existing_rec.cancelled_by = None
+            existing_rec.cancelled_at = None
+            existing_rec.cancellation_reason = None
+            await self.db.flush()
+            rec = {
+                "record_id": existing_rec.record_id,
+                "session_id": existing_rec.session_id,
+                "member_id": existing_rec.member_id,
+                "member_name": member.full_name,
+                "member_stage": member.stage,
+                "scanned_by_user": user_id,
+                "method": method,
+                "status": "Valid",
+                "scanned_at": now_ts
+            }
+        else:
+            rec = await self.repo.create_record(
+                session_id=session_id,
+                member_id=member.member_id,
+                user_id=user_id,
+                device_id=device_id,
+                method=method,
+                member_name=member.full_name,
+                member_stage=member.stage
+            )
+
+        # 8. ⚡ Fast Atomic Attendance Points Award (+10 points in member ledger)
         try:
-            from app.rewards.service import RewardsService
-            rewards_service = RewardsService(self.db)
-            await rewards_service.award_attendance_points(member["member_id"], session_id)
+            member.total_points = (member.total_points or 0) + 10
+            pts_id = f"PTS-{secrets.randbelow(1_000_000):06d}"
+            self.db.add(PointsTransaction(
+                transaction_id=pts_id,
+                member_id=member.member_id,
+                points=10,
+                type="Earned",
+                session_id=session_id,
+                reason="حضور اجتماع الأحد ⛪",
+                created_by=user_id
+            ))
+            await self.db.flush()
         except Exception:
             pass
 

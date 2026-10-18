@@ -4,7 +4,7 @@ from datetime import date
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.auth.dependencies import get_current_user, require_permission, get_servant_class_ids
+from app.auth.dependencies import get_current_user, require_permission, require_any_permission, get_servant_class_ids
 from app.reports.service import ReportsService
 from app.shared.response import success_response
 
@@ -18,7 +18,7 @@ async def get_attendance_report(
     from_date: Optional[date] = Query(None),
     to_date: Optional[date] = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_permission("reports:export"))
+    current_user=Depends(require_any_permission(["reports:read", "reports:export"]))
 ):
     allowed_class_ids = await get_servant_class_ids(current_user, db)
     service = ReportsService(db)
@@ -40,7 +40,7 @@ async def get_who_attended_report(
     from_date: Optional[date] = Query(None),
     to_date: Optional[date] = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_permission("reports:export"))
+    current_user=Depends(require_any_permission(["reports:read", "reports:export", "attendance:session", "attendance:scan"]))
 ):
     allowed_class_ids = await get_servant_class_ids(current_user, db)
     service = ReportsService(db)
@@ -63,7 +63,7 @@ async def get_who_absent_report(
     from_date: Optional[date] = Query(None),
     to_date: Optional[date] = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_permission("reports:export"))
+    current_user=Depends(require_any_permission(["reports:read", "reports:export", "attendance:session", "attendance:scan"]))
 ):
     allowed_class_ids = await get_servant_class_ids(current_user, db)
     service = ReportsService(db)
@@ -82,7 +82,7 @@ async def get_who_absent_report(
 async def get_member_profile_print(
     member_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_permission("reports:export"))
+    current_user=Depends(require_any_permission(["reports:read", "reports:export", "members:read"]))
 ):
     service = ReportsService(db)
     html_content = await service.generate_member_profile_report(member_id)
@@ -99,7 +99,7 @@ async def get_financial_report(
     from_date: Optional[date] = Query(None),
     to_date: Optional[date] = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_permission("reports:export"))
+    current_user=Depends(require_any_permission(["reports:read", "reports:export"]))
 ):
     service = ReportsService(db)
     items = await service.get_financial_report(event_type=event_type, from_date=from_date, to_date=to_date)
@@ -132,7 +132,7 @@ async def get_financial_report(
 @router.get("/followup", response_model=dict)
 async def get_followup_report(
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_permission("reports:export"))
+    current_user=Depends(require_any_permission(["reports:read", "reports:export", "followup:read"]))
 ):
     service = ReportsService(db)
     data = await service.get_followup_report()
@@ -141,12 +141,24 @@ async def get_followup_report(
 
 @router.get("/birthdays", response_model=dict)
 async def get_birthday_report(
-    year: Optional[int] = Query(None),
+    year: Optional[int] = Query(None, description="السنة الميلادية"),
+    month: Optional[int] = Query(None, ge=1, le=12, description="الشهر (1-12)"),
+    stage: Optional[str] = Query(None, description="المرحلة الدراسية"),
+    class_id: Optional[str] = Query(None, description="الفصل الخدمي"),
+    gift_status: Optional[str] = Query(None, description="حالة الهدية"),
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_permission("reports:export"))
+    current_user=Depends(require_any_permission(["reports:read", "reports:export", "birthdays:read"]))
 ):
+    allowed_class_ids = await get_servant_class_ids(current_user, db)
     service = ReportsService(db)
-    data = await service.get_birthday_report(year=year)
+    data = await service.get_birthday_report(
+        year=year,
+        month=month,
+        stage=stage,
+        class_id=class_id,
+        allowed_class_ids=allowed_class_ids,
+        gift_status=gift_status
+    )
     return success_response(data=data, message="تم حساب تقرير أعياد الميلاد وتوزيع الهدايا بنجاح")
 
 
@@ -161,8 +173,11 @@ async def export_excel(
     event_type: Optional[str] = Query(None),
     from_date: Optional[date] = Query(None),
     to_date: Optional[date] = Query(None),
+    month: Optional[int] = Query(None),
+    year: Optional[int] = Query(None),
+    gift_status: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_permission("reports:export"))
+    current_user=Depends(require_any_permission(["reports:read", "reports:export", "birthdays:read"]))
 ):
     allowed_class_ids = await get_servant_class_ids(current_user, db)
     service = ReportsService(db)
@@ -175,7 +190,10 @@ async def export_excel(
         allowed_class_ids=allowed_class_ids,
         event_type=event_type,
         from_date=from_date,
-        to_date=to_date
+        to_date=to_date,
+        month=month,
+        year=year,
+        gift_status=gift_status
     )
     return Response(
         content=content,
@@ -193,8 +211,11 @@ async def export_csv(
     event_type: Optional[str] = Query(None),
     from_date: Optional[date] = Query(None),
     to_date: Optional[date] = Query(None),
+    month: Optional[int] = Query(None),
+    year: Optional[int] = Query(None),
+    gift_status: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_permission("reports:export"))
+    current_user=Depends(require_any_permission(["reports:read", "reports:export", "birthdays:read"]))
 ):
     allowed_class_ids = await get_servant_class_ids(current_user, db)
     service = ReportsService(db)
@@ -207,7 +228,10 @@ async def export_csv(
         allowed_class_ids=allowed_class_ids,
         event_type=event_type,
         from_date=from_date,
-        to_date=to_date
+        to_date=to_date,
+        month=month,
+        year=year,
+        gift_status=gift_status
     )
     return Response(
         content=content,
@@ -225,8 +249,11 @@ async def export_pdf(
     event_type: Optional[str] = Query(None),
     from_date: Optional[date] = Query(None),
     to_date: Optional[date] = Query(None),
+    month: Optional[int] = Query(None),
+    year: Optional[int] = Query(None),
+    gift_status: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_permission("reports:export"))
+    current_user=Depends(require_any_permission(["reports:read", "reports:export", "birthdays:read"]))
 ):
     allowed_class_ids = await get_servant_class_ids(current_user, db)
     service = ReportsService(db)
@@ -239,7 +266,10 @@ async def export_pdf(
         allowed_class_ids=allowed_class_ids,
         event_type=event_type,
         from_date=from_date,
-        to_date=to_date
+        to_date=to_date,
+        month=month,
+        year=year,
+        gift_status=gift_status
     )
     return Response(
         content=content,

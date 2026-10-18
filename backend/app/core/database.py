@@ -9,13 +9,19 @@ class Base(DeclarativeBase):
     pass
 
 
+# ⚡ Bump this value whenever init_db() migrations/seeds change.
+# When the DB already holds this version, the heavy startup migrations are skipped
+# (critical on serverless where every cold start used to run ~40 DDL statements).
+SCHEMA_VERSION = "2026-10-18-perf-1"
+
 # Async SQLAlchemy Engine
 engine = create_async_engine(
     settings.DATABASE_URL,
     echo=False,
     pool_pre_ping=True,
-    pool_size=10,
-    max_overflow=20,
+    pool_size=5,
+    max_overflow=10,
+    pool_recycle=300,
     connect_args={"statement_cache_size": 0},
 )
 
@@ -30,12 +36,30 @@ AsyncSessionLocal = async_sessionmaker(
 async_session_maker = AsyncSessionLocal
 
 
+async def _schema_is_current() -> bool:
+    """Single cheap query: is the DB already migrated to SCHEMA_VERSION?"""
+    from sqlalchemy import text
+    try:
+        async with engine.connect() as conn:
+            res = await conn.execute(
+                text("SELECT value FROM system_settings WHERE key = 'schema_version'")
+            )
+            row = res.first()
+            return bool(row and row[0] == SCHEMA_VERSION)
+    except Exception:
+        return False
+
+
 async def init_db():
     """Create all tables on startup and apply missing column migrations."""
     # Import all models so SQLAlchemy registers them
     from app.models import user, member, event, attendance, followup, rewards, setting, birthday, internal_messages, audit_log  # noqa
     from app.models import class_group, residential_area  # noqa
-    from sqlalchemy import text, select
+    from sqlalchemy import text, select, func
+
+    if await _schema_is_current():
+        logger.info(f"Schema already at version {SCHEMA_VERSION} — skipping startup migrations.")
+        return
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -119,6 +143,20 @@ async def init_db():
             WHERE is_active = TRUE;
         """))
         logger.info("Migrations for ClassGroup schema applied successfully.")
+
+        # ⚡ Performance indexes for hot paths (attendance sheet, scan, reports)
+        await conn.execute(text("""
+            CREATE INDEX IF NOT EXISTS ix_cgm_class_active
+            ON class_group_members (class_id, member_id) WHERE is_active = TRUE;
+        """))
+        await conn.execute(text("""
+            CREATE INDEX IF NOT EXISTS ix_att_records_session_status
+            ON attendance_records (session_id, status);
+        """))
+        await conn.execute(text("""
+            CREATE INDEX IF NOT EXISTS ix_cgs_servant_active
+            ON class_group_servants (servant_id) WHERE is_active = TRUE;
+        """))
 
     # Ensure church logo exists in frontend assets safely
     import shutil, os
@@ -254,6 +292,20 @@ async def init_db():
             existing_admin.hashed_password = get_password_hash(settings.INITIAL_SUPERADMIN_PASSWORD)
             existing_admin.is_active = True
             logger.info("Auto-updated Super Admin credentials.")
+
+        # Record schema version so subsequent cold starts skip all of the above
+        q_ver = await session.execute(
+            select(setting.SystemSetting).where(setting.SystemSetting.key == "schema_version")
+        )
+        ver_row = q_ver.scalar_one_or_none()
+        if ver_row:
+            ver_row.value = SCHEMA_VERSION
+        else:
+            session.add(setting.SystemSetting(
+                key="schema_version",
+                value=SCHEMA_VERSION,
+                description="إصدار هيكل قاعدة البيانات (لتخطي الترحيلات عند بدء التشغيل)"
+            ))
 
         await session.commit()
     logger.info("Database tables created / verified successfully.")

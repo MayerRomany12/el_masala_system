@@ -31,6 +31,22 @@ const STAGE_OPTIONS = [
   'خريجين'
 ];
 
+const MONTH_OPTIONS = [
+  { value: '', label: 'جميع الشهور 📅' },
+  { value: '1', label: '1 - يناير' },
+  { value: '2', label: '2 - فبراير' },
+  { value: '3', label: '3 - مارس' },
+  { value: '4', label: '4 - أبريل' },
+  { value: '5', label: '5 - مايو' },
+  { value: '6', label: '6 - يونيو' },
+  { value: '7', label: '7 - يوليو' },
+  { value: '8', label: '8 - أغسطس' },
+  { value: '9', label: '9 - سبتمبر' },
+  { value: '10', label: '10 - أكتوبر' },
+  { value: '11', label: '11 - نوفمبر' },
+  { value: '12', label: '12 - ديسمبر' }
+];
+
 export const ReportManagement = () => {
   const { hasPermission, hasAnyPermission } = useAuth();
 
@@ -46,6 +62,8 @@ export const ReportManagement = () => {
   const [selectedEventType, setSelectedEventType] = useState('');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
+  const [selectedMonth, setSelectedMonth] = useState('');
+  const [selectedGiftStatus, setSelectedGiftStatus] = useState('');
 
   // Data States
   const [dataList, setDataList] = useState([]);
@@ -131,10 +149,15 @@ export const ReportManagement = () => {
           setDataList([]);
         }
       } else if (reportType === 'birthdays') {
-        const res = await reportsApi.getBirthdayReport();
-        if (res.success) {
-          setSummaryData(res.data);
-          setDataList([]);
+        const res = await reportsApi.getBirthdayReport({
+          month: selectedMonth ? parseInt(selectedMonth, 10) : undefined,
+          class_id: selectedClassId || undefined,
+          stage: selectedStage && selectedStage !== 'ALL' ? selectedStage : undefined,
+          gift_status: selectedGiftStatus && selectedGiftStatus !== 'ALL' ? selectedGiftStatus : undefined
+        });
+        if (res && res.success) {
+          setSummaryData(res.data?.summary || res.data);
+          setDataList(res.data?.items || []);
         }
       }
     } catch (err) {
@@ -142,7 +165,7 @@ export const ReportManagement = () => {
     } finally {
       setLoading(false);
     }
-  }, [reportType, selectedClassId, selectedStage, selectedEventType, fromDate, toDate]);
+  }, [reportType, selectedClassId, selectedStage, selectedEventType, fromDate, toDate, selectedMonth, selectedGiftStatus]);
 
   useEffect(() => {
     fetchReportData();
@@ -158,6 +181,8 @@ export const ReportManagement = () => {
       if (selectedEventType && selectedEventType !== 'ALL') params.event_type = selectedEventType;
       if (fromDate) params.from_date = fromDate;
       if (toDate) params.to_date = toDate;
+      if (selectedMonth) params.month = parseInt(selectedMonth, 10);
+      if (selectedGiftStatus && selectedGiftStatus !== 'ALL') params.gift_status = selectedGiftStatus;
 
       const res = await reportsApi.downloadExport(reportType, format, params);
 
@@ -221,7 +246,7 @@ export const ReportManagement = () => {
 
         {/* Unified Export Buttons */}
         <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          {hasPermission('reports:export') && (
+          {hasAnyPermission(['reports:export', 'reports:read', 'birthdays:read']) && (
             <>
               <button
                 onClick={() => handleExport('excel')}
@@ -326,7 +351,7 @@ export const ReportManagement = () => {
           </button>
         )}
 
-        {hasPermission('birthdays:read') && (
+        {hasAnyPermission(['birthdays:read', 'reports:read', 'reports:export']) && (
           <button
             onClick={() => setReportType('birthdays')}
             className={`btn ${reportType === 'birthdays' ? 'btn-primary' : 'btn-secondary'}`}
@@ -345,7 +370,7 @@ export const ReportManagement = () => {
         </div>
 
         {/* Class Filter */}
-        {(reportType === 'members' || reportType === 'who_attended' || reportType === 'who_absent' || reportType === 'attendance') && (
+        {(reportType === 'members' || reportType === 'who_attended' || reportType === 'who_absent' || reportType === 'attendance' || reportType === 'birthdays') && (
           <div style={{ flex: '0 1 200px' }}>
             <select
               className="form-input"
@@ -360,7 +385,8 @@ export const ReportManagement = () => {
           </div>
         )}
 
-        {(reportType === 'members' || reportType === 'who_attended' || reportType === 'who_absent' || reportType === 'attendance') && (
+        {/* Stage Filter */}
+        {(reportType === 'members' || reportType === 'who_attended' || reportType === 'who_absent' || reportType === 'attendance' || reportType === 'birthdays') && (
           <div style={{ flex: '0 1 200px' }}>
             <select
               className="form-input"
@@ -371,6 +397,36 @@ export const ReportManagement = () => {
               {STAGE_OPTIONS.filter(s => s !== 'ALL').map((stg) => (
                 <option key={stg} value={stg}>{stg}</option>
               ))}
+            </select>
+          </div>
+        )}
+
+        {/* Month Selector for Birthdays */}
+        {reportType === 'birthdays' && (
+          <div style={{ flex: '0 1 180px' }}>
+            <select
+              className="form-input"
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+            >
+              {MONTH_OPTIONS.map((m) => (
+                <option key={m.value} value={m.value}>{m.label}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Gift Delivery Status Filter for Birthdays */}
+        {reportType === 'birthdays' && (
+          <div style={{ flex: '0 1 180px' }}>
+            <select
+              className="form-input"
+              value={selectedGiftStatus}
+              onChange={(e) => setSelectedGiftStatus(e.target.value)}
+            >
+              <option value="">كل حالات الهدايا 🎁</option>
+              <option value="معلق">في انتظار التسليم 🟡</option>
+              <option value="تم التسليم">تم تسليم الهدية 🟢</option>
             </select>
           </div>
         )}
@@ -879,29 +935,152 @@ export const ReportManagement = () => {
           </div>
         )}
 
-        {/* Birthday Summary Display */}
-        {reportType === 'birthdays' && summaryData && (
+        {/* Birthday Summary Display & Detailed Table */}
+        {reportType === 'birthdays' && (
           <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-              <div style={{ padding: '1rem', background: 'rgba(0,0,0,0.3)', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.08)' }}>
-                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block' }}>إجمالي المستحقين لهدايا لسنة {summaryData.year}</span>
-                <strong style={{ fontSize: '1.3rem', fontWeight: 900, color: 'var(--text-main)' }}>{summaryData.total_eligible_children} طفل</strong>
-              </div>
+            {summaryData && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+                <div style={{ padding: '1rem', background: 'rgba(0,0,0,0.3)', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block' }}>
+                    إجمالي المستحقين لهدايا {selectedMonth ? `(شهر ${selectedMonth})` : `لسنة ${summaryData.year || new Date().getFullYear()}`}
+                  </span>
+                  <strong style={{ fontSize: '1.3rem', fontWeight: 900, color: 'var(--text-main)' }}>
+                    {summaryData.total_eligible_children ?? dataList.length} طفل
+                  </strong>
+                </div>
 
-              <div style={{ padding: '1rem', background: 'rgba(52, 211, 153, 0.1)', borderRadius: '10px', border: '1px solid rgba(52, 211, 153, 0.3)' }}>
-                <span style={{ fontSize: '0.78rem', color: '#34d399', display: 'block', fontWeight: 700 }}>تم تسليم هداياهم 🟢</span>
-                <strong style={{ fontSize: '1.3rem', fontWeight: 900, color: '#34d399' }}>{summaryData.delivered_gifts_count} طفل</strong>
-              </div>
+                <div style={{ padding: '1rem', background: 'rgba(52, 211, 153, 0.1)', borderRadius: '10px', border: '1px solid rgba(52, 211, 153, 0.3)' }}>
+                  <span style={{ fontSize: '0.78rem', color: '#34d399', display: 'block', fontWeight: 700 }}>تم تسليم هداياهم 🟢</span>
+                  <strong style={{ fontSize: '1.3rem', fontWeight: 900, color: '#34d399' }}>
+                    {summaryData.delivered_gifts_count ?? 0} طفل
+                  </strong>
+                </div>
 
-              <div style={{ padding: '1rem', background: 'rgba(251, 191, 36, 0.1)', borderRadius: '10px', border: '1px solid rgba(251, 191, 36, 0.3)' }}>
-                <span style={{ fontSize: '0.78rem', color: '#fbbf24', display: 'block', fontWeight: 700 }}>في انتظار التسليم 🟡</span>
-                <strong style={{ fontSize: '1.3rem', fontWeight: 900, color: '#fbbf24' }}>{summaryData.pending_gifts_count} طفل</strong>
-              </div>
+                <div style={{ padding: '1rem', background: 'rgba(251, 191, 36, 0.1)', borderRadius: '10px', border: '1px solid rgba(251, 191, 36, 0.3)' }}>
+                  <span style={{ fontSize: '0.78rem', color: '#fbbf24', display: 'block', fontWeight: 700 }}>في انتظار التسليم 🟡</span>
+                  <strong style={{ fontSize: '1.3rem', fontWeight: 900, color: '#fbbf24' }}>
+                    {summaryData.pending_gifts_count ?? 0} طفل
+                  </strong>
+                </div>
 
-              <div style={{ padding: '1rem', background: 'rgba(56, 189, 248, 0.1)', borderRadius: '10px', border: '1px solid rgba(56, 189, 248, 0.3)' }}>
-                <span style={{ fontSize: '0.78rem', color: '#38bdf8', display: 'block', fontWeight: 700 }}>نسبة تسليم الهدايا السنوية</span>
-                <strong style={{ fontSize: '1.3rem', fontWeight: 900, color: '#38bdf8' }}>{summaryData.delivery_rate_pct}%</strong>
+                <div style={{ padding: '1rem', background: 'rgba(56, 189, 248, 0.1)', borderRadius: '10px', border: '1px solid rgba(56, 189, 248, 0.3)' }}>
+                  <span style={{ fontSize: '0.78rem', color: '#38bdf8', display: 'block', fontWeight: 700 }}>نسبة تسليم الهدايا</span>
+                  <strong style={{ fontSize: '1.3rem', fontWeight: 900, color: '#38bdf8' }}>
+                    {summaryData.delivery_rate_pct ?? 0}%
+                  </strong>
+                </div>
               </div>
+            )}
+
+            {/* Birthdays Detailed Table */}
+            <div className="table-container">
+              <table className="custom-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: '45px', textAlign: 'center' }}>م</th>
+                    <th>كود المخدوم</th>
+                    <th>اسم الطفل الكامل</th>
+                    <th>الفصل</th>
+                    <th>المرحلة</th>
+                    <th>تاريخ الميلاد</th>
+                    <th>حالة الهدية</th>
+                    <th>تاريخ الاستلام</th>
+                    <th>المستلم بواسطة</th>
+                    <th>تليفون ولي الأمر</th>
+                    <th style={{ textAlign: 'center' }}>تهنئة وتواصل</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loading ? (
+                    <tr>
+                      <td colSpan={11} style={{ textAlign: 'center', padding: '2rem' }}>جاري استخراج كشف أعياد الميلاد والهدايا...</td>
+                    </tr>
+                  ) : dataList.length === 0 ? (
+                    <tr>
+                      <td colSpan={11} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>لا توجد أعياد ميلاد مطابقة للتصفية الحالية.</td>
+                    </tr>
+                  ) : (
+                    dataList.map((row, idx) => {
+                      const isDelivered = row.gift_status && (row.gift_status.includes('تم التسليم') || row.gift_status.includes('Delivered'));
+                      return (
+                        <tr key={`${row.member_id}-${idx}`}>
+                          <td style={{ textAlign: 'center', fontWeight: 800, color: 'var(--color-gold-light)' }}>
+                            {row.index || (idx + 1)}
+                          </td>
+                          <td>
+                            <span style={{ fontFamily: 'monospace', fontWeight: 800, color: '#38bdf8' }}>
+                              {row.member_id}
+                            </span>
+                          </td>
+                          <td style={{ fontWeight: 700, color: 'var(--text-main)' }}>
+                            {row.full_name}
+                          </td>
+                          <td>
+                            <span className="badge" style={{ background: 'rgba(212, 175, 55, 0.15)', color: 'var(--color-gold-light)', border: '1px solid rgba(212, 175, 55, 0.3)' }}>
+                              {row.class_name || '—'}
+                            </span>
+                          </td>
+                          <td>{row.stage || '—'}</td>
+                          <td style={{ fontWeight: 600, color: '#f8fafc' }}>
+                            🎂 {row.date_of_birth}
+                          </td>
+                          <td>
+                            <span className="badge" style={{
+                              background: isDelivered ? 'rgba(52, 211, 153, 0.18)' : 'rgba(251, 191, 36, 0.18)',
+                              color: isDelivered ? '#34d399' : '#fbbf24',
+                              border: `1px solid ${isDelivered ? 'rgba(52, 211, 153, 0.35)' : 'rgba(251, 191, 36, 0.35)'}`
+                            }}>
+                              {row.gift_status}
+                            </span>
+                          </td>
+                          <td style={{ color: 'var(--text-muted)' }}>{row.delivered_at || '—'}</td>
+                          <td style={{ color: '#cbd5e1' }}>{row.delivered_by || '—'}</td>
+                          <td>
+                            <span style={{ color: '#38bdf8', fontWeight: 600 }}>{row.phone || '—'}</span>
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center' }}>
+                              {row.phone && (
+                                <a
+                                  href={getWaUrl(
+                                    row.whatsapp_phone || row.phone,
+                                    `كل سنة وانت طيب يا ${row.full_name} وعقبال 100 سنة حلوة مع بابا يسوع 🎂🎉! كنيسة الشهيد مارجرجس والأنبا شنودة بالكرور تتمنى لك عيد ميلاد سعيد وخدمة مباركة ✨`
+                                  )}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="btn btn-secondary"
+                                  style={{ fontSize: '0.78rem', padding: '0.25rem 0.5rem', color: '#34d399', borderColor: 'rgba(52, 211, 153, 0.4)' }}
+                                  title="إرسال رسالة تهنئة بعيد الميلاد عبر واتساب"
+                                >
+                                  <MessageCircle size={13} /> تهنئة
+                                </a>
+                              )}
+                              {row.phone && (
+                                <a
+                                  href={`tel:${row.phone}`}
+                                  className="btn btn-secondary"
+                                  style={{ fontSize: '0.78rem', padding: '0.25rem 0.45rem' }}
+                                  title="اتصال هاتفي"
+                                >
+                                  <Phone size={13} />
+                                </a>
+                              )}
+                              <button
+                                onClick={() => window.open(reportsApi.getMemberProfilePrintUrl(row.member_id), '_blank')}
+                                className="btn btn-secondary"
+                                style={{ fontSize: '0.78rem', padding: '0.25rem 0.45rem' }}
+                                title="استمارة المخدوم"
+                              >
+                                <Printer size={13} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         )}

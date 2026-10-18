@@ -326,18 +326,21 @@ export const AttendanceManagement = () => {
       await html5QrcodeRef.current.start(
         { facingMode: 'environment' },
         {
-          fps: 20,
+          fps: 25, // ⚡ 25 scans per second for instant capture
           qrbox: (w, h) => {
             const minEdge = Math.min(w, h);
-            const edge = Math.floor(minEdge * 0.8);
+            const edge = Math.floor(minEdge * 0.85);
             return { width: edge, height: edge };
           },
-          aspectRatio: 1.0
+          aspectRatio: 1.0,
+          experimentalFeatures: { useBarCodeDetectorIfSupported: true }
         },
         async (decodedText) => {
           if (isScanLockedRef.current) return;
           const token = decodedText?.trim();
-          if (!token || lastScannedTokenRef.current === token) return;
+          if (!token) return;
+          // Prevent re-triggering the same card within 1.2 seconds
+          if (lastScannedTokenRef.current === token) return;
 
           isScanLockedRef.current = true;
           lastScannedTokenRef.current = token;
@@ -351,28 +354,58 @@ export const AttendanceManagement = () => {
             });
 
             playFeedbackSound('success');
+            const memberName = res.data?.member_name || token;
+            const scannedMemberId = res.data?.member_id;
+            const scannedTime = res.data?.scanned_at
+              ? new Date(res.data.scanned_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })
+              : new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+
             setRecentScanResult({
               status: 'success',
               title: 'تم تسجيل الحضور بنجاح ✓',
-              name: res.data?.member_name || token
+              name: memberName
             });
 
-            // Refresh sheet
-            fetchSessionSheet(selectedSession.session_id, sheetSearch);
-
-            // Cooldown 2 seconds
-            setCooldownSeconds(2);
-            cooldownIntervalRef.current = setInterval(() => {
-              setCooldownSeconds(c => {
-                if (c <= 1) {
-                  clearInterval(cooldownIntervalRef.current);
-                  isScanLockedRef.current = false;
-                  lastScannedTokenRef.current = '';
-                  return 0;
+            // ⚡ Instant In-Memory Sheet Update: no network lag, zero jank
+            if (scannedMemberId) {
+              setSheetItems(prev => prev.map(m => {
+                if (m.member_id === scannedMemberId) {
+                  return {
+                    ...m,
+                    attended: true,
+                    is_present: true,
+                    scanned_at: scannedTime,
+                    method: 'QR'
+                  };
                 }
-                return c - 1;
+                return m;
+              }));
+
+              setSheetStats(prev => {
+                if (!prev) return prev;
+                const wasAttended = sheetItems.find(m => m.member_id === scannedMemberId)?.attended;
+                if (wasAttended) return prev;
+                const newPresent = prev.present_count + 1;
+                const newAbsent = Math.max(0, prev.absent_count - 1);
+                const total = prev.total_members || (newPresent + newAbsent) || 1;
+                return {
+                  ...prev,
+                  present_count: newPresent,
+                  absent_count: newAbsent,
+                  attendance_rate: Math.round((newPresent / total) * 1000) / 10
+                };
               });
-            }, 1000);
+            }
+
+            // ⚡ Rapid Cooldown: ready for the NEXT student's card in just 500ms!
+            setCooldownSeconds(0);
+            setTimeout(() => {
+              isScanLockedRef.current = false;
+            }, 500);
+            // Clear current token lock after 1.2s so the same card can't accidentally re-fire
+            setTimeout(() => {
+              lastScannedTokenRef.current = '';
+            }, 1200);
 
           } catch (scanErr) {
             playFeedbackSound('warning');
@@ -382,10 +415,11 @@ export const AttendanceManagement = () => {
               title: 'تنبيه مسح الكارت',
               name: msg
             });
+            // Quick unlock on error (700ms)
             setTimeout(() => {
               isScanLockedRef.current = false;
               lastScannedTokenRef.current = '';
-            }, 1500);
+            }, 700);
           }
         },
         () => {}
@@ -431,12 +465,46 @@ export const AttendanceManagement = () => {
       });
 
       playFeedbackSound('success');
+      const memberName = res.data?.member_name || token;
+      const scannedMemberId = res.data?.member_id;
+      const scannedTime = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+
       setRecentScanResult({
         status: 'success',
         title: 'تم تسجيل الحضور بنجاح ✓',
-        name: res.data?.member_name || token
+        name: memberName
       });
-      fetchSessionSheet(selectedSession.session_id, sheetSearch);
+
+      // ⚡ Instant In-Memory Sheet Update
+      if (scannedMemberId) {
+        setSheetItems(prev => prev.map(m => {
+          if (m.member_id === scannedMemberId) {
+            return {
+              ...m,
+              attended: true,
+              is_present: true,
+              scanned_at: scannedTime,
+              method: 'يدوي'
+            };
+          }
+          return m;
+        }));
+
+        setSheetStats(prev => {
+          if (!prev) return prev;
+          const wasAttended = sheetItems.find(m => m.member_id === scannedMemberId)?.attended;
+          if (wasAttended) return prev;
+          const newPresent = prev.present_count + 1;
+          const newAbsent = Math.max(0, prev.absent_count - 1);
+          const total = prev.total_members || (newPresent + newAbsent) || 1;
+          return {
+            ...prev,
+            present_count: newPresent,
+            absent_count: newAbsent,
+            attendance_rate: Math.round((newPresent / total) * 1000) / 10
+          };
+        });
+      }
     } catch (scanErr) {
       playFeedbackSound('warning');
       const msg = scanErr.response?.data?.detail || scanErr.response?.data?.message || 'كارت أو رمز غير صالح';
