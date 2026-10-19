@@ -473,9 +473,9 @@ class FollowupRepository:
         # 0. Auto-run absence detector for this class first (consecutive >= 1) to ensure all absentees have active tasks
         await self.run_absence_detector(class_id=clean_cid)
 
-        # 1. Fetch active servants in this class
+        # 1. Fetch active servants in this class along with their assigned class role
         s_query = (
-            select(User.user_id, User.full_name, User.role, User.phone)
+            select(User.user_id, User.full_name, User.role, User.phone, ClassGroupServant.role.label("class_role"))
             .join(ClassGroupServant, User.user_id == ClassGroupServant.servant_id)
             .where(
                 func.upper(ClassGroupServant.class_id) == clean_cid,
@@ -488,9 +488,17 @@ class FollowupRepository:
         if not all_servants:
             raise AppException(f"لا يوجد خدام مسجلون بنشاط في فصل '{class_name}' لتوزيع المهام عليهم")
 
-        # Exclude super admins if regular servants exist, but fall back gracefully if only admins are assigned
-        regular_servants = [s for s in all_servants if s[2] not in ["SuperAdmin", "Super Admin"]]
-        servants = regular_servants if regular_servants else all_servants
+        # Distinguish Lead Servant (أمين الفصل) from regular servants
+        lead_servants = [s for s in all_servants if s[4] == "LeadServant"]
+        regular_servants = [s for s in all_servants if s[4] != "LeadServant"]
+
+        # Fallbacks if one group is empty
+        if not lead_servants:
+            lead_servants = [all_servants[0]]
+        if not regular_servants:
+            regular_servants = lead_servants
+
+        lead_servant = lead_servants[0]
 
         # 2. Fetch active members of this class
         m_query = select(ClassGroupMember.member_id).where(
@@ -514,17 +522,36 @@ class FollowupRepository:
                 "class_name": class_name,
                 "total_tasks": 0,
                 "distributed_count": 0,
-                "servants_count": len(servants),
+                "servants_count": len(all_servants),
                 "message": "لا توجد حالات غياب أو مهام افتقاد معلقة لهذا الفصل",
                 "per_servant": []
             }
 
-        per_servant_counts = {s[0]: {"servant_id": s[0], "servant_name": s[1], "count": 0} for s in servants}
-        for idx, task in enumerate(tasks):
-            assigned_servant = servants[idx % len(servants)]
-            task.assigned_servant_id = assigned_servant[0]
-            task.updated_at = datetime.now(timezone.utc)
-            per_servant_counts[assigned_servant[0]]["count"] += 1
+        per_servant_counts = {s[0]: {"servant_id": s[0], "servant_name": s[1], "class_role": s[4], "count": 0} for s in all_servants}
+        now_ts = datetime.now(timezone.utc)
+        regular_idx = 0
+        lead_escalated_count = 0
+        regular_distributed_count = 0
+
+        for task in tasks:
+            # ⚡ Rule: If absent 3 or more consecutive times -> Automatically goes to أمين الفصل (Lead Servant)
+            if task.consecutive_weeks >= 3:
+                task.assigned_servant_id = lead_servant[0]
+                task.status = "Escalated"
+                task.priority = "Urgent"
+                task.updated_at = now_ts
+                per_servant_counts[lead_servant[0]]["count"] += 1
+                lead_escalated_count += 1
+            else:
+                # ⚡ Rule: 1 or 2 consecutive absences -> Distributed evenly among regular class servants
+                assigned = regular_servants[regular_idx % len(regular_servants)]
+                task.assigned_servant_id = assigned[0]
+                task.status = "Pending"
+                task.priority = "High" if task.consecutive_weeks == 2 else "Normal"
+                task.updated_at = now_ts
+                per_servant_counts[assigned[0]]["count"] += 1
+                regular_distributed_count += 1
+                regular_idx += 1
 
         await self.db.commit()
 
@@ -533,9 +560,12 @@ class FollowupRepository:
             "class_name": class_name,
             "total_tasks": len(tasks),
             "distributed_count": len(tasks),
-            "servants_count": len(servants),
+            "lead_servant_name": lead_servant[1],
+            "lead_escalated_count": lead_escalated_count,
+            "regular_distributed_count": regular_distributed_count,
+            "servants_count": len(all_servants),
             "distribution": list(per_servant_counts.values()),
-            "message": f"تم توزيع {len(tasks)} مهمة افتقاد بالتساوي على {len(servants)} من خدام الفصل بنجاح"
+            "message": f"تم توزيع {regular_distributed_count} مهمة غياب على خدام الفصل وتصعيد {lead_escalated_count} حالة غياب متكرر (3 مرات+) لأمين الفصل ({lead_servant[1]}) بنجاح"
         }
 
     async def detect_and_distribute_class(self, class_id: str) -> Dict[str, Any]:

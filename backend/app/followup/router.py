@@ -68,6 +68,29 @@ async def list_followup_tasks(
     if servant_id == "me" or servant_id == "@me":
         resolved_servant_id = current_user.get("user_id")
 
+    # ⚡ Servant Scope Isolation Rule:
+    # A regular Servant can only see tasks assigned to them, unless they are LeadServant (أمين فصل) in the class.
+    from app.users.schemas import RoleEnum
+    from sqlalchemy import select, func
+    if current_user.get("role") in ["Servant", RoleEnum.SERVANT]:
+        from app.models.class_group import ClassGroupServant
+        lead_check = await db.execute(
+            select(ClassGroupServant.class_id).where(
+                ClassGroupServant.servant_id == current_user.get("user_id"),
+                ClassGroupServant.role == "LeadServant",
+                ClassGroupServant.is_active == True
+            )
+        )
+        lead_cids = [str(r[0]).upper() for r in lead_check.all()]
+        is_lead = False
+        if class_id and class_id.strip().upper() in lead_cids:
+            is_lead = True
+        elif not class_id and len(lead_cids) > 0:
+            is_lead = True
+
+        if not is_lead:
+            resolved_servant_id = current_user.get("user_id")
+
     service = FollowupService(db)
     result = await service.list_tasks(
         servant_id=resolved_servant_id, priority=priority, status=status_filter, search=search,
@@ -133,6 +156,42 @@ async def log_followup(
     current_user=Depends(require_permission("followup:read"))
 ):
     service = FollowupService(db)
+
+    # ⚡ Servant Follow-up Task Assignment Check:
+    # A regular servant can ONLY log follow-ups for their own assigned children, or if they are LeadServant (أمين الفصل) in that class.
+    from app.users.schemas import RoleEnum
+    from sqlalchemy import select, func
+    if current_user.get("role") in ["Servant", RoleEnum.SERVANT]:
+        task = await service.repo.get_task_by_id(task_id)
+        if not task:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="مهمة الافتقاد غير موجودة")
+
+        if task.get("assigned_servant_id") != current_user.get("user_id"):
+            # Check if current user is LeadServant in the member's active class
+            from app.models.class_group import ClassGroupMember, ClassGroupServant
+            c_res = await db.execute(
+                select(ClassGroupMember.class_id).where(
+                    func.upper(ClassGroupMember.member_id) == task["member_id"].strip().upper(),
+                    ClassGroupMember.is_active == True
+                )
+            )
+            m_cids = [str(r[0]).upper() for r in c_res.all()]
+            lead_res = await db.execute(
+                select(ClassGroupServant.class_id).where(
+                    ClassGroupServant.servant_id == current_user.get("user_id"),
+                    ClassGroupServant.role == "LeadServant",
+                    ClassGroupServant.is_active == True,
+                    func.upper(ClassGroupServant.class_id).in_(m_cids)
+                )
+            )
+            is_lead = lead_res.first() is not None
+
+            if not is_lead:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="عفواً، هذا المخدوم مخصص لخادم آخر في الفصل. يلتزم كل خادم بالمجموعة المخصصة له فقط."
+                )
+
     updated_task = await service.log_followup(
         task_id=task_id,
         data=log_in,

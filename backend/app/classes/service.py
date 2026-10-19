@@ -57,6 +57,9 @@ class ClassService:
     async def wipe_all_classes_and_attendance(self) -> Dict[str, Any]:
         return await self.repo.wipe_all_classes_and_attendance()
 
+    async def promote_new_coptic_year(self, superadmin_user_id: Optional[str] = None) -> Dict[str, Any]:
+        return await self.repo.promote_new_coptic_year(superadmin_user_id)
+
     # Servant Management
     async def assign_servant(self, class_id: str, data: AssignServantRequest) -> Dict[str, Any]:
         existing = await self.repo.get_by_id(class_id)

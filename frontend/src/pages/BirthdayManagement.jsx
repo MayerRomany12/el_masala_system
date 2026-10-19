@@ -337,7 +337,7 @@ export const BirthdayManagement = () => {
             onChange={(e) => setSelectedStage(e.target.value)}
           >
             <option value="">جميع المراحل الدراسية</option>
-            {['حضانة', 'ابتدائي', 'إعدادي', 'ثانوي', 'جامعيين', 'خريجين'].map((stg) => (
+            {['حضانة', 'ابتدائي', 'إعدادي', 'ثانوي', 'جامعيين وخريجين'].map((stg) => (
               <option key={stg} value={stg}>{stg}</option>
             ))}
           </select>

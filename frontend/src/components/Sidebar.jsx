@@ -37,7 +37,6 @@ const navGroups = [
     label: 'الخدمة والفصول',
     items: [
       { title: 'الفصول والمجموعات', path: '/classes', icon: <FolderKanban size={18} />, permission: 'classes:read' },
-      { title: 'النشاط الصيفي', path: '/summer-activities', icon: <Calendar size={18} />, permission: 'classes:read' },
       { title: 'الأنشطة والرحلات', path: '/events', icon: <QrCode size={18} />, permission: 'events:read' }
     ]
   },

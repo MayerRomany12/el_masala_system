@@ -1,8 +1,11 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { Html5Qrcode } from 'html5-qrcode';
 import { useAuth } from '../context/AuthContext';
 import { rewardsApi } from '../api/rewards';
 import { membersApi } from '../api/members';
 import { eventsApi } from '../api/events';
+import { cardsApi } from '../api/cards';
+import { CANONICAL_STAGES } from '../constants/stages';
 import {
   Award,
   Trophy,
@@ -22,24 +25,13 @@ import {
   ArrowDownRight,
   ArrowUpRight,
   X,
-  AlertCircle
+  AlertCircle,
+  Camera,
+  QrCode,
+  MinusCircle,
+  PlusCircle,
+  ShieldCheck
 } from 'lucide-react';
-
-const STAGE_OPTIONS = [
-  'ALL',
-  'حضانة (KG1 & KG2)',
-  'ابتدائي - الصف الأول',
-  'ابتدائي - الصف الثاني',
-  'ابتدائي - الصف الثالث',
-  'ابتدائي - الصف الرابع',
-  'ابتدائي - الصف الخامس',
-  'ابتدائي - الصف السادس',
-  'إعدادي - الصف الأول',
-  'إعدادي - الصف الثاني',
-  'إعدادي - الصف الثالث',
-  'ثانوي',
-  'جامعة وخريجين'
-];
 
 export const RewardManagement = () => {
   const { hasPermission } = useAuth();
@@ -47,6 +39,19 @@ export const RewardManagement = () => {
   const [leaderboard, setLeaderboard] = useState([]);
   const [lbLoading, setLbLoading] = useState(true);
   const [selectedStage, setSelectedStage] = useState('');
+
+  // QR Rewards Scanner State
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const [scanToken, setScanToken] = useState('');
+  const [scannedMember, setScannedMember] = useState(null);
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [scanActionLoading, setScanActionLoading] = useState(false);
+  const [scanMessage, setScanMessage] = useState(null); // { type: 'success' | 'error', text: '' }
+  const [cameraError, setCameraError] = useState('');
+  const scannerRef = useRef(null);
+  const isLockedRef = useRef(false);
+  const scannerContainerId = 'reward-qr-reader-box';
 
   // Calculator State
   const [eventsList, setEventsList] = useState([]);
@@ -58,6 +63,7 @@ export const RewardManagement = () => {
   const [calcLoading, setCalcLoading] = useState(false);
 
   // Manual Award Modal
+
   const [isAwardModalOpen, setIsAwardModalOpen] = useState(false);
   const [awardMemberSearch, setAwardMemberSearch] = useState('');
   const [awardMembersFound, setAwardMembersFound] = useState([]);
@@ -70,7 +76,179 @@ export const RewardManagement = () => {
   const [ledgerMember, setLedgerMember] = useState(null);
   const [ledgerData, setLedgerData] = useState({ total_points: 0, ledger: [] });
 
+  // Audio Feedback Synthesizer
+  const playAudio = (type) => {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      if (type === 'success') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+        osc.frequency.setValueAtTime(880, ctx.currentTime + 0.12);
+        gain.gain.setValueAtTime(0.28, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.4);
+      } else {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(220, ctx.currentTime);
+        osc.frequency.setValueAtTime(155, ctx.currentTime + 0.14);
+        gain.gain.setValueAtTime(0.32, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.45);
+      }
+    } catch (e) {}
+  };
+
+  // Start Camera
+  const startScannerCamera = async () => {
+    setCameraError('');
+    setScanMessage(null);
+    isLockedRef.current = false;
+    try {
+      if (!scannerRef.current) {
+        scannerRef.current = new Html5Qrcode(scannerContainerId, {
+          experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+          verbose: false
+        });
+      }
+
+      await scannerRef.current.start(
+        { facingMode: 'environment' },
+        {
+          fps: 20,
+          qrbox: (w, h) => {
+            const edge = Math.floor(Math.min(w, h) * 0.85);
+            return { width: edge, height: edge };
+          },
+          aspectRatio: 1.0
+        },
+        (decodedText) => {
+          if (isLockedRef.current) return;
+          if (!decodedText || !decodedText.trim()) return;
+          isLockedRef.current = true;
+          handleProcessToken(decodedText.trim());
+        },
+        () => {}
+      );
+      setScanning(true);
+    } catch (err) {
+      setCameraError('تعذر فتح الكاميرا. يرجى التأكد من السماح بالوصول للكاميرا للمتصفح.');
+      setScanning(false);
+    }
+  };
+
+  // Stop Camera
+  const stopScannerCamera = async () => {
+    isLockedRef.current = false;
+    if (scannerRef.current && scanning) {
+      try {
+        await scannerRef.current.stop();
+      } catch (e) {}
+      setScanning(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!isScannerOpen) {
+      stopScannerCamera();
+    }
+  }, [isScannerOpen]);
+
+  // Process Token
+  const handleProcessToken = async (rawToken) => {
+    if (!rawToken) return;
+    let token = rawToken.trim().replace(/^["']|["']$/g, '');
+    if (token.startsWith('{') && token.endsWith('}')) {
+      try {
+        const parsed = JSON.parse(token);
+        token = parsed.qr_token || parsed.token || parsed.member_id || token;
+      } catch (e) {}
+    }
+
+    setLookupLoading(true);
+    setScanMessage(null);
+    try {
+      const cardRes = await cardsApi.scanQRToken(token);
+      if (cardRes.success && cardRes.data) {
+        let currentPoints = 0;
+        try {
+          const ptRes = await rewardsApi.getMemberPoints(cardRes.data.member_id);
+          if (ptRes.success) currentPoints = ptRes.data.total_points || 0;
+        } catch (e) {}
+
+        setScannedMember({
+          ...cardRes.data,
+          current_points: currentPoints,
+          raw_token: token
+        });
+        playAudio('success');
+      } else {
+        setScanMessage({ type: 'error', text: 'رمز الـ QR غير مسجل في قاعدة البيانات' });
+        playAudio('error');
+        setTimeout(() => { isLockedRef.current = false; }, 1500);
+      }
+    } catch (err) {
+      const msg = err.response?.data?.message || err.response?.data?.detail || 'تعذر التعرف على رمز الـ QR';
+      setScanMessage({ type: 'error', text: msg });
+      playAudio('error');
+      setTimeout(() => { isLockedRef.current = false; }, 1500);
+    } finally {
+      setLookupLoading(false);
+    }
+  };
+
+  // Apply Points (Add / Deduct)
+  const handleApplyPoints = async (action) => {
+    if (!scannedMember) return;
+    setScanActionLoading(true);
+    setScanMessage(null);
+    try {
+      const res = await rewardsApi.scanPoints({
+        member_id: scannedMember.member_id,
+        qr_token: scannedMember.raw_token,
+        action: action
+      });
+      if (res.success) {
+        playAudio('success');
+        setScanMessage({
+          type: 'success',
+          text: action === 'add'
+            ? `🎉 ${res.message} (+${res.data.points_applied} نقطة) | الرصيد المحدث: ${res.data.new_total_points} نقطة`
+            : `⚠️ ${res.message} (-${res.data.points_applied} نقطة) | الرصيد المحدث: ${res.data.new_total_points} نقطة`
+        });
+        setScannedMember((prev) => ({
+          ...prev,
+          current_points: res.data.new_total_points
+        }));
+        fetchLeaderboard();
+      }
+    } catch (err) {
+      playAudio('error');
+      const msg = err.response?.data?.message || err.response?.data?.detail || 'فشلت العملية';
+      setScanMessage({ type: 'error', text: msg });
+    } finally {
+      setScanActionLoading(false);
+    }
+  };
+
+  // Reset Scanner
+  const handleResetScanner = () => {
+    setScannedMember(null);
+    setScanMessage(null);
+    setScanToken('');
+    isLockedRef.current = false;
+  };
+
   // Fetch Leaderboard
+
   const fetchLeaderboard = useCallback(async () => {
     setLbLoading(true);
     try {
@@ -225,7 +403,24 @@ export const RewardManagement = () => {
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => {
+              setIsScannerOpen(true);
+              setScannedMember(null);
+              setScanMessage(null);
+              setScanToken('');
+              setTimeout(() => {
+                startScannerCamera();
+              }, 100);
+            }}
+            className="btn btn-primary"
+            style={{ gap: '0.4rem', background: 'linear-gradient(135deg, #0284c7 0%, #38bdf8 100%)' }}
+          >
+            <Camera size={18} />
+            <span>مسح QR للمكافآت والخصم 📷</span>
+          </button>
+
           {hasPermission('rewards:manage') && (
             <button onClick={() => setIsAwardModalOpen(true)} className="btn btn-primary" style={{ gap: '0.4rem', background: 'linear-gradient(135deg, #d97706 0%, #fbbf24 100%)' }}>
               <Gift size={18} />
@@ -253,11 +448,13 @@ export const RewardManagement = () => {
             value={selectedStage}
             onChange={(e) => setSelectedStage(e.target.value)}
           >
-            {STAGE_OPTIONS.map((stg) => (
-              <option key={stg} value={stg === 'ALL' ? '' : stg}>{stg}</option>
+            <option value="">جميع المراحل</option>
+            {CANONICAL_STAGES.map((stg) => (
+              <option key={stg} value={stg}>{stg}</option>
             ))}
           </select>
         </div>
+
 
         {/* Podium Top 3 */}
         {leaderboard.length >= 3 && (
@@ -591,6 +788,203 @@ export const RewardManagement = () => {
           </div>
         </div>
       )}
+      {/* 6. Reward QR Scanner Modal */}
+      {isScannerOpen && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.88)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '1rem' }}>
+          <div className="glass-card animate-fade-in" style={{ width: '100%', maxWidth: '580px', maxHeight: '90vh', background: '#0f172a', border: '2px solid #38bdf8', boxShadow: '0 0 30px rgba(56, 189, 248, 0.25)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            
+            {/* Modal Header */}
+            <div style={{ padding: '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <QrCode size={24} style={{ color: '#38bdf8' }} />
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>
+                  مسح QR للمكافآت والخصم السريع 📷
+                </h3>
+              </div>
+              <button
+                onClick={() => {
+                  stopScannerCamera();
+                  setIsScannerOpen(false);
+                }}
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+              >
+                <X size={22} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{ padding: '1.25rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              
+              {/* Camera Scanner Viewfinder */}
+              <div style={{ position: 'relative', width: '100%', borderRadius: '16px', overflow: 'hidden', background: '#020617', border: '2px dashed rgba(56, 189, 248, 0.4)', minHeight: '220px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div id={scannerContainerId} style={{ width: '100%', minHeight: '220px' }} />
+
+                {!scanning && (
+                  <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', background: 'rgba(15, 23, 42, 0.95)', zIndex: 5 }}>
+                    <Camera size={44} style={{ color: '#38bdf8' }} />
+                    <button type="button" onClick={startScannerCamera} className="btn btn-primary" style={{ gap: '0.4rem' }}>
+                      <Camera size={16} />
+                      <span>تشغيل الكاميرا للمسح</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {cameraError && (
+                <div style={{ fontSize: '0.82rem', color: '#fca5a5', background: 'rgba(239, 68, 68, 0.15)', padding: '0.5rem 0.8rem', borderRadius: '8px', textAlign: 'center' }}>
+                  {cameraError}
+                </div>
+              )}
+
+              {/* Manual input fallback */}
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (scanToken.trim()) handleProcessToken(scanToken.trim());
+                }}
+                style={{ display: 'flex', gap: '0.5rem' }}
+              >
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="أو أدخل كود المخدوم / رمز الـ QR يدوياً..."
+                  value={scanToken}
+                  onChange={(e) => setScanToken(e.target.value)}
+                />
+                <button type="submit" className="btn btn-secondary" disabled={lookupLoading || !scanToken.trim()}>
+                  <Search size={16} />
+                  <span>بحث</span>
+                </button>
+              </form>
+
+              {lookupLoading && (
+                <div style={{ textAlign: 'center', padding: '1rem', color: '#38bdf8', fontWeight: 700 }}>
+                  <RefreshCw size={22} className="spin" style={{ display: 'inline', marginLeft: '6px' }} />
+                  <span>جاري التحقق من هوية المخدوم...</span>
+                </div>
+              )}
+
+              {/* Scan Message / Toast */}
+              {scanMessage && (
+                <div
+                  style={{
+                    padding: '0.85rem 1rem',
+                    borderRadius: '10px',
+                    fontWeight: 700,
+                    fontSize: '0.88rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    background: scanMessage.type === 'success' ? 'rgba(52, 211, 153, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                    border: `1px solid ${scanMessage.type === 'success' ? '#34d399' : '#f87171'}`,
+                    color: scanMessage.type === 'success' ? '#34d399' : '#fca5a5'
+                  }}
+                >
+                  {scanMessage.type === 'success' ? <CheckCircle size={20} /> : <AlertCircle size={20} />}
+                  <span>{scanMessage.text}</span>
+                </div>
+              )}
+
+              {/* Scanned Member Profile & Action Choice */}
+              {scannedMember && (
+                <div className="glass-card animate-fade-in" style={{ padding: '1.25rem', border: '1px solid #34d399', background: 'linear-gradient(145deg, #1e293b 0%, #0f172a 100%)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <div style={{ width: '60px', height: '60px', borderRadius: '12px', background: 'rgba(56, 189, 248, 0.15)', border: '2px solid #38bdf8', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      {scannedMember.photo_url ? (
+                        <img src={scannedMember.photo_url} alt={scannedMember.full_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ) : (
+                        <User size={30} style={{ color: '#38bdf8' }} />
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                      <strong style={{ fontSize: '1.15rem', color: '#fff' }}>{scannedMember.full_name}</strong>
+                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', fontSize: '0.8rem' }}>
+                        <span style={{ color: '#38bdf8', fontFamily: 'monospace', fontWeight: 700 }}>{scannedMember.member_id}</span>
+                        <span style={{ color: '#cbd5e1' }}>• {scannedMember.stage}</span>
+                        {scannedMember.group_name && <span style={{ color: '#94a3b8' }}>({scannedMember.group_name})</span>}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#fbbf24', fontWeight: 800, fontSize: '0.9rem', marginTop: '0.2rem' }}>
+                        <Star size={16} fill="#fbbf24" />
+                        <span>رصيد النقاط الحالي: {scannedMember.current_points ?? 0} نقطة</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Add / Deduct Action Buttons */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginTop: '0.5rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => handleApplyPoints('add')}
+                      disabled={scanActionLoading}
+                      className="btn btn-primary"
+                      style={{
+                        background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+                        border: '1px solid #34d399',
+                        padding: '0.8rem 1rem',
+                        fontWeight: 800,
+                        gap: '0.5rem',
+                        justifyContent: 'center'
+                      }}
+                    >
+                      <PlusCircle size={20} />
+                      <span>إضافة نقاط (+5 نقاط) 🟢</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleApplyPoints('deduct')}
+                      disabled={scanActionLoading}
+                      className="btn btn-primary"
+                      style={{
+                        background: 'linear-gradient(135deg, #dc2626 0%, #ef4444 100%)',
+                        border: '1px solid #f87171',
+                        padding: '0.8rem 1rem',
+                        fontWeight: 800,
+                        gap: '0.5rem',
+                        justifyContent: 'center'
+                      }}
+                    >
+                      <MinusCircle size={20} />
+                      <span>خصم نقاط (-5 نقاط) 🔴</span>
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '0.75rem', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                    <span>ℹ️ الحد اليومي الأقصى: معاملة واحدة يومياً لكل مخدوم لمنع التكرار.</span>
+                    <button
+                      type="button"
+                      onClick={handleResetScanner}
+                      className="btn btn-secondary"
+                      style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem', gap: '0.3rem' }}
+                    >
+                      <RefreshCw size={13} />
+                      <span>مسح مخدوم آخر</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{ padding: '1rem 1.25rem', borderTop: '1px solid rgba(255,255,255,0.1)', display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  stopScannerCamera();
+                  setIsScannerOpen(false);
+                }}
+                className="btn btn-secondary"
+              >
+                إغلاق
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
+

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { apiClient } from '../api/client';
+import { CANONICAL_STAGES } from '../constants/stages';
 import {
   FolderKanban,
   Plus,
@@ -31,11 +32,19 @@ export const ClassManagement = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  const [searchParams] = useSearchParams();
   // ─── Filters & Search State ──────────────────────────────────────────────
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState('ALL'); // 'ALL' | 'Regular' | 'Summer'
+  const [filterType, setFilterType] = useState(() => searchParams.get('group_type') || 'ALL'); // 'ALL' | 'Regular' | 'Summer'
   const [filterStage, setFilterStage] = useState('');
   const [filterSeason, setFilterSeason] = useState('');
+
+  useEffect(() => {
+    const urlType = searchParams.get('group_type');
+    if (urlType) {
+      setFilterType(urlType);
+    }
+  }, [searchParams]);
 
   // ─── Auto-dismiss Notification Helpers ────────────────────────────────────
   const notifySuccess = (msg) => {
@@ -84,27 +93,6 @@ export const ClassManagement = () => {
       fetchClasses(true);
     } catch (err) {
       notifyError(err.response?.data?.detail || err.response?.data?.message || 'فشل حذف الفصل');
-    }
-  };
-
-  const handleWipeAllClassesAndAttendance = async () => {
-    const confirm1 = window.confirm('⚠️ تحذير شديد الأهمية:\n\nهل تريد مسح جميع الفصول وجلسات وسجلات الحضور السابقة نهائياً للبدء على نظافة؟\n\nلن تعود الفصول المحذوفة مجدداً بعد هذا الإجراء.');
-    if (!confirm1) return;
-    const confirm2 = window.prompt('للتأكيد النهائي، اكتب كلمة "نظافة" في المربع أدناه:');
-    if (confirm2 !== 'نظافة') {
-      alert('تم إلغاء عملية المسح.');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const res = await apiClient.post('/classes/wipe-clean');
-      notifySuccess(res.data?.message || 'تم مسح الفصول وجلسات الحضور بنجاح');
-      fetchClasses(true);
-    } catch (err) {
-      notifyError(err.response?.data?.detail || err.response?.data?.message || 'فشلت عملية مسح البيانات');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -199,7 +187,7 @@ export const ClassManagement = () => {
     });
   }, [classes, searchTerm, filterType, filterStage, filterSeason]);
 
-  const stageOptions = ['حضانة', 'ابتدائي', 'إعدادي', 'ثانوي', 'جامعيين', 'خريجين'];
+  const stageOptions = CANONICAL_STAGES;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', paddingBottom: '2.5rem' }}>
@@ -215,17 +203,6 @@ export const ClassManagement = () => {
         </div>
 
         <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
-          {(user?.role === 'Super Admin' || user?.role === 'Admin') && hasPermission('classes:manage') && (
-            <button
-              className="btn btn-secondary"
-              onClick={handleWipeAllClassesAndAttendance}
-              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', color: '#fca5a5', borderColor: 'rgba(239, 68, 68, 0.3)' }}
-              title="مسح كافة الفصول القديمة وجلسات الحضور للبدء على نظافة تامة"
-            >
-              <Trash2 size={15} />
-              <span>مسح الفصول والحضور (بدء على نظافة) 🧹</span>
-            </button>
-          )}
 
           <button
             className="btn btn-secondary"
@@ -612,12 +589,9 @@ export const ClassManagement = () => {
                       onChange={(e) => setEditForm(prev => ({ ...prev, stage: e.target.value }))}
                     >
                       <option value="">عام (بدون مرحلة محددة)</option>
-                      <option value="حضانة">حضانة</option>
-                      <option value="ابتدائي">ابتدائي</option>
-                      <option value="إعدادي">إعدادي</option>
-                      <option value="ثانوي">ثانوي</option>
-                      <option value="جامعيين">جامعيين</option>
-                      <option value="خريجين">خريجين</option>
+                      {CANONICAL_STAGES.map(stg => (
+                        <option key={stg} value={stg}>{stg}</option>
+                      ))}
                     </select>
                   </div>
 

@@ -152,20 +152,39 @@ async def delete_class_group(
     return success_response(data=None, message="تم حذف الفصل بنجاح")
 
 
-@router.post("/wipe-clean", response_model=dict)
-async def wipe_all_classes_and_attendance(
+
+
+@router.post("/promote-new-coptic-year", response_model=dict)
+async def promote_new_coptic_year(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(require_permission("classes:manage"))
 ):
-    if current_user.get("role") in ["Servant", RoleEnum.SERVANT]:
+    """
+    محرك الترقية السنوية وتصفير العام القبطي الجديد (مخصص للسوبر أدمن حصراً)
+    """
+    if current_user.get("role") not in ["Super Admin", RoleEnum.SUPER_ADMIN]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="غير مصرح: لا يمتلك الخادم صلاحية مسح الفصول"
+            detail="غير مصرح: إجراء الترقية السنوية وتصفير العام القبطي الجديد مخصص لمدير النظام الرئيسي (Super Admin) فقط"
         )
 
     service = ClassService(db)
-    result = await service.wipe_all_classes_and_attendance()
-    return success_response(data=result, message=result["message"])
+    result = await service.promote_new_coptic_year(current_user.get("user_id"))
+
+    try:
+        from app.audit.service import AuditService
+        audit_svc = AuditService(db)
+        await audit_svc.log_event(
+            action="COPTIC_NEW_YEAR_PROMOTION",
+            resource_type="System",
+            resource_id="NEW_COPTIC_YEAR",
+            current_user=current_user,
+            details=f"قام بتشغيل محرك ترقية العام القبطي الجديد وتصفير البيانات. تم ترحيل {result.get('promoted_count', 0)} مخدوم بنجاح."
+        )
+    except Exception:
+        pass
+
+    return success_response(data=result, message=result.get("message", "تم ترحيل المخدومين وتصفير بيانات العام الجديد بنجاح"))
 
 
 # Servants Management

@@ -299,3 +299,7 @@ class ReportsService:
         )
         return generate_member_profile_html(member, history, church_name)
 
+    async def get_dashboard_stats(self, allowed_class_ids: Optional[List[str]] = None) -> Dict[str, Any]:
+        return await self.repo.get_dashboard_stats(allowed_class_ids=allowed_class_ids)
+
+

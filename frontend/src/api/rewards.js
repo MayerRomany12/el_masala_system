@@ -31,5 +31,12 @@ export const rewardsApi = {
   getLeaderboard: async (params = {}) => {
     const response = await apiClient.get('/rewards/leaderboard', { params });
     return response.data;
+  },
+
+  // POST /rewards/scan-points — Scan QR and add/deduct points with daily limit
+  scanPoints: async (payload) => {
+    const response = await apiClient.post('/rewards/scan-points', payload);
+    return response.data;
   }
 };
+

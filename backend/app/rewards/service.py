@@ -146,3 +146,99 @@ class RewardsService:
 
     async def get_leaderboard(self, stage: Optional[str] = None, limit: int = 20) -> List[Dict[str, Any]]:
         return await self.repo.get_leaderboard(stage=stage, limit=limit)
+
+    async def scan_points(self, data: Any, created_by: Optional[str] = None) -> Dict[str, Any]:
+        """
+        مسح كارت المخدوم لإضافة أو خصم نقاط المكافآت مع تطبيق قاعدة الحد اليومي:
+        - لا يمكن إضافة نقاط لنفس المخدوم أكثر من مرة واحدة في نفس اليوم.
+        - لا يمكن خصم نقاط من نفس المخدوم أكثر من مرة واحدة في نفس اليوم.
+        - عدد نقاط الإضافة والخصم يتم قراءتها ديناميكياً من إعدادات النظام (افتراضي 5).
+        """
+        from datetime import datetime, timezone
+        from app.models.rewards import PointsTransaction
+        from app.settings.repository import SettingsRepository
+
+        settings_repo = SettingsRepository(self.db)
+        action = (getattr(data, "action", "") or "").lower().strip()
+        if action not in ["add", "deduct"]:
+            raise BadRequestException("نوع العملية غير صالح. يجب اختيار 'add' (إضافة) أو 'deduct' (خصم)")
+
+        # 1. Resolve member either by member_id or qr_token
+        member = None
+        m_id = getattr(data, "member_id", None)
+        token = getattr(data, "qr_token", None)
+
+        if token:
+            member = await self.member_repo.get_by_qr_token(token)
+            if not member:
+                member = await self.member_repo.get_by_member_id(token)
+        elif m_id:
+            member = await self.member_repo.get_by_member_id(m_id)
+
+        if not member:
+            raise NotFoundException("لم يتم العثور على مخدوم مطابق لكود QR الممسوح")
+
+        resolved_member_id = member["member_id"]
+
+        # 2. Get configured points amount from SystemSettings
+        if action == "add":
+            pts_setting = await settings_repo.get_setting_value("reward_scan_add_points", "5")
+        else:
+            pts_setting = await settings_repo.get_setting_value("reward_scan_deduct_points", "5")
+
+        try:
+            points_value = abs(int(float(pts_setting)))
+        except (ValueError, TypeError):
+            points_value = 5
+
+        if points_value <= 0:
+            points_value = 5
+
+        # 3. Check Daily Limit for THIS action on today's date
+        today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+
+        target_type = "Bonus" if action == "add" else "Penalty"
+        target_reason_kw = "مسح QR مكافأة" if action == "add" else "مسح QR خصم"
+
+        existing_today = await self.db.execute(
+            select(PointsTransaction).where(
+                PointsTransaction.member_id == resolved_member_id,
+                PointsTransaction.created_at >= today_start,
+                (PointsTransaction.type == target_type) | (PointsTransaction.reason.ilike(f"%{target_reason_kw}%"))
+            )
+        )
+        if existing_today.first():
+            op_label = "إضافة نقاط مكافأة" if action == "add" else "خصم نقاط"
+            raise BadRequestException(f"عفواً، تم تسجيل عملية ({op_label}) لهذا المخدوم اليوم بالفعل. لا يمكن تكرار نفس العملية أكثر من مرة واحدة في اليوم.")
+
+        # 4. Apply transaction and update member points
+        current_pts = int(member.get("total_points", 0))
+        if action == "add":
+            applied_pts = points_value
+            new_total = current_pts + applied_pts
+            reason_text = f"مسح QR مكافأة تشجيعية (+{points_value} نقطة)"
+            txn_type = "Bonus"
+        else:
+            applied_pts = -points_value
+            new_total = max(0, current_pts - points_value)
+            reason_text = f"مسح QR خصم نقاط (-{points_value} نقطة)"
+            txn_type = "Penalty"
+
+        await self.repo.record_transaction(
+            member_id=resolved_member_id,
+            points=applied_pts,
+            type_str=txn_type,
+            reason=reason_text,
+            created_by=created_by
+        )
+
+        return {
+            "member_id": resolved_member_id,
+            "member_name": member["full_name"],
+            "stage": member.get("stage", ""),
+            "action": action,
+            "points_applied": applied_pts,
+            "new_total_points": new_total,
+            "message": f"تم {'إضافة' if action == 'add' else 'خصم'} {points_value} نقاط بنجاح للمخدوم {member['full_name']}. الرصيد الحالي: {new_total} نقطة."
+        }
+

@@ -21,15 +21,13 @@ import {
   BookOpen
 } from 'lucide-react';
 
+import { CANONICAL_STAGES } from '../constants/stages';
+
 const STAGE_OPTIONS = [
   'ALL',
-  'حضانة',
-  'ابتدائي',
-  'إعدادي',
-  'ثانوي',
-  'جامعيين',
-  'خريجين'
+  ...CANONICAL_STAGES
 ];
+
 
 const MONTH_OPTIONS = [
   { value: '', label: 'جميع الشهور 📅' },

@@ -4,6 +4,7 @@ import QRCode from 'qrcode';
 import { membersApi } from '../api/members';
 import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import { CANONICAL_STAGES } from '../constants/stages';
 import { normalizePhone, getWaUrl, isValidFullName, isValidEgyptianMobile } from '../utils/phone';
 import { getPhotoUrl } from '../utils/photo';
 import { WhatsAppButton } from '../components/WhatsAppButton';
@@ -374,6 +375,7 @@ export const MemberManagement = () => {
   // Filters State
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedClassId, setSelectedClassId] = useState('');
+  const [selectedStage, setSelectedStage] = useState('');
   const [selectedArea, setSelectedArea] = useState('');
   const [areasList, setAreasList] = useState([]);
   const [selectedStatus, setSelectedStatus] = useState('');
@@ -428,6 +430,7 @@ export const MemberManagement = () => {
         membersApi.getMembers({
           search: searchTerm || undefined,
           class_id: selectedClassId || undefined,
+          stage: selectedStage || undefined,
           area: selectedArea || undefined,
           status: selectedStatus || undefined,
           page,
@@ -448,7 +451,7 @@ export const MemberManagement = () => {
     } finally {
       setLoading(false);
     }
-  }, [searchTerm, selectedClassId, selectedArea, selectedStatus, page]);
+  }, [searchTerm, selectedClassId, selectedStage, selectedArea, selectedStatus, page]);
 
   useEffect(() => {
     fetchData();
@@ -619,9 +622,23 @@ export const MemberManagement = () => {
             value={selectedClassId}
             onChange={(e) => { setSelectedClassId(e.target.value); setPage(1); }}
           >
-            <option value="">كل الفصول الخدمية</option>
+            <option value="">جميع الفصول الخدمية</option>
             {classes.map((cls) => (
               <option key={cls.class_id} value={cls.class_id}>{cls.name}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Stage Filter */}
+        <div style={{ flex: '0 1 170px' }}>
+          <select
+            className="form-input"
+            value={selectedStage}
+            onChange={(e) => { setSelectedStage(e.target.value); setPage(1); }}
+          >
+            <option value="">جميع المراحل الدراسية</option>
+            {CANONICAL_STAGES.map((stg) => (
+              <option key={stg} value={stg}>{stg}</option>
             ))}
           </select>
         </div>

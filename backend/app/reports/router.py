@@ -11,6 +11,20 @@ from app.shared.response import success_response
 router = APIRouter(prefix="/reports", tags=["Analytics, Reports & Data Export Engine"])
 
 
+@router.get("/dashboard-stats", response_model=dict)
+async def get_dashboard_stats(
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    """
+    محرك الإحصائيات والمؤشرات الحية للداشبورد الرئيسي (متاح لجميع الخدام والمسؤولين)
+    """
+    allowed_class_ids = await get_servant_class_ids(current_user, db)
+    service = ReportsService(db)
+    data = await service.get_dashboard_stats(allowed_class_ids=allowed_class_ids)
+    return success_response(data=data, message="تم حساب إحصائيات ومؤشرات الداشبورد الحية بنجاح")
+
+
 @router.get("/attendance", response_model=dict)
 async def get_attendance_report(
     stage: Optional[str] = Query(None),

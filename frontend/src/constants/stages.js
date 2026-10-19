@@ -1,25 +1,35 @@
-// Canonical Stage Codes & Dynamic Arabic Mappings
+// Canonical Stages for Church Sunday School
+export const CANONICAL_STAGES = [
+  'حضانة',
+  'ابتدائي',
+  'إعدادي',
+  'ثانوي',
+  'جامعيين وخريجين'
+];
+
 export const STAGE_OPTIONS = [
-  { code: 'ALL', label: 'الكل (ALL)' },
-  { code: 'NURSERY', label: 'حضانة (KG1 & KG2)' },
-  { code: 'PRIMARY_1', label: 'ابتدائي - الصف الأول' },
-  { code: 'PRIMARY_2', label: 'ابتدائي - الصف الثاني' },
-  { code: 'PRIMARY_3', label: 'ابتدائي - الصف الثالث' },
-  { code: 'PRIMARY_4', label: 'ابتدائي - الصف الرابع' },
-  { code: 'PRIMARY_5', label: 'ابتدائي - الصف الخامس' },
-  { code: 'PRIMARY_6', label: 'ابتدائي - الصف السادس' },
-  { code: 'PREPARATORY_1', label: 'إعدادي - الصف الأول' },
-  { code: 'PREPARATORY_2', label: 'إعدادي - الصف الثاني' },
-  { code: 'PREPARATORY_3', label: 'إعدادي - الصف الثالث' },
+  { code: 'ALL', label: 'جميع المراحل' },
+  { code: 'NURSERY', label: 'حضانة' },
+  { code: 'PRIMARY', label: 'ابتدائي' },
+  { code: 'PREPARATORY', label: 'إعدادي' },
   { code: 'SECONDARY', label: 'ثانوي' },
-  { code: 'UNIVERSITY', label: 'جامعيين' },
-  { code: 'GRADUATES', label: 'خريجين' }
+  { code: 'UNIVERSITY_AND_GRADS', label: 'جامعيين وخريجين' }
+];
+
+export const GROUP_TYPES = [
+  { value: 'ALL', label: 'جميع أنواع الخدمة' },
+  { value: 'Regular', label: 'مدارس أحد ⛪' },
+  { value: 'Summer', label: 'نشاط صيفي ☀️' },
+  { value: 'General', label: 'عام 🌟' }
 ];
 
 export const getStageLabel = (stageCodeOrName) => {
   if (!stageCodeOrName) return '';
+  const clean = stageCodeOrName.trim();
+  if (clean === 'ALL' || clean === 'الكل (ALL)' || clean === 'الكل') return 'جميع المراحل';
+  if (clean === 'جامعيين' || clean === 'خريجين' || clean === 'جامعيين وخريجين') return 'جامعيين وخريجين';
   const match = STAGE_OPTIONS.find(
-    s => s.code.toLowerCase() === stageCodeOrName.toLowerCase() || s.label === stageCodeOrName
+    s => s.code.toLowerCase() === clean.toLowerCase() || s.label === clean
   );
-  return match ? match.label : stageCodeOrName;
+  return match ? match.label : clean;
 };

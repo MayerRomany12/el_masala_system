@@ -469,6 +469,181 @@ class ClassRepository:
             "message": "تم مسح جميع الفصول وجلسات الحضور السابقة بنجاح. يمكنك الآن إضافة فصولك الجديدة على نظافة تامة ولن تعود الفصول المحذوفة مجدداً."
         }
 
+    async def promote_new_coptic_year(self, superadmin_user_id: Optional[str] = None) -> Dict[str, Any]:
+        """
+        الترقية السنوية وتصفير العام القبطي الجديد:
+        1. ترحيل جميع أطفال فصول مدارس الأحد للمراحل التالية تصاعدياً
+        2. حضانة وجامعيين وخريجين يبقون كما هم دون نقل
+        3. تصفير جلسات وسجلات الحضور والغياب
+        4. تصفير مهام وسجلات الافتقاد
+        5. تصفير رصيد المكافآت والنقاط وحركاتها
+        6. تصفير سجل العمليات (Audit Logs)
+        """
+        # Helper to determine grade rank of a class
+        def _get_rank(c_name: str, c_slug: Optional[str], c_stage: Optional[str]) -> Optional[int]:
+            cn = (c_name or "").strip().lower()
+            cs = (c_slug or "").strip().lower() if c_slug else ""
+            cstg = (c_stage or "").strip().lower() if c_stage else ""
+
+            if any(k in cn or k in cs or k in cstg for k in ["حضانة", "حضانه", "kg", "nursery"]):
+                return 0  # Nursery: Stay in place
+
+            if any(k in cn or k in cs or k in cstg for k in ["جامعيين وخريجين", "جامعيين", "خريجين", "جامعة", "خريج", "university", "graduate"]):
+                return 13  # University & Graduates: Stay in place
+
+            # Combined primary classes
+            if any(k in cn for k in ["أولى وتانية", "اولى وتانية", "أول وتاني", "اول وتانى"]):
+                return 102
+            if any(k in cn for k in ["تالتة ورابعة", "تالته ورابعه", "تالت ورابع"]):
+                return 104
+            if any(k in cn for k in ["خامسة وسادسة", "خامسه وسادسه", "خامس وسادس"]):
+                return 106
+
+            # Primary (1-6)
+            if "ابتدائي" in cn or "ابتدائى" in cn or "primary" in cs or "ابتدائي" in cstg:
+                if any(k in cn for k in ["سادس", "سادسة", "6"]) or "primary_6" in cs:
+                    return 6
+                if any(k in cn for k in ["خامس", "خامسة", "5"]) or "primary_5" in cs:
+                    return 5
+                if any(k in cn for k in ["رابع", "رابعة", "4"]) or "primary_4" in cs:
+                    return 4
+                if any(k in cn for k in ["تالت", "تالتة", "ثالث", "3"]) or "primary_3" in cs:
+                    return 3
+                if any(k in cn for k in ["تان", "تانية", "ثاني", "2"]) or "primary_2" in cs:
+                    return 2
+                if any(k in cn for k in ["اول", "أول", "أولى", "اولى", "1"]) or "primary_1" in cs:
+                    return 1
+
+            # Preparatory (7-9)
+            if "إعدادي" in cn or "اعدادي" in cn or "prep" in cs or "إعدادي" in cstg:
+                if any(k in cn for k in ["تالت", "تالتة", "ثالث", "3"]) or "prep_3" in cs:
+                    return 9
+                if any(k in cn for k in ["تان", "تانية", "ثاني", "2"]) or "prep_2" in cs:
+                    return 8
+                if any(k in cn for k in ["اول", "أول", "أولى", "اولى", "1"]) or "prep_1" in cs:
+                    return 7
+
+            # Secondary (10-12)
+            if "ثانوي" in cn or "ثانوى" in cn or "sec" in cs or "secondary" in cs or "ثانوي" in cstg:
+                if any(k in cn for k in ["تالت", "تالتة", "ثالث", "3"]) or "sec_3" in cs:
+                    return 12
+                if any(k in cn for k in ["تان", "تانية", "ثاني", "2"]) or "sec_2" in cs:
+                    return 11
+                if any(k in cn for k in ["اول", "أول", "أولى", "اولى", "1"]) or "sec_1" in cs:
+                    return 10
+
+            return None
+
+        TARGET_RANK_MAP = {
+            1: 2,    # أولى ابتدائي -> تانية ابتدائي
+            2: 3,    # تانية ابتدائي -> تالتة ابتدائي
+            3: 4,    # تالتة ابتدائي -> رابعة ابتدائي
+            4: 5,    # رابعة ابتدائي -> خامسة ابتدائي
+            5: 6,    # خامسة ابتدائي -> سادسة ابتدائي
+            6: 7,    # سادسة ابتدائي -> أولى إعدادي
+            7: 8,    # أولى إعدادي -> تانية إعدادي
+            8: 9,    # تانية إعدادي -> تالتة إعدادي
+            9: 10,   # تالتة إعدادي -> أولى ثانوي
+            10: 11,  # أولى ثانوي -> تانية ثانوي
+            11: 12,  # تانية ثانوي -> تالتة ثانوي
+            12: 13,  # تالتة ثانوي -> جامعيين وخريجين
+            # Combined
+            102: 104, # أولى وتانية -> تالتة ورابعة
+            104: 106, # تالتة ورابعة -> خامسة وسادسة
+            106: 7,   # خامسة وسادسة -> أولى إعدادي
+        }
+
+        STAGE_BY_RANK = {
+            0: "حضانة",
+            1: "ابتدائي", 2: "ابتدائي", 3: "ابتدائي", 4: "ابتدائي", 5: "ابتدائي", 6: "ابتدائي",
+            7: "إعدادي", 8: "إعدادي", 9: "إعدادي",
+            10: "ثانوي", 11: "ثانوي", 12: "ثانوي",
+            13: "جامعيين وخريجين",
+            102: "ابتدائي", 104: "ابتدائي", 106: "ابتدائي"
+        }
+
+        # 1. Fetch all classes
+        c_rows = (await self.db.execute(select(ClassGroup))).scalars().all()
+        class_rank_dict = {}
+        rank_to_class = {}
+
+        for cg in c_rows:
+            r = _get_rank(cg.name, cg.slug, cg.stage)
+            if r is not None:
+                class_rank_dict[cg.class_id] = r
+                if r not in rank_to_class:
+                    rank_to_class[r] = cg
+
+        # 2. Process all active members and their current class
+        m_memberships = (await self.db.execute(
+            select(ClassGroupMember).where(ClassGroupMember.is_active == True)
+        )).scalars().all()
+
+        promoted_count = 0
+        stayed_count = 0
+        now_ts = datetime.now(timezone.utc)
+
+        for cgm in m_memberships:
+            curr_rank = class_rank_dict.get(cgm.class_id)
+            if curr_rank is None or curr_rank == 0 or curr_rank == 13:
+                # Nursery or University/Graduates -> Stay in place
+                stayed_count += 1
+                continue
+
+            target_rank = TARGET_RANK_MAP.get(curr_rank)
+            if target_rank is not None:
+                target_class = rank_to_class.get(target_rank)
+                new_stage = STAGE_BY_RANK.get(target_rank, "عام")
+
+                if target_class and target_class.class_id != cgm.class_id:
+                    # Deactivate old membership
+                    cgm.is_active = False
+                    cgm.left_at = now_ts
+
+                    # Create new membership in target class
+                    rand_id = f"CGM-{secrets.randbelow(1_000_000):06d}"
+                    self.db.add(ClassGroupMember(
+                        membership_id=rand_id,
+                        class_id=target_class.class_id,
+                        member_id=cgm.member_id,
+                        joined_at=now_ts,
+                        is_active=True,
+                        created_by=superadmin_user_id
+                    ))
+
+                # Update Member stage
+                await self.db.execute(
+                    update(Member)
+                    .where(Member.member_id == cgm.member_id)
+                    .values(stage=new_stage, updated_at=now_ts)
+                )
+                promoted_count += 1
+
+        # 3. Complete Resets for the New Coptic Year
+        # Delete attendance sessions & records
+        await self.db.execute(text("DELETE FROM attendance_records"))
+        await self.db.execute(text("DELETE FROM attendance_sessions"))
+
+        # Delete followup tasks & logs
+        await self.db.execute(text("DELETE FROM followup_logs"))
+        await self.db.execute(text("DELETE FROM followup_tasks"))
+
+        # Reset member points & rewards
+        await self.db.execute(text("DELETE FROM points_transactions"))
+        await self.db.execute(text("UPDATE members SET total_points = 0"))
+
+        # Clear audit logs
+        await self.db.execute(text("DELETE FROM audit_logs"))
+
+        await self.db.commit()
+
+        return {
+            "success": True,
+            "promoted_count": promoted_count,
+            "stayed_count": stayed_count,
+            "message": f"تمت ترقية {promoted_count} مخدوم للمراحل الدراسية التالية وتصفير كافة سجلات الحضور والافتقاد والنقاط وسجل العمليات بنجاح للعام القبطي الجديد 🎉"
+        }
+
     def _row_to_dict(self, cg: ClassGroup) -> Dict[str, Any]:
         status_val = getattr(cg, "status", "Active")
         return {

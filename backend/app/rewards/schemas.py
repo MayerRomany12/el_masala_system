@@ -64,3 +64,19 @@ class LeaderboardItemResponse(BaseModel):
     stage: str
     total_points: int
     attendance_percentage: float
+
+
+class RewardScanRequest(BaseModel):
+    member_id: Optional[str] = Field(default=None, description="كود المخدوم أو الرمز")
+    qr_token: Optional[str] = Field(default=None, description="رمز QR الممسوح من الكارت")
+    action: str = Field(..., description="الإجراء: add (إضافة مكافأة) أو deduct (خصم نقاط)")
+
+
+class RewardScanResponse(BaseModel):
+    member_id: str
+    member_name: str
+    action: str
+    points_applied: int
+    new_total_points: int
+    message: str
+

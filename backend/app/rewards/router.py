@@ -7,7 +7,8 @@ from app.auth.dependencies import get_current_user, require_permission
 from app.rewards.schemas import (
     PointsAwardRequest,
     PointsRedeemRequest,
-    DiscountCalculationResponse
+    DiscountCalculationResponse,
+    RewardScanRequest
 )
 from app.rewards.service import RewardsService
 from app.shared.response import success_response
@@ -82,3 +83,32 @@ async def get_rewards_leaderboard(
     service = RewardsService(db)
     leaderboard = await service.get_leaderboard(stage=stage, limit=limit)
     return success_response(data=leaderboard, message="تم جلب قائمة متميزي الحضور والنقاط بنجاح")
+
+
+@router.post("/scan-points", response_model=dict)
+async def scan_reward_points(
+    data: RewardScanRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_permission("rewards:manage"))
+):
+    """
+    مسح كارت المخدوم لإضافة أو خصم نقاط المكافآت مع التحقق من الحد اليومي (مرة واحدة باليوم لكل عملية)
+    """
+    service = RewardsService(db)
+    result = await service.scan_points(data, current_user.get("user_id"))
+
+    try:
+        from app.audit.service import AuditService
+        audit_svc = AuditService(db)
+        await audit_svc.log_event(
+            action="SCAN_REWARD_POINTS",
+            resource_type="Member",
+            resource_id=result.get("member_id"),
+            current_user=current_user,
+            details=f"قام بـ ({'إضافة' if data.action == 'add' else 'خصم'}) نقاط بالممسح الضوئي للمخدوم {result.get('member_name')}. النقاط: {result.get('points_applied')}."
+        )
+    except Exception:
+        pass
+
+    return success_response(data=result, message=result.get("message"))
+

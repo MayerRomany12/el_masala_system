@@ -178,6 +178,8 @@ async def init_db():
             ("absence_threshold_weeks", "2", "عدد أسابيع الغياب المتتالية لبدء الافتقاد التلقائي"),
             ("discount_high_pct", "30.0", "نسبة الخصم المالي للانتظام المرتفع (90%+)"),
             ("discount_medium_pct", "15.0", "نسبة الخصم المالي للانتظام المتوسط (75%-89%)"),
+            ("reward_scan_add_points", "5", "عدد نقاط المكافأة الثابتة عند المسح الضوئي"),
+            ("reward_scan_deduct_points", "5", "عدد نقاط الخصم الثابتة عند المسح الضوئي"),
             ("church_name", "كنيسة الشهيد العظيم مارجرجس الروماني والقديس العظيم الأنبا شنودة رئيس المتوحدين", "اسم الكنيسة المطبوع بالبطاقات والتقارير")
         ]
         for key, val, desc in default_settings:
@@ -187,6 +189,20 @@ async def init_db():
                 session.add(setting.SystemSetting(key=key, value=val, description=desc))
             elif key == "church_name" and ("مارجرجس" not in (existing_s.value or "")):
                 existing_s.value = val
+
+        # ─── Seed Season 2026/2027 ───
+        from app.models.season import Season
+        from datetime import date
+        q_ssn = await session.execute(select(Season).where(Season.name == "2026/2027"))
+        if not q_ssn.scalar_one_or_none():
+            session.add(Season(
+                season_id="SSN-2026-2027",
+                name="2026/2027",
+                start_date=date(2026, 9, 1),
+                end_date=date(2027, 8, 31),
+                is_active=True,
+                description="الموسم الخدمي لمدارس الأحد 2026 / 2027"
+            ))
 
         # ─── Seed Default ClassGroups (Only on VERY FIRST DB initialization) ───
         from app.models.class_group import ClassGroup

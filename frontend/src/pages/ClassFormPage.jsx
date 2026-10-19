@@ -190,13 +190,12 @@ export const ClassFormPage = () => {
                   value={formData.stage}
                   onChange={(e) => setFormData({ ...formData, stage: e.target.value })}
                 >
-                  <option value="الكل (ALL)">الكل (ALL)</option>
+                  <option value="جميع المراحل">جميع المراحل</option>
                   <option value="حضانة">حضانة</option>
                   <option value="ابتدائي">ابتدائي</option>
                   <option value="إعدادي">إعدادي</option>
                   <option value="ثانوي">ثانوي</option>
-                  <option value="جامعيين">جامعيين</option>
-                  <option value="خريجين">خريجين</option>
+                  <option value="جامعيين وخريجين">جامعيين وخريجين</option>
                 </select>
               </div>
             </div>

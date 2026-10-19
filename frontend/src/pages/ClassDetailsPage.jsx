@@ -211,10 +211,11 @@ export const ClassDetailsPage = () => {
     try {
       await apiClient.post(`/classes/${id}/servants`, {
         servant_id: selectedServantId,
-        role_title: servantRoleTitle
+        role: servantRoleTitle === 'LeadServant' ? 'LeadServant' : 'Servant'
       });
       fetchClassDetails();
       setSelectedServantId('');
+      setServantRoleTitle('Servant');
       setActiveTab('servants');
     } catch (err) {
       alert(err.response?.data?.message || 'تعذر تعيين الخادم للفصل');
@@ -764,8 +765,16 @@ export const ClassDetailsPage = () => {
                       <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-main)' }}>
                         {s.full_name || s.username}
                       </div>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--color-gold)', marginTop: '2px' }}>
-                        {s.role_title || 'خادم الفصل'}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '3px' }}>
+                        {s.role === 'LeadServant' ? (
+                          <span className="badge" style={{ background: 'rgba(212, 175, 55, 0.2)', color: 'var(--color-gold)', border: '1px solid var(--color-gold)', fontSize: '0.75rem', fontWeight: 700 }}>
+                            👑 أمين الفصل
+                          </span>
+                        ) : (
+                          <span className="badge" style={{ background: 'rgba(56, 189, 248, 0.15)', color: 'var(--color-primary-light)', fontSize: '0.75rem' }}>
+                            ⛪ خادم الفصل
+                          </span>
+                        )}
                       </div>
                       {s.phone && (
                         <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '2px', fontFamily: 'monospace' }}>
@@ -893,14 +902,15 @@ export const ClassDetailsPage = () => {
             </div>
 
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">المسمى / المسؤولية الخدمية</label>
-              <input
-                type="text"
+              <label className="form-label">المسؤولية الخدمية في الفصل*</label>
+              <select
                 className="form-input"
                 value={servantRoleTitle}
                 onChange={(e) => setServantRoleTitle(e.target.value)}
-                placeholder="مثال: أمين الفصل، خادم مساعد، مسؤول أنشطة..."
-              />
+              >
+                <option value="Servant">خادم الفصل (Servant) ⛪</option>
+                <option value="LeadServant">أمين الفصل (LeadServant) 👑</option>
+              </select>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
