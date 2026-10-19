@@ -11,6 +11,8 @@ ALL_PERMISSIONS: Set[str] = {
     # System Settings & Stages
     "settings:read",
     "settings:write",
+    "system:backup",
+    "system:restore",
     "stages:manage",
 
     # Classes & Groups Management

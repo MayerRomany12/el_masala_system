@@ -145,11 +145,16 @@ export const SettingsPage = () => {
     setLoadingSeasons(true);
     try {
       const res = await settingsApi.getSeasons();
-      if (res.success && res.data) {
-        setSeasons(res.data);
+      if (res && res.success && res.data) {
+        const items = Array.isArray(res.data)
+          ? res.data
+          : (Array.isArray(res.data.items) ? res.data.items : []);
+        setSeasons(items);
+      } else {
+        setSeasons([]);
       }
     } catch (err) {
-      // transient
+      setSeasons([]);
     } finally {
       setLoadingSeasons(false);
     }
@@ -532,46 +537,54 @@ export const SettingsPage = () => {
             </p>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
-              {seasons.map((s) => (
-                <div
-                  key={s.season_id}
-                  style={{
-                    padding: '1rem',
-                    borderRadius: '12px',
-                    background: s.is_active ? 'rgba(56, 189, 248, 0.12)' : 'rgba(255, 255, 255, 0.03)',
-                    border: s.is_active ? '2px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.08)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '0.5rem'
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <strong style={{ fontSize: '1.05rem', color: '#f8fafc' }}>{s.name}</strong>
-                    {s.is_active ? (
-                      <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#34d399', background: 'rgba(52, 211, 153, 0.2)', padding: '0.2rem 0.6rem', borderRadius: '20px' }}>
-                        الموسم النشط حالياً ✅
-                      </span>
-                    ) : (
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>موسم سابق/أرشيف</span>
+              {loadingSeasons ? (
+                <div style={{ padding: '1rem', color: 'var(--text-muted)' }}>جاري تحميل المواسم الخدمية...</div>
+              ) : (Array.isArray(seasons) && seasons.length > 0) ? (
+                seasons.map((s) => (
+                  <div
+                    key={s.season_id}
+                    style={{
+                      padding: '1rem',
+                      borderRadius: '12px',
+                      background: s.is_active ? 'rgba(56, 189, 248, 0.12)' : 'rgba(255, 255, 255, 0.03)',
+                      border: s.is_active ? '2px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.08)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.5rem'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <strong style={{ fontSize: '1.05rem', color: '#f8fafc' }}>{s.name}</strong>
+                      {s.is_active ? (
+                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#34d399', background: 'rgba(52, 211, 153, 0.2)', padding: '0.2rem 0.6rem', borderRadius: '20px' }}>
+                          الموسم النشط حالياً ✅
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>موسم سابق/أرشيف</span>
+                      )}
+                    </div>
+
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                      الفترة: {s.start_date || 'غير محدد'} إلى {s.end_date || 'غير محدد'}
+                    </div>
+
+                    {!s.is_active && isSuperAdmin && (
+                      <button
+                        type="button"
+                        onClick={() => handleActivateSeason(s.season_id)}
+                        className="btn btn-secondary"
+                        style={{ marginTop: '0.5rem', padding: '0.35rem 0.75rem', fontSize: '0.8rem', alignSelf: 'flex-start' }}
+                      >
+                        تفعيل هذا الموسم
+                      </button>
                     )}
                   </div>
-
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                    الفترة: {s.start_date || 'غير محدد'} إلى {s.end_date || 'غير محدد'}
-                  </div>
-
-                  {!s.is_active && isSuperAdmin && (
-                    <button
-                      type="button"
-                      onClick={() => handleActivateSeason(s.season_id)}
-                      className="btn btn-secondary"
-                      style={{ marginTop: '0.5rem', padding: '0.35rem 0.75rem', fontSize: '0.8rem', alignSelf: 'flex-start' }}
-                    >
-                      تفعيل هذا الموسم
-                    </button>
-                  )}
+                ))
+              ) : (
+                <div style={{ padding: '1rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                  لا توجد مواسم مسجلة حالياً
                 </div>
-              ))}
+              )}
             </div>
           </div>
 

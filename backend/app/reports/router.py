@@ -19,9 +19,8 @@ async def get_dashboard_stats(
     """
     محرك الإحصائيات والمؤشرات الحية للداشبورد الرئيسي (متاح لجميع الخدام والمسؤولين)
     """
-    allowed_class_ids = await get_servant_class_ids(current_user, db)
     service = ReportsService(db)
-    data = await service.get_dashboard_stats(allowed_class_ids=allowed_class_ids)
+    data = await service.get_dashboard_stats()
     return success_response(data=data, message="تم حساب إحصائيات ومؤشرات الداشبورد الحية بنجاح")
 
 

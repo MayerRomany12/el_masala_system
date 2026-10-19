@@ -26,6 +26,52 @@ import { ClassDetailsPage } from './pages/ClassDetailsPage';
 import { SummerActivityManagement } from './pages/SummerActivityManagement';
 import { AuditLogsPage } from './pages/AuditLogsPage';
 
+class PageErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error("Page error caught by PageErrorBoundary:", error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{
+          padding: '2.5rem',
+          textAlign: 'center',
+          background: 'var(--bg-card, #1e293b)',
+          borderRadius: '16px',
+          border: '1px solid rgba(239, 68, 68, 0.3)',
+          margin: '2rem auto',
+          maxWidth: '560px'
+        }}>
+          <h3 style={{ color: '#f87171', fontSize: '1.25rem', marginBottom: '0.75rem' }}>
+            ⚠️ حدث خطأ أثناء تحميل هذه الصفحة
+          </h3>
+          <p style={{ color: 'var(--text-muted, #94a3b8)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
+            {this.state.error?.message || 'يرجى إعادة المحاولة أو تحديث الصفحة.'}
+          </p>
+          <button
+            onClick={() => {
+              this.setState({ hasError: false, error: null });
+              window.location.reload();
+            }}
+            className="btn btn-primary"
+            style={{ padding: '0.5rem 1.25rem' }}
+          >
+            إعادة تحميل الصفحة 🔄
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 const ProtectedLayout = () => {
   const { user, loading } = useAuth();
   const [mobileOpen, setMobileOpen] = React.useState(false);
@@ -57,7 +103,8 @@ const ProtectedLayout = () => {
       <div className="main-content">
         <Navbar onToggleMobileSidebar={() => setMobileOpen(prev => !prev)} />
         <main className="page-body">
-          <Routes>
+          <PageErrorBoundary>
+            <Routes>
             <Route path="/" element={<DashboardOverview />} />
             <Route path="/users" element={<UserManagement />} />
             
@@ -85,6 +132,7 @@ const ProtectedLayout = () => {
             <Route path="/audit-logs" element={<AuditLogsPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </PageErrorBoundary>
         </main>
       </div>
     </div>

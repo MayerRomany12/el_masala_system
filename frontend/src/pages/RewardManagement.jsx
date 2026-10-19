@@ -11,7 +11,6 @@ import {
   Trophy,
   Sparkles,
   DollarSign,
-  Gift,
   Search,
   RefreshCw,
   Plus,
@@ -62,15 +61,6 @@ export const RewardManagement = () => {
   const [calcResult, setCalcResult] = useState(null);
   const [calcLoading, setCalcLoading] = useState(false);
 
-  // Manual Award Modal
-
-  const [isAwardModalOpen, setIsAwardModalOpen] = useState(false);
-  const [awardMemberSearch, setAwardMemberSearch] = useState('');
-  const [awardMembersFound, setAwardMembersFound] = useState([]);
-  const [selectedAwardMember, setSelectedAwardMember] = useState(null);
-  const [awardPoints, setAwardPoints] = useState(20);
-  const [awardReason, setAwardReason] = useState('مكافأة تشجيعية وتفوق بالحفظ');
-  const [awardLoading, setAwardLoading] = useState(false);
 
   // Member Points Ledger Modal
   const [ledgerMember, setLedgerMember] = useState(null);
@@ -334,46 +324,6 @@ export const RewardManagement = () => {
     }
   };
 
-  // Search Member for Award Modal
-  const handleSearchAwardMember = async (val) => {
-    setAwardMemberSearch(val);
-    if (!val || val.trim().length < 2) {
-      setAwardMembersFound([]);
-      return;
-    }
-    try {
-      const res = await membersApi.getMembers({ search: val, status: 'Active', limit: 5 });
-      if (res.success) {
-        setAwardMembersFound(res.data.items);
-      }
-    } catch (err) {
-      setAwardMembersFound([]);
-    }
-  };
-
-  // Submit Award Points
-  const handleAwardSubmit = async (e) => {
-    e.preventDefault();
-    if (!selectedAwardMember) return;
-    setAwardLoading(true);
-    try {
-      const res = await rewardsApi.awardPoints({
-        member_id: selectedAwardMember.member_id,
-        points: parseInt(awardPoints),
-        reason: awardReason
-      });
-      if (res.success) {
-        setIsAwardModalOpen(false);
-        setSelectedAwardMember(null);
-        setAwardMemberSearch('');
-        fetchLeaderboard();
-      }
-    } catch (err) {
-      alert(err.response?.data?.message || 'تعذر منح النقاط');
-    } finally {
-      setAwardLoading(false);
-    }
-  };
 
   // Open Ledger Modal
   const handleOpenLedger = async (memberId) => {
@@ -421,12 +371,7 @@ export const RewardManagement = () => {
             <span>مسح QR للمكافآت والخصم 📷</span>
           </button>
 
-          {hasPermission('rewards:manage') && (
-            <button onClick={() => setIsAwardModalOpen(true)} className="btn btn-primary" style={{ gap: '0.4rem', background: 'linear-gradient(135deg, #d97706 0%, #fbbf24 100%)' }}>
-              <Gift size={18} />
-              <span>منح نقاط تشجيعية 🎁</span>
-            </button>
-          )}
+
           <button onClick={fetchLeaderboard} className="btn btn-secondary">
             <RefreshCw size={16} />
             <span>تحديث</span>
@@ -659,87 +604,7 @@ export const RewardManagement = () => {
         )}
       </div>
 
-      {/* 4. Manual Award Modal */}
-      {isAwardModalOpen && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 23, 42, 0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
-          <div className="glass-card animate-fade-in" style={{ width: '100%', maxWidth: '440px', background: '#1e293b', boxShadow: 'var(--shadow-glow)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.75rem', marginBottom: '1.25rem' }}>
-              <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Gift size={22} style={{ color: '#fbbf24' }} />
-                <span>منح نقاط تشجيعية للطفل</span>
-              </h3>
-              <button onClick={() => setIsAwardModalOpen(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
-                <X size={22} />
-              </button>
-            </div>
 
-            <form onSubmit={handleAwardSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div className="form-group" style={{ position: 'relative' }}>
-                <label className="form-label">ابحث عن الطفل *</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="اسم الطفل أو الرمز..."
-                  value={selectedAwardMember ? `${selectedAwardMember.full_name} (${selectedAwardMember.member_id})` : awardMemberSearch}
-                  onChange={(e) => {
-                    setSelectedAwardMember(null);
-                    handleSearchAwardMember(e.target.value);
-                  }}
-                  required
-                />
-
-                {awardMembersFound.length > 0 && !selectedAwardMember && (
-                  <div style={{ position: 'absolute', top: '100%', right: 0, left: 0, background: '#0f172a', border: '1px solid #38bdf8', borderRadius: '8px', zIndex: 50, maxHeight: '180px', overflowY: 'auto', marginTop: '2px' }}>
-                    {awardMembersFound.map((m) => (
-                      <div
-                        key={m.member_id}
-                        onClick={() => {
-                          setSelectedAwardMember(m);
-                          setAwardMembersFound([]);
-                        }}
-                        style={{ padding: '0.5rem 0.75rem', fontSize: '0.82rem', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.05)', color: '#f8fafc' }}
-                      >
-                        <strong>{m.full_name}</strong> ({m.member_id})
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">عدد النقاط الممنوحة *</label>
-                <input
-                  type="number"
-                  min="1"
-                  className="form-input"
-                  value={awardPoints}
-                  onChange={(e) => setAwardPoints(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">سبب منح النقاط *</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={awardReason}
-                  onChange={(e) => setAwardReason(e.target.value)}
-                  placeholder="مثال: تفوق في حفظ الألحان/القداس"
-                  required
-                />
-              </div>
-
-              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
-                <button type="button" onClick={() => setIsAwardModalOpen(false)} className="btn btn-secondary">إلغاء</button>
-                <button type="submit" className="btn btn-primary" disabled={awardLoading}>
-                  {awardLoading ? 'جاري المنح...' : 'تأكيد منح النقاط 🎁'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* 5. Points Ledger Modal */}
       {ledgerMember && (

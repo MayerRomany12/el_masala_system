@@ -35,6 +35,7 @@ export const DashboardOverview = () => {
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
   const [dashboardData, setDashboardData] = useState({
     kpis: {
       total_members: 0,
@@ -58,6 +59,7 @@ export const DashboardOverview = () => {
   const fetchDashboardData = useCallback(async (isManualRefresh = false) => {
     if (isManualRefresh) setRefreshing(true);
     else setLoading(true);
+    setErrorMsg('');
 
     try {
       const res = await apiClient.get('/reports/dashboard-stats');
@@ -66,6 +68,7 @@ export const DashboardOverview = () => {
       }
     } catch (err) {
       console.error('Failed to load dashboard statistics:', err);
+      setErrorMsg(err.response?.data?.message || err.response?.data?.detail || 'تعذر تحميل إحصائيات لوحة التحكم الحية');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -266,6 +269,36 @@ export const DashboardOverview = () => {
           </button>
         </div>
       </div>
+
+      {/* Error notification banner */}
+      {errorMsg && (
+        <div style={{
+          padding: '0.9rem 1.25rem',
+          borderRadius: '12px',
+          background: 'rgba(239, 68, 68, 0.15)',
+          border: '1px solid rgba(239, 68, 68, 0.35)',
+          color: '#fca5a5',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '0.75rem',
+          fontSize: '0.9rem',
+          fontWeight: 600
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <AlertTriangle size={20} style={{ color: '#ef4444' }} />
+            <span>{errorMsg}</span>
+          </div>
+          <button
+            onClick={() => fetchDashboardData(true)}
+            className="btn btn-secondary"
+            style={{ padding: '0.35rem 0.85rem', fontSize: '0.8rem', color: '#fff', borderColor: 'rgba(239, 68, 68, 0.4)' }}
+          >
+            إعادة المحاولة 🔄
+          </button>
+        </div>
+      )}
 
       {/* ─── 2. KPI Cards Grid ──────────────────────────────────────────────── */}
       <div style={{

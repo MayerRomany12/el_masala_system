@@ -568,32 +568,42 @@ class ReportsRepository:
         from app.models.user import User
         from app.models.class_group import ClassGroup, ClassGroupMember, ClassGroupServant
         from app.models.rewards import PointsTransaction
-        from datetime import date, timedelta
+        from datetime import date, timedelta, datetime
 
         today = date.today()
 
         # 1. Base Counts
-        mem_q = select(func.count()).select_from(Member).where(Member.status == "Active", Member.is_archived == False)
-        cls_q = select(func.count()).select_from(ClassGroup).where(ClassGroup.status == "Active")
-        srv_q = select(func.count()).select_from(User).where(User.is_active == True)
-        ses_q = select(func.count()).select_from(AttendanceSession).where(AttendanceSession.status != "Cancelled")
-        open_ses_q = select(func.count()).select_from(AttendanceSession).where(AttendanceSession.status == "Open")
+        mem_q = select(func.count()).select_from(Member).where(
+            or_(Member.status.ilike("active"), Member.status == "Active", Member.status == "نشط", Member.status == None),
+            or_(Member.is_archived == False, Member.is_archived == None)
+        )
+        cls_q = select(func.count()).select_from(ClassGroup).where(
+            or_(ClassGroup.status.ilike("active"), ClassGroup.status == "Active", ClassGroup.status == None)
+        )
+        srv_q = select(func.count()).select_from(User).where(or_(User.is_active == True, User.is_active == None))
+        ses_q = select(func.count()).select_from(AttendanceSession).where(
+            or_(AttendanceSession.status != "Cancelled", AttendanceSession.status == None)
+        )
+        open_ses_q = select(func.count()).select_from(AttendanceSession).where(
+            or_(AttendanceSession.status == "Open", AttendanceSession.status == "Scheduled")
+        )
         pending_fol_q = select(func.count()).select_from(FollowupTask).where(FollowupTask.status == "Pending")
-        escalated_fol_q = select(func.count()).select_from(FollowupTask).where(FollowupTask.status == "Escalated")
-        pts_q = select(func.coalesce(func.sum(Member.total_points), 0)).select_from(Member).where(Member.status == "Active")
+        escalated_fol_q = select(func.count()).select_from(FollowupTask).where(FollowupTask.status.in_(["Escalated", "Urgent"]))
+        pts_q = select(func.coalesce(func.sum(Member.total_points), 0)).select_from(Member)
 
-        if allowed_class_ids is not None:
-            clean_allowed = [c.strip().upper() for c in allowed_class_ids]
-            mem_q = mem_q.where(exists(
-                select(1).select_from(ClassGroupMember).where(
-                    func.upper(func.trim(ClassGroupMember.member_id)) == func.upper(func.trim(Member.member_id)),
-                    func.upper(func.trim(ClassGroupMember.class_id)).in_(clean_allowed),
-                    ClassGroupMember.is_active == True
-                )
-            ))
-            cls_q = cls_q.where(func.upper(ClassGroup.class_id).in_(clean_allowed))
-            ses_q = ses_q.where(func.upper(AttendanceSession.class_id).in_(clean_allowed))
-            open_ses_q = open_ses_q.where(func.upper(AttendanceSession.class_id).in_(clean_allowed))
+        if allowed_class_ids and len(allowed_class_ids) > 0:
+            clean_allowed = [c.strip().upper() for c in allowed_class_ids if c and c.strip()]
+            if clean_allowed:
+                mem_q = mem_q.where(exists(
+                    select(1).select_from(ClassGroupMember).where(
+                        func.upper(func.trim(ClassGroupMember.member_id)) == func.upper(func.trim(Member.member_id)),
+                        func.upper(func.trim(ClassGroupMember.class_id)).in_(clean_allowed),
+                        ClassGroupMember.is_active == True
+                    )
+                ))
+                cls_q = cls_q.where(func.upper(ClassGroup.class_id).in_(clean_allowed))
+                ses_q = ses_q.where(func.upper(AttendanceSession.class_id).in_(clean_allowed))
+                open_ses_q = open_ses_q.where(func.upper(AttendanceSession.class_id).in_(clean_allowed))
 
         total_members = (await self.db.execute(mem_q)).scalar_one() or 0
         total_classes = (await self.db.execute(cls_q)).scalar_one() or 0
@@ -610,15 +620,17 @@ class ReportsRepository:
         for stg in canonical_list:
             if stg == "جامعيين وخريجين":
                 cond = or_(
-                    Member.stage == "جامعيين وخريجين",
-                    Member.stage == "جامعيين",
-                    Member.stage == "خريجين"
+                    Member.stage.ilike("%جامع%"),
+                    Member.stage.ilike("%خريج%"),
+                    Member.stage == "جامعيين وخريجين"
                 )
             else:
                 cond = Member.stage.ilike(f"%{stg}%")
 
             stg_q = select(func.count()).select_from(Member).where(
-                Member.status == "Active", Member.is_archived == False, cond
+                or_(Member.is_archived == False, Member.is_archived == None),
+                or_(Member.status.ilike("active"), Member.status == "Active", Member.status == "نشط", Member.status == None),
+                cond
             )
             count = (await self.db.execute(stg_q)).scalar_one() or 0
             pct = round((count / total_members * 100), 1) if total_members > 0 else 0
@@ -632,10 +644,10 @@ class ReportsRepository:
         rec_ses_q = (
             select(AttendanceSession, ClassGroup.name.label("class_name"))
             .outerjoin(ClassGroup, AttendanceSession.class_id == ClassGroup.class_id)
-            .where(AttendanceSession.status != "Cancelled")
+            .where(or_(AttendanceSession.status != "Cancelled", AttendanceSession.status == None))
         )
-        if allowed_class_ids is not None:
-            rec_ses_q = rec_ses_q.where(func.upper(AttendanceSession.class_id).in_([c.strip().upper() for c in allowed_class_ids]))
+        if allowed_class_ids and len(allowed_class_ids) > 0:
+            rec_ses_q = rec_ses_q.where(func.upper(AttendanceSession.class_id).in_([c.strip().upper() for c in allowed_class_ids if c and c.strip()]))
         rec_ses_q = rec_ses_q.order_by(AttendanceSession.session_date.desc(), AttendanceSession.created_at.desc()).limit(6)
         ses_rows = (await self.db.execute(rec_ses_q)).all()
 
@@ -655,12 +667,15 @@ class ReportsRepository:
                         ClassGroupMember.class_id == s.class_id, ClassGroupMember.is_active == True
                     )
                 )).scalar_one() or 0
+                if tgt_cnt == 0:
+                    tgt_cnt = att_cnt
             else:
-                tgt_cnt = total_members
+                tgt_cnt = total_members or att_cnt
 
             abs_cnt = max(0, tgt_cnt - att_cnt)
-            rate = round((att_cnt / tgt_cnt * 100), 1) if tgt_cnt > 0 else 0
-            recent_rates.append(rate)
+            rate = round((att_cnt / tgt_cnt * 100), 1) if tgt_cnt > 0 else (100.0 if att_cnt > 0 else 0.0)
+            if tgt_cnt > 0:
+                recent_rates.append(rate)
             recent_sessions_data.append({
                 "session_id": s.session_id,
                 "title": s.title,
@@ -674,97 +689,124 @@ class ReportsRepository:
 
         avg_attendance_rate = round(sum(recent_rates) / len(recent_rates), 1) if recent_rates else 0.0
 
-        # 4. Urgent Followup Cases (absent 3+ times waiting on Lead Servant)
-        urgent_q = (
-            select(FollowupTask, Member.full_name, Member.phone, User.full_name.label("servant_name"))
-            .join(Member, FollowupTask.member_id == Member.member_id)
-            .outerjoin(User, FollowupTask.assigned_servant_id == User.user_id)
-            .where(FollowupTask.status.in_(["Pending", "Escalated"]), FollowupTask.consecutive_weeks >= 3)
-            .order_by(FollowupTask.consecutive_weeks.desc())
-            .limit(5)
-        )
-        urgent_rows = (await self.db.execute(urgent_q)).all()
-        urgent_cases = [{
-            "task_id": t.task_id,
-            "member_id": t.member_id,
-            "member_name": m_name,
-            "phone": m_phone,
-            "consecutive_weeks": t.consecutive_weeks,
-            "assigned_servant": srv_name or "أمين الفصل"
-        } for t, m_name, m_phone, srv_name in urgent_rows]
+        # 4. Urgent Followup Cases (absent 2+ times)
+        urgent_cases = []
+        try:
+            urgent_q = (
+                select(FollowupTask, Member.full_name, Member.phone, User.full_name.label("servant_name"))
+                .join(Member, FollowupTask.member_id == Member.member_id)
+                .outerjoin(User, FollowupTask.assigned_servant_id == User.user_id)
+                .where(FollowupTask.status.in_(["Pending", "Escalated"]), FollowupTask.consecutive_weeks >= 2)
+                .order_by(FollowupTask.consecutive_weeks.desc())
+                .limit(5)
+            )
+            urgent_rows = (await self.db.execute(urgent_q)).all()
+            urgent_cases = [{
+                "task_id": t.task_id,
+                "member_id": t.member_id,
+                "member_name": m_name,
+                "phone": m_phone,
+                "consecutive_weeks": t.consecutive_weeks,
+                "assigned_servant": srv_name or "أمين الفصل"
+            } for t, m_name, m_phone, srv_name in urgent_rows]
+        except Exception:
+            pass
 
-        # 5. Upcoming Birthdays (Next 7 days)
-        bday_rows = (await self.db.execute(
-            select(Member.member_id, Member.full_name, Member.date_of_birth, Member.phone, Member.stage)
-            .where(Member.status == "Active", Member.is_archived == False, Member.date_of_birth != None)
-        )).all()
-
+        # 5. Upcoming Birthdays (Next 14 days)
         upcoming_bdays = []
-        for mid, fn, dob, ph, stg in bday_rows:
-            if not dob:
-                continue
-            try:
-                b_this_year = date(today.year, dob.month, dob.day)
-            except ValueError:
-                b_this_year = date(today.year, 3, 1)
+        try:
+            bday_rows = (await self.db.execute(
+                select(Member.member_id, Member.full_name, Member.date_of_birth, Member.phone, Member.stage)
+                .where(or_(Member.is_archived == False, Member.is_archived == None), Member.date_of_birth != None)
+            )).all()
 
-            if b_this_year < today:
+            for mid, fn, dob, ph, stg in bday_rows:
+                if not dob:
+                    continue
+                if isinstance(dob, str):
+                    try:
+                        dob = datetime.strptime(dob[:10], "%Y-%m-%d").date()
+                    except Exception:
+                        continue
+                elif isinstance(dob, datetime):
+                    dob = dob.date()
+
                 try:
-                    b_next = date(today.year + 1, dob.month, dob.day)
+                    b_this_year = date(today.year, dob.month, dob.day)
                 except ValueError:
-                    b_next = date(today.year + 1, 3, 1)
-            else:
-                b_next = b_this_year
+                    b_this_year = date(today.year, 3, 1)
 
-            days_diff = (b_next - today).days
-            if 0 <= days_diff <= 7:
-                upcoming_bdays.append({
-                    "member_id": mid,
-                    "full_name": fn,
-                    "days_remaining": days_diff,
-                    "phone": ph,
-                    "stage": stg,
-                    "birthday_str": f"{dob.day:02d}/{dob.month:02d}"
-                })
-        upcoming_bdays.sort(key=lambda x: x["days_remaining"])
+                if b_this_year < today:
+                    try:
+                        b_next = date(today.year + 1, dob.month, dob.day)
+                    except ValueError:
+                        b_next = date(today.year + 1, 3, 1)
+                else:
+                    b_next = b_this_year
+
+                days_diff = (b_next - today).days
+                if 0 <= days_diff <= 14:
+                    upcoming_bdays.append({
+                        "member_id": mid,
+                        "full_name": fn,
+                        "days_remaining": days_diff,
+                        "phone": ph,
+                        "stage": stg,
+                        "birthday_str": f"{dob.day:02d}/{dob.month:02d}"
+                    })
+            upcoming_bdays.sort(key=lambda x: x["days_remaining"])
+        except Exception:
+            pass
 
         # 6. Active Classes with Lead Servants
-        c_all_q = (
-            select(
-                ClassGroup,
-                func.count(func.distinct(ClassGroupMember.membership_id)).label("members_count"),
-                func.count(func.distinct(ClassGroupServant.assignment_id)).label("servants_count")
-            )
-            .outerjoin(ClassGroupMember, and_(ClassGroupMember.class_id == ClassGroup.class_id, ClassGroupMember.is_active == True))
-            .outerjoin(ClassGroupServant, and_(ClassGroupServant.class_id == ClassGroup.class_id, ClassGroupServant.is_active == True))
-            .where(ClassGroup.status == "Active")
-        )
-        if allowed_class_ids is not None:
-            c_all_q = c_all_q.where(func.upper(ClassGroup.class_id).in_([c.strip().upper() for c in allowed_class_ids]))
-        c_all_q = c_all_q.group_by(ClassGroup.class_id).order_by(func.count(func.distinct(ClassGroupMember.membership_id)).desc()).limit(8)
-        c_res = (await self.db.execute(c_all_q)).all()
-
         top_classes = []
-        for cg, m_cnt, s_cnt in c_res:
-            ls_q = (
-                select(User.full_name)
-                .join(ClassGroupServant, User.user_id == ClassGroupServant.servant_id)
-                .where(
-                    ClassGroupServant.class_id == cg.class_id,
-                    ClassGroupServant.role == "LeadServant",
-                    ClassGroupServant.is_active == True
+        try:
+            c_query = (
+                select(
+                    ClassGroup.class_id,
+                    ClassGroup.name,
+                    ClassGroup.stage,
+                    ClassGroup.group_type,
+                    func.count(func.distinct(ClassGroupMember.membership_id)).label("members_count"),
+                    func.count(func.distinct(ClassGroupServant.assignment_id)).label("servants_count")
                 )
+                .outerjoin(ClassGroupMember, and_(ClassGroupMember.class_id == ClassGroup.class_id, ClassGroupMember.is_active == True))
+                .outerjoin(ClassGroupServant, and_(ClassGroupServant.class_id == ClassGroup.class_id, ClassGroupServant.is_active == True))
+                .where(or_(ClassGroup.status.ilike("active"), ClassGroup.status == "Active", ClassGroup.status == None))
             )
-            lead_name = (await self.db.execute(ls_q)).scalar_one_or_none()
-            top_classes.append({
-                "class_id": cg.class_id,
-                "name": cg.name,
-                "stage": cg.stage,
-                "group_type": cg.group_type,
-                "members_count": m_cnt,
-                "servants_count": s_cnt,
-                "lead_servant": lead_name or "لم يُحدد"
-            })
+            if allowed_class_ids and len(allowed_class_ids) > 0:
+                c_query = c_query.where(func.upper(ClassGroup.class_id).in_([c.strip().upper() for c in allowed_class_ids if c and c.strip()]))
+            c_query = (
+                c_query
+                .group_by(ClassGroup.class_id, ClassGroup.name, ClassGroup.stage, ClassGroup.group_type)
+                .order_by(func.count(func.distinct(ClassGroupMember.membership_id)).desc())
+                .limit(8)
+            )
+            c_res = (await self.db.execute(c_query)).all()
+
+            for cid, cname, cstage, cgtype, m_cnt, s_cnt in c_res:
+                ls_q = (
+                    select(User.full_name)
+                    .join(ClassGroupServant, User.user_id == ClassGroupServant.servant_id)
+                    .where(
+                        ClassGroupServant.class_id == cid,
+                        ClassGroupServant.role.ilike("%lead%"),
+                        ClassGroupServant.is_active == True
+                    )
+                    .limit(1)
+                )
+                lead_name = (await self.db.execute(ls_q)).scalars().first()
+                top_classes.append({
+                    "class_id": cid,
+                    "name": cname,
+                    "stage": cstage,
+                    "group_type": cgtype,
+                    "members_count": m_cnt,
+                    "servants_count": s_cnt,
+                    "lead_servant": lead_name or "لم يُحدد"
+                })
+        except Exception:
+            pass
 
         return {
             "kpis": {

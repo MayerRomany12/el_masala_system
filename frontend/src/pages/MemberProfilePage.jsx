@@ -251,7 +251,9 @@ export const MemberProfilePage = () => {
   }
 
   const attendanceRate = history?.attendance_rate ?? 0;
-  const currentStreak = history?.current_streak ?? 0;
+  const currentStreak = history?.current_streak ?? history?.attendance_streak ?? 0;
+  const presentCount = history?.present_count ?? history?.attended_count ?? 0;
+  const absentCount = history?.absent_count ?? 0;
   const activeClasses = history?.active_classes || (member.active_classes || []);
 
   return (
@@ -560,7 +562,7 @@ export const MemberProfilePage = () => {
           </div>
           <div>
             <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>مرات الحضور</div>
-            <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#22c55e' }}>{history?.present_count ?? 0} جلسة</div>
+            <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#22c55e' }}>{presentCount} جلسة</div>
           </div>
         </div>
 
@@ -571,7 +573,7 @@ export const MemberProfilePage = () => {
           </div>
           <div>
             <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>مرات الغياب</div>
-            <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#ef4444' }}>{history?.absent_count ?? 0} جلسة</div>
+            <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#ef4444' }}>{absentCount} جلسة</div>
           </div>
         </div>
 
@@ -583,7 +585,13 @@ export const MemberProfilePage = () => {
           <div>
             <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>الاستمرارية المتتالية</div>
             <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#f59e0b' }}>
-              {currentStreak > 0 ? `${currentStreak} جلسات متواصلة 🔥` : 'لا يوجد استمرارية حالياً'}
+              {currentStreak === 1
+                ? 'جلسة واحدة متواصلة 🔥'
+                : currentStreak === 2
+                ? 'جلستان متواصلتان 🔥'
+                : currentStreak > 2
+                ? `${currentStreak} جلسات متواصلة 🔥`
+                : 'لا يوجد استمرارية حالياً'}
             </div>
           </div>
         </div>

@@ -436,7 +436,15 @@ class MemberRepository:
             m["rate"] = round((m["attended"] / m["total"] * 100), 1) if m["total"] > 0 else 0.0
             monthly_stats.append(m)
 
-        # 6. Consecutive absences right now
+        # 6. Consecutive attended sessions streak (الاستمرارية المتتالية للحضور)
+        current_streak = 0
+        for item in timeline:
+            if item["attended"]:
+                current_streak += 1
+            else:
+                break
+
+        # Consecutive absences right now
         current_absence_streak = 0
         for item in timeline:
             if not item["attended"]:
@@ -449,8 +457,11 @@ class MemberRepository:
             "member_name": member["full_name"],
             "total_sessions": total_sessions,
             "attended_count": attended_count,
+            "present_count": attended_count,
             "absent_count": total_sessions - attended_count,
             "attendance_rate": percentage,
+            "current_streak": current_streak,
+            "attendance_streak": current_streak,
             "current_absence_streak": current_absence_streak,
             "timeline": timeline,
             "monthly_stats": monthly_stats

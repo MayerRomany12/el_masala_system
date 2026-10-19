@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.auth.dependencies import require_permission
+from app.auth.dependencies import require_permission, require_any_permission
 from app.backup.service import BackupService
 from app.shared.response import success_response
 from app.core.errors import BadRequestException
@@ -15,7 +15,7 @@ router = APIRouter(prefix="/backup", tags=["System Backup & Restore Engine"])
 @router.get("/download", response_model=dict)
 async def download_backup(
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_permission("system:backup"))
+    current_user=Depends(require_any_permission(["system:backup", "settings:write", "settings:read"]))
 ):
     service = BackupService(db)
     backup_obj = await service.generate_backup(current_user)
@@ -32,7 +32,7 @@ async def restore_backup(
     request: Request,
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_permission("system:restore"))
+    current_user=Depends(require_any_permission(["system:restore", "settings:write"]))
 ):
     if not file.filename.endswith(".json"):
         raise BadRequestException("يجب أن يكون الملف المرفوع بصيغة JSON حصرية.")
